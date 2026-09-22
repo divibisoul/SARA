@@ -353,7 +353,13 @@ class RegenerativeLoop:
 
     def _phase_strategy(self, ctx, cycle, idx):
         if hasattr(self._itr, "generate_strategic"):
-            strategy = self._itr.generate_strategic(ctx.current, {"cycle": idx})
+            strategy = self._itr.generate_strategic(
+                ctx.current,
+                {
+                    "cycle": idx,
+                    "clean_state": not bool(cycle.get("_flaws", [])),
+                },
+            )
             cycle["phases"]["strategy"] = {
                 "type": "StrategicPlan",
                 "phases": len(strategy.phases),
