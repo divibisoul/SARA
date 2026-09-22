@@ -49,7 +49,7 @@ from sara.research.neural_lens import NeuralLens
 from sara.research.quantum_crawler import QuantumCrawler
 from sara.research.quantum_scanner import QuantumScanner
 from sara.audit.cycle_auditor import CycleAuditor
-from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment
+from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
 
@@ -94,7 +94,9 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     filters.register(buen)
 
     legal_compliance = LegalCompliance()
-    legal_ai = LegalAI(allowed_licenses={"MIT", "Apache-2.0", "BSD-3-Clause"})
+    legal_ai = LegalAI(allowed_licenses={"MIT", "Apache-2.0", "BSD-3-Clause"}, patent_oracle=patent_oracle_from_environment())
+    if legal_ai.is_patent_oracle_ready():
+        legal_ai.STATUS = ModuleStatus.IMPLEMENTED
     committee = AssimilationReviewCommittee(quorum=0.75)
     committee.register_member("etr", lambda p: etr.validate(str(p.get("description", ""))).approved)
     committee.register_member("identity", lambda p: identity.validate(str(p.get("description", ""))).approved)
