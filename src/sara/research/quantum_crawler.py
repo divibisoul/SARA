@@ -148,5 +148,14 @@ class QuantumCrawler:
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
-            ctx.record("governance", self.NAME, False,
-                       reason="PENDING_INFRASTRUCTURE")
+            active = self.is_backends_ready()
+            ctx.record(
+                "governance",
+                self.NAME,
+                active,
+                reason=(
+                    "active_real_http_backends"
+                    if active else "PENDING_INFRASTRUCTURE"
+                ),
+                backends_configured=len(self._backends),
+            )
