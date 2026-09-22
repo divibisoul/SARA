@@ -39,3 +39,19 @@ def test_runtime_diagnostics_for_clean_cycle_and_complexity_detector():
     result = system.sistema_vivo.process("promover autonomia comunitária", cycle_id="diagnostic-clean-001")
     assert result.loop_report.converged is True, result.loop_report.cycles
     assert result.loop_report.fusion is not None, result.loop_report.cycles
+
+
+
+def test_runtime_diagnostic_execution_failure_is_explicit():
+    import json
+    system = build_default_system(fail_closed=True)
+    itr = system.components["itr_extended"]
+    plan = itr.generate_strategic("promover autonomia comunitária", {"cycle": 1, "ara_audit": {"flaws": []}})
+    composed = itr.execute_composed(plan)
+    assert composed.rollback_triggered is False, json.dumps(composed.phase_results, ensure_ascii=False, default=str)
+
+    result = system.sistema_vivo.process("promover autonomia comunitária", cycle_id="diagnostic-execution-001")
+    if not result.loop_report.converged:
+        assert result.loop_report.cycles, "ciclo sem evidência"
+        cycle = result.loop_report.cycles[-1]
+        assert "execution" in cycle["phases"], json.dumps(cycle, ensure_ascii=False, default=str)
