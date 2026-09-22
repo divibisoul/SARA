@@ -39,6 +39,7 @@ from sara.meta.ara_forge import ARAForge
 from sara.meta.assimilation_committee import AssimilationReviewCommittee
 from sara.meta.quantum_snapshot import QuantumSnapshotSystem
 from sara.meta.eru_engine import ERU_Engine
+from sara.meta.clareira import ClareiraSubsystem
 from sara.meta.eru_trinity_bridge import ERUTrinityBridge
 from sara.core.trinity_eru_unified import TrinityERUUnified
 from sara.meta.transystem_sara import TransystemSARA
@@ -114,6 +115,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     ara_forge = ARAForge()
     quantum_snapshot = QuantumSnapshotSystem()
     eru = ERU_Engine(provenance=prov, temporal=temporal)
+    clareira = ClareiraSubsystem(eru=eru, provenance=prov)
 
     neuro = NeuroIntegrator(rollback, memory, registry=registry)
     neural_lens = NeuralLens()
@@ -158,7 +160,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
         safe_sandbox, itr, itr_extended, filters,
         legal_compliance, legal_ai, committee, radar, governed,
-        ara_forge, quantum_snapshot, eru, eru_bridge, trinity_eru,
+        ara_forge, quantum_snapshot, eru, clareira, eru_bridge, trinity_eru,
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
@@ -209,7 +211,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "etr": etr, "etr_extended": etr_extended,
             "itr": itr, "itr_extended": itr_extended,
             "trinity": trinity, "trinity_eru": trinity_eru,
-            "eru_bridge": eru_bridge, "identity": identity,
+            "eru_bridge": eru_bridge, "clareira": clareira, "identity": identity,
             "memory": memory, "temporal": temporal, "dna": dna,
             "filters": filters, "rollback": rollback, "trace": trace,
             "loop": loop, "sistema_vivo": sistema, "governed": governed,
