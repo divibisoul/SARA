@@ -95,3 +95,4 @@ class CycleContextProtocol(Protocol):
     cycle_id: str
     current: str
     sink: TraceSink
+    fusion: CycleFusionState | None
