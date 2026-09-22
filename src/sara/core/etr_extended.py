@@ -60,7 +60,7 @@ class ETR_Extended(ETR):
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.NUCLEAR
-    DEPENDENCIES = ETR.DEPENDENCIES + ("ETR",)
+    DEPENDENCIES = ETR.DEPENDENCIES
     CYCLE_PHASES = ETR.CYCLE_PHASES
 
     FRAMEWORKS = ("utilitarista", "deontologico", "virtude", "cuidado")
