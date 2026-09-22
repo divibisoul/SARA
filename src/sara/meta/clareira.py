@@ -273,7 +273,9 @@ class ClareiraSubsystem:
                 "correlation_id": correlation_id,
             },
         )
-        self._vagal_commands.append(copy.deepcopy(event))
+        record = copy.deepcopy(event)
+        record["delivery_status"] = "PENDING"
+        self._vagal_commands.append(record)
         if len(self._vagal_commands) > 256:
             del self._vagal_commands[:-256]
         return {
@@ -285,6 +287,32 @@ class ClareiraSubsystem:
             "node_id": node_id,
             "command": command,
         }
+
+    def pending_vagal_commands(self, *, limit: int = 32) -> list[dict[str, Any]]:
+        if limit < 1:
+            raise ValueError("CLAREIRA_VAGAL_LIMIT_INVALID")
+        pending = [
+            copy.deepcopy(item)
+            for item in self._vagal_commands
+            if item.get("delivery_status") == "PENDING"
+        ]
+        return pending[-min(limit, 128):]
+
+    def acknowledge_vagal_command(
+        self,
+        event_id: str,
+        *,
+        executed: bool,
+        execution_status: str,
+    ) -> dict[str, Any]:
+        if not event_id.strip():
+            raise ValueError("CLAREIRA_VAGAL_EVENT_ID_REQUIRED")
+        for item in reversed(self._vagal_commands):
+            if item.get("event_id") == event_id:
+                item["delivery_status"] = "EXECUTED" if executed else "DELIVERY_FAILED"
+                item["execution_status"] = execution_status
+                return copy.deepcopy(item)
+        raise ValueError("CLAREIRA_VAGAL_EVENT_NOT_FOUND")
 
     def latest_snapshot(self) -> dict[str, Any] | None:
         return copy.deepcopy(self._latest_snapshot)
