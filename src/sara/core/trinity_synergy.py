@@ -87,6 +87,7 @@ class TrinitySynergy:
         self._etr = etr
         self._itr = itr
         self._eru = eru
+        self._eru_bridge = None
         self._max_iterations = max_iterations
         self._mirrors: dict[str, FusionMirror] = {}
 
@@ -219,6 +220,11 @@ class TrinitySynergy:
         iterations: list[TrinityIteration] = []
 
         for i in range(1, self._max_iterations + 1):
+            cycle_id = f"trinity-{i}-{hash_json(current)[:12]}"
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "INPUT", {"iteration": i, "state": current}
+                )
             # 1. ARA detecta (3 camadas)
             lexical_flaws = self._ara.detect(current)
             structural_flaws = self._ara.detect_structural(current)
@@ -231,6 +237,14 @@ class TrinitySynergy:
                 + list(structural_flaws)
             )
 
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id,
+                    "ARA",
+                    {"flaws": [f.kind for f in all_flaws],
+                     "semantic_fingerprint": self._ara.analyze_semantics(current).fingerprint},
+                )
+
             # 2. ITR gera plano estratégico usando o estado auditado pelo ARA.
             ara_state = {
                 "input": current,
@@ -242,9 +256,24 @@ class TrinitySynergy:
                 context={"ara_audit": ara_state},
             )
 
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "ITR_PLAN",
+                    {"phases": len(plan.phases),
+                     "criteria": list(plan.convergence_criteria)},
+                )
+
             # 3. ETR valida o plano
             plan_text = f"{plan.objective} | phases={len(plan.phases)} | criteria={plan.convergence_criteria}"
             multi = self._etr.validate_multi_framework(plan_text)
+
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "ETR_PRE",
+                    {"approved": multi.approved,
+                     "consensus": multi.consensus_score,
+                     "dissenting": list(multi.dissenting_frameworks)},
+                )
 
             # 4. ARA regenera (se necessário)
             regenerated = False
@@ -254,20 +283,48 @@ class TrinitySynergy:
                 current = regen.transformed
                 regenerated = True
 
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "ARA_REGEN",
+                    {"state": current, "regenerated": regenerated},
+                )
+
             # 5. ETR valida o estado regenerado antes da execução estratégica.
             post_regeneration = self._etr.validate_multi_framework(current)
+
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "ETR_POST_REGEN",
+                    {"approved": post_regeneration.approved,
+                     "consensus": post_regeneration.consensus_score},
+                )
 
             # 6. ITR executa
             result = self._itr.execute_composed(plan, initial_text=current)
             current = result.transformed
             executed = not result.rollback_triggered
 
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "ITR_EXEC",
+                    {"state": current,
+                     "rollback": result.rollback_triggered,
+                     "metrics": result.metrics},
+                )
+
             # 7. ETR valida novamente o resultado da execução.
             post_execution = self._etr.validate_multi_framework(current)
 
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "ETR_POST_EXEC",
+                    {"approved": post_execution.approved,
+                     "consensus": post_execution.consensus_score},
+                )
+
             # 8. Espelhamento/fusão: nenhum subsistema perde seu estado próprio.
             mirror = self.fuse_and_mirror(
-                cycle_id=f"trinity-{i}-{hash_json(current)[:12]}",
+                cycle_id=cycle_id,
                 target=current,
                 ara_output={
                     "flaws": [f.kind for f in all_flaws],
@@ -283,10 +340,14 @@ class TrinitySynergy:
                     "phases": len(plan.phases),
                     "rollback": result.rollback_triggered,
                     "metrics": result.metrics,
-                    "fusion_hash": mirror.fused_hash,
-                    "mirror_integrity": mirror.integrity_ok,
                 },
             )
+
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "FINAL",
+                    {"state": current},
+                )
 
             # 9. Convergência
             converged = (
@@ -296,6 +357,12 @@ class TrinitySynergy:
                 and post_execution.approved
                 and executed
             )
+
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe(
+                    cycle_id, "FINAL_RESULT",
+                    {"state": current, "converged": converged},
+                )
 
             iteration = TrinityIteration(
                 iteration=i,
