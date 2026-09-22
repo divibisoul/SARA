@@ -45,7 +45,7 @@ CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
     module="QuantumCrawler",
     required_infrastructure="APIs de rede (GitHub/HuggingFace/arXiv) + credenciais + rate limiter",
     activation_method="inject_backends",
-    fallback_behavior="scan() levanta NotImplementedError; list_sources() permanece",
+    fallback_behavior="scan() e list_sources() usam os backends configurados; sem rede os erros de transporte são explícitos",
     activates_phases=("governance",),
     verification_hook="is_backends_ready",
 ))
@@ -69,7 +69,7 @@ CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
     module="LegalAI",
     required_infrastructure="API de patentes (USPTO/INPI/EPO) + nó Ethereum (opcional)",
     activation_method="inject_patent_oracle",
-    fallback_behavior="validate_license() + verify_chain() locais permanecem; check_patent() levanta NotImplementedError",
+    fallback_behavior="validate_license() + verify_chain() locais permanecem; check_patent() retorna BLOQUEADO_INFRASTRUCTURE sem oracle e executa consulta HTTP quando configurado",
     activates_phases=("governance",),
     verification_hook="is_patent_oracle_ready",
 ))
