@@ -194,6 +194,6 @@ class SaraHTTPServer(ThreadingHTTPServer):
 
 def create_server(host: str | None = None, port: int | None = None, *, fail_closed: bool = True) -> SaraHTTPServer:
     host = host or os.getenv("SARA_HOST", "127.0.0.1")
-    port = int(port or os.getenv("SARA_PORT", "8080"))
+    port = int(os.getenv("SARA_PORT", "8080")) if port is None else int(port)
     system = build_default_system(fail_closed=fail_closed)
     return SaraHTTPServer((host, port), system)
