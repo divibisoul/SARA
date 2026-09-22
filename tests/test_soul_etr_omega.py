@@ -73,6 +73,12 @@ def test_omega_context_services_use_explicit_inputs_only():
     assert report.adaptation["reward_source"] == "external_observation"
 
 
+
+def test_gc_action_remains_available_but_is_not_claimed_reversible():
+    action = ETRGenesisSuite().symbiosis._gc_action()
+    assert action.id == "omega-gc"
+    assert action.reversible is False
+
 def test_omega_does_not_fabricate_adaptive_reward():
     report = SoulETROmegaSystem().run_cycle()
     assert report.adaptation["updated"] is False
