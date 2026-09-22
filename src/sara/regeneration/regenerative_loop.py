@@ -517,6 +517,11 @@ class RegenerativeLoop:
             except Exception as exc:
                 ctx.record(phase.value, registered.name, False, error=str(exc))
 
+    def _record(self, ctx: CycleContext, phase: CyclePhase,
+                module: str, ok: bool, **info: Any) -> None:
+        """Registra uma evidência de fase no contexto canônico."""
+        ctx.record(phase.value, module, ok, **info)
+
     def history(self) -> list[LoopReport]:
         return list(self._history)
 
