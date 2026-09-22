@@ -122,6 +122,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         cycle_auditor=auditor, max_cycles=3,
         connected_runtime=connected_runtime,
         trinity=trinity,
+        eru=eru,
     )
     sistema = SistemaVivo(
         loop, storm, trace, registry=registry, provenance=prov,
