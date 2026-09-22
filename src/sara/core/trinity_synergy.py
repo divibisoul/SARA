@@ -89,6 +89,7 @@ class TrinitySynergy:
         self._eru = eru
         self._eru_bridge = None
         self._max_iterations = max_iterations
+        self._run_sequence = 0
         self._mirrors: dict[str, FusionMirror] = {}
 
     def describe(self) -> dict:
@@ -218,9 +219,11 @@ class TrinitySynergy:
         """Aplica a Trindade completa sobre o alvo."""
         current = str(target)
         iterations: list[TrinityIteration] = []
+        self._run_sequence += 1
+        run_id = self._run_sequence
 
         for i in range(1, self._max_iterations + 1):
-            cycle_id = f"trinity-{i}-{hash_json(current)[:12]}"
+            cycle_id = f"trinity-run{run_id}-{i}-{hash_json(current)[:12]}"
             if self._eru_bridge is not None:
                 self._eru_bridge.observe(
                     cycle_id, "INPUT", {"iteration": i, "state": current}
