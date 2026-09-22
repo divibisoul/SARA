@@ -30,6 +30,11 @@ def test_affinity_lookup_is_case_and_whitespace_tolerant():
     assert affinity_for(" n02 ") == affinity_for("N02")
 
 
+
+def test_chimera_bridge_is_advertised_as_complementary_for_gateway_and_federation():
+    assert "AeternumChimeraBridge" in affinity_for("N01").complementary_sara_modules
+    assert "AeternumChimeraBridge" in affinity_for("N07").complementary_sara_modules
+
 def test_sara_owns_operations_without_claiming_live_connectivity():
     manifest = federation_manifest()
     assert manifest["ownership"].startswith("SARA-owns")
