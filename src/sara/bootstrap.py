@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import logging
 
-from sara.contracts import ModuleRegistry
+from sara.contracts import ModuleRegistry, ModuleStatus
 from sara.contracts.base import ModuleStatus
 from sara.contracts.activation import CANONICAL_ACTIVATION_PLAN
 from sara.contracts.invariants import InvariantValidator
