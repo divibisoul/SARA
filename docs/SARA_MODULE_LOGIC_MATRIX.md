@@ -26,7 +26,7 @@ Extensões de integração não são novos núcleos SOUL.
 | SafeSandbox | isolamento | análise estática local; DockerIsolationBackend real quando Docker + imagem existem | EXECUTION | PARCIAL / BACKEND EXTERNO CONDICIONAL |
 | StormMonitor | observabilidade operacional | sessões, amostragem de carga e anomalias | MONITORING | REAL LOCAL |
 | DecisionTrace | trilha de decisões | cadeia hash thread-safe; IPFS separado | PERSISTENCE, MONITORING | REAL LOCAL / IPFS BLOQUEADO |
-| GovernanceBackend | governança operacional | decisões, snapshots, overrides e API SARA; UI externa permanece apresentação | MONITORING, GOVERNANCE | REAL LOCAL / UI PENDENTE |
+| GovernanceBackend | governança operacional | decisões, snapshots, overrides + UI HTML administrativa local autenticada | MONITORING, GOVERNANCE | REAL LOCAL |
 | QuantumCrawler | descoberta tecnológica | backends HTTP reais GitHub/HuggingFace + coleta e verificação de origem; depende de rede no runtime | GOVERNANCE | IMPLEMENTADO COM ATIVAÇÃO HTTP |
 | NeuralLens | análise de código | AST Python local + cliente remoto pendente | GOVERNANCE | REAL LOCAL |
 | InnovationRadar | análise de candidatos | relevância, inovação, ética, estratégia e risco | GOVERNANCE | REAL |
