@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import json
 import os
+import copy
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -47,11 +48,12 @@ class DecisionTrace:
     def log(self, decision: dict) -> TraceEntry:
         with self._lock:
             prev = self._entries[-1].hash if self._entries else "GENESIS"
-            h = chain_hash(prev, decision)
+            frozen_decision = copy.deepcopy(decision)
+            h = chain_hash(prev, frozen_decision)
             entry = TraceEntry(
                 index=len(self._entries),
                 ts=now_iso(),
-                decision=dict(decision),
+                decision=frozen_decision,
                 prev_hash=prev,
                 hash=h,
             )
