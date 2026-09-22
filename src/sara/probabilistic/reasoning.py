@@ -274,7 +274,13 @@ class ProbabilisticReasoningLayer:
         }
         return ProbabilisticReasoningLayer._normalize(counts)
 
-    def _node(self, raw: Mapping[str, Any]) -> BayesianNode:
+    def _node(
+        self,
+        raw: Mapping[str, Any],
+        *,
+        alpha_dirichlet: float | None = None,
+        beta_neural: float | None = None,
+    ) -> BayesianNode:
         name = str(raw.get("name", "")).strip()
         if not name:
             raise ProbabilisticReasoningError("NODE_NAME_REQUIRED")
@@ -328,8 +334,8 @@ class ProbabilisticReasoningLayer:
             entropy = float(neural_result["entropy"])
         else:
             neural_probs = dict(zip(states, neural_result["probabilities"]))
-            alpha = self.alpha_dirichlet
-            beta = self.beta_neural
+            alpha = self.alpha_dirichlet if alpha_dirichlet is None else float(alpha_dirichlet)
+            beta = self.beta_neural if beta_neural is None else float(beta_neural)
             if alpha == 0 and beta == 0:
                 raise ProbabilisticReasoningError("ZERO_FUSION_WEIGHTS")
             fused = {
@@ -383,7 +389,32 @@ class ProbabilisticReasoningLayer:
         if len(raw_nodes) > 32:
             raise ProbabilisticReasoningError("TOO_MANY_NODES")
 
-        nodes = [self._node(raw) for raw in raw_nodes if isinstance(raw, Mapping)]
+        supplied_fusion = payload.get("fusion")
+        fusion = {
+            "alpha_dirichlet": self.alpha_dirichlet,
+            "beta_neural": self.beta_neural,
+            "temperature": self.temperature,
+        }
+        if isinstance(supplied_fusion, Mapping):
+            for key in fusion:
+                if key in supplied_fusion:
+                    fusion[key] = float(supplied_fusion[key])
+        if (
+            fusion["alpha_dirichlet"] < 0
+            or fusion["beta_neural"] < 0
+            or fusion["temperature"] <= 0
+        ):
+            raise ProbabilisticReasoningError("INVALID_FUSION_CONFIG")
+
+        nodes = [
+            self._node(
+                raw,
+                alpha_dirichlet=fusion["alpha_dirichlet"],
+                beta_neural=fusion["beta_neural"],
+            )
+            for raw in raw_nodes
+            if isinstance(raw, Mapping)
+        ]
         if len(nodes) != len(raw_nodes):
             raise ProbabilisticReasoningError("NODE_MUST_BE_OBJECT")
         node_names = {node.name for node in nodes}
@@ -420,19 +451,6 @@ class ProbabilisticReasoningLayer:
                 "evidence": {str(k): str(v) for k, v in evidence.items()},
                 "query": query,
             })
-
-        fusion = {
-            "alpha_dirichlet": self.alpha_dirichlet,
-            "beta_neural": self.beta_neural,
-            "temperature": self.temperature,
-        }
-        supplied_fusion = payload.get("fusion")
-        if isinstance(supplied_fusion, Mapping):
-            for key in fusion:
-                if key in supplied_fusion:
-                    fusion[key] = float(supplied_fusion[key])
-            if fusion["alpha_dirichlet"] < 0 or fusion["beta_neural"] < 0 or fusion["temperature"] <= 0:
-                raise ProbabilisticReasoningError("INVALID_FUSION_CONFIG")
 
         pipeline = {
             "steps": ["load", "clean", "normalize", "discretize", "bayes", "neural", "fuse", "gate"],
