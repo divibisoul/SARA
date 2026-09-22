@@ -28,7 +28,7 @@ Extensões de integração não são novos núcleos SOUL.
 | DecisionTrace | trilha de decisões | cadeia hash thread-safe; IPFS separado | PERSISTENCE, MONITORING | REAL LOCAL / IPFS BLOQUEADO |
 | GovernanceBackend | governança operacional | decisões, snapshots, overrides + UI HTML administrativa local autenticada | MONITORING, GOVERNANCE | REAL LOCAL |
 | QuantumCrawler | descoberta tecnológica | backends HTTP reais GitHub/HuggingFace + coleta e verificação de origem; depende de rede no runtime | GOVERNANCE | IMPLEMENTADO COM ATIVAÇÃO HTTP |
-| NeuralLens | análise de código | AST Python local + cliente remoto pendente | GOVERNANCE | REAL LOCAL |
+| NeuralLens | análise de código | AST Python local + cliente GitHub remoto com ref opcional e Git blob SHA para proveniência de conteúdo | GOVERNANCE | REAL LOCAL |
 | InnovationRadar | análise de candidatos | relevância, inovação, ética, estratégia e risco | GOVERNANCE | REAL |
 | NeuroIntegrator | integração de candidatos | snapshot, persistência, validação e rollback transacional | SNAPSHOT, PERSISTENCE | REAL |
 | QuantumScanner | inspeção profunda | scanner depende de acesso ao alvo/toolchain | — | BLOQUEADO POR INFRA |
