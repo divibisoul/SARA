@@ -81,6 +81,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "trace_integrity": system.components["trace"].verify(),
                     "provenance_integrity": system.components["provenance"].verify_integrity(),
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
+                    "engineering_gate": system.engineering_gate_report,
                     "module_count": system.registry.snapshot()["count"],
                     "pending_infrastructure": system.registry.by_status().get("PENDING_INFRASTRUCTURE", []),
                 })
@@ -142,6 +143,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
+                    "engineering_gate": system.engineering_gate_report,
                 })
                 return
             if path == "/v1/state":
