@@ -1,0 +1,148 @@
+openapi: 3.0.3
+info:
+  title: SARA Regenerative Service
+  version: 3.1.0
+  description: >
+    Serviço HTTP real sobre o runtime modular SARA. Não substitui os módulos
+    internos; expõe operações versionadas com autenticação Bearer e rastreabilidade.
+servers:
+  - url: http://localhost:8090
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      security: []
+      responses:
+        '200':
+          description: Runtime health and integrity status
+  /v1/capabilities:
+    get:
+      responses:
+        '200':
+          description: Versioned SARA operations and module inventory
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/AuthNotConfigured'
+  /v1/cycle:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CycleRequest'
+      responses:
+        '200':
+          description: Regenerative cycle completed or returned with explicit status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CycleResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+  /v1/audit:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextRequest'
+      responses:
+        '200':
+          description: Lexical, semantic, structural, relational and ethical audit
+  /v1/regenerate:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextRequest'
+      responses:
+        '200':
+          description: Regenerated state and validation evidence
+  /v1/state:
+    get:
+      responses:
+        '200':
+          description: Current SARA state
+  /v1/trace/{cycle_id}:
+    get:
+      parameters:
+        - in: path
+          name: cycle_id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DecisionTrace and TemporalVectorDB records for the cycle
+        '404':
+          $ref: '#/components/responses/NotFound'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    CycleRequest:
+      type: object
+      required: [input]
+      additionalProperties: false
+      properties:
+        input:
+          type: string
+          minLength: 1
+          maxLength: 100000
+        cycle_id:
+          type: string
+          minLength: 1
+          maxLength: 256
+    TextRequest:
+      type: object
+      required: [input]
+      additionalProperties: false
+      properties:
+        input:
+          type: string
+          minLength: 1
+          maxLength: 100000
+    CycleResponse:
+      type: object
+      required:
+        - cycle_id
+        - final_state
+        - converged
+        - rollback_performed
+        - execution_report
+        - trace_hash
+      properties:
+        cycle_id:
+          type: string
+        input:
+          type: string
+        final_state:
+          type: string
+        converged:
+          type: boolean
+        rollback_performed:
+          type: boolean
+        execution_report:
+          type: object
+        trace_hash:
+          type: string
+  responses:
+    Unauthorized:
+      description: Bearer token invalid or missing
+    AuthNotConfigured:
+      description: SARA_API_TOKEN is not configured; protected API remains fail-closed
+    ValidationError:
+      description: Request payload failed validation
+    NotFound:
+      description: Requested endpoint or cycle not found
