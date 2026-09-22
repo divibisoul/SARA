@@ -210,8 +210,8 @@ class ERU_Engine:
         if self._provenance is not None:
             self._provenance.register(
                 f"ERU.behavior.{snapshot_name}.{method}.{probe_id}",
-                Provenance.RECONSTRUCTED,
-                "Evidência comportamental fornecida por execução externa observada",
+                Provenance.UNKNOWN,
+                "Evidência comportamental observada; origem histórica da capacidade permanece não determinada",
                 source="ERU_Engine.record_behavior_observation",
             )
         return copy.deepcopy(observation)
