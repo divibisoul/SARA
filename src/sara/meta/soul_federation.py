@@ -80,6 +80,14 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "purpose": "receber, validar e congelar estado real do runtime Clareira",
         "requires_auth": True,
     },
+    "sara.clareira.audit": {
+        "version": "1.0.0",
+        "endpoint": "/v1/clareira/audit",
+        "method": "GET",
+        "phases": ["audit", "strategy", "validation", "persistence"],
+        "purpose": "consultar a avaliação cruzada ERU→MMD→RGO→Tríade do último estado Clareira",
+        "requires_auth": True,
+    },
     "sara.clareira.vagus": {
         "version": "1.1.0",
         "endpoint": "/v1/clareira/vagus",
