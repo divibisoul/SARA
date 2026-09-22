@@ -449,7 +449,8 @@ class RegenerativeLoop:
         ctx.register_artifact("final_output", transformed)
         ctx.flags["execution_ok"] = ok
         cycle["phases"]["execution"] = {"ok": ok, **info}
-        self._record(ctx, CyclePhase.EXECUTION, "ITR", ok, **cycle["phases"]["execution"])
+        # "ok" já é o argumento posicional do registro; não o repassamos em **info.
+        self._record(ctx, CyclePhase.EXECUTION, "ITR", ok, **info)
         if not ok:
             raise _Aborted("EXECUTION", "execution_rollback_triggered")
         return result
