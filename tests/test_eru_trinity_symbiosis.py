@@ -155,3 +155,35 @@ def test_live_regenerative_loop_is_observed_by_eru():
     assert audit["observations"]
     assert audit["capability_observations"]
     assert audit["capability_drifts"]
+
+def test_eru_capability_recovery_candidates():
+    class Old:
+        def describe(self):
+            return {"name": "Old", "version": "1.0", "status": "IMPLEMENTED",
+                    "role": "meta", "dependencies": [], "phases": []}
+
+        def keep(self):
+            return "keep"
+
+        def lost(self):
+            return "lost"
+
+    class New:
+        def describe(self):
+            return {"name": "New", "version": "2.0", "status": "IMPLEMENTED",
+                    "role": "meta", "dependencies": [], "phases": []}
+
+        def keep(self):
+            return "keep"
+
+    eru = ERU_Engine()
+    old = Old()
+    new = New()
+    eru.freeze_capabilities("old", old)
+    eru.freeze_capabilities("new", new)
+    advisor = ERURecoveryAdvisor(eru)
+    candidates = advisor.find_lost_capabilities("CAP::old", "CAP::new")
+    lost = [c for c in candidates if c["path"] == "method:lost"]
+    assert len(lost) == 1
+    assert lost[0]["recoverable"] is True
+    assert lost[0]["automatic_reintegration"] is False
