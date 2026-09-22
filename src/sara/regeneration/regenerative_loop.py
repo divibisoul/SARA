@@ -518,7 +518,7 @@ class RegenerativeLoop:
                 ctx.record(phase.value, registered.name, False, error=str(exc))
 
     def _record(self, ctx: CycleContext, phase: CyclePhase,
-                module: str, ok: bool, **info: Any) -> None:
+                module: str, success: bool, **info: Any) -> None:
         """Registra evidência sem colidir com um campo de informação chamado ok."""
         ctx.record(phase.value, module, success, **info)
 
