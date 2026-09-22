@@ -119,7 +119,10 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         cycle_auditor=auditor, max_cycles=3,
         connected_runtime=connected_runtime,
     )
-    sistema = SistemaVivo(loop, storm, trace, registry=registry, provenance=prov)
+    sistema = SistemaVivo(
+        loop, storm, trace, registry=registry, provenance=prov,
+        connected_runtime=connected_runtime,
+    )
     trinity = TrinitySynergy(ara_extended, etr_extended, itr_extended)
 
     candidates = [
