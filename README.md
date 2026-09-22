@@ -59,10 +59,8 @@ Rastreabilidade Tripla
 · DecisionTrace: cadeia de hash verificável
 · ProvenanceTracker: origem de cada regra
 
-Módulos PENDING_INFRASTRUCTURE
+Backends externos continuam sendo ativados por detecção/configuração real. Quando a infraestrutura necessária não existe, a capacidade permanece exposta com estado explícito e erro operacional determinístico; nunca há mock ou sucesso fabricado.
 
-8 módulos aguardam infraestrutura externa. Mantêm interface completa +
-NotImplementedError descritivo. NUNCA mock.
 
 ## Serviço HTTP e Federação
 
@@ -75,7 +73,7 @@ python -m sara.service.main
 
 Endpoints protegidos:
 `GET /v1/capabilities`, `POST /v1/cycle`, `POST /v1/audit`,
-`POST /v1/regenerate`, `GET /v1/state`, `GET /v1/trace/{cycle_id}`.
+`POST /v1/regenerate`, `GET /v1/state`, `GET /v1/trace/{cycle_id}`, `GET /v1/governance/ui`.
 
 Health:
 `GET /health`.
