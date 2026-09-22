@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
-from sara.meta.soul_federation import federation_manifest
+from sara.meta.soul_federation import federation_manifest, SARA_OPERATIONS
 
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
@@ -118,6 +118,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if path == "/v1/capabilities":
                 modules = system.registry.snapshot()["modules"]
                 operation_specs = {
+                    "sara.health@1.0.0": ("/health", ("monitoring",)),
                     "sara.cycle@1.0.0": (
                         "/v1/cycle",
                         tuple(p.value for p in system.components["loop"].CYCLE_PHASES),
@@ -147,7 +148,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         endpoint=spec[0],
                         phases=spec[1],
                         status="IMPLEMENTED",
-                        requires_auth=True,
+                        requires_auth=bool(SARA_OPERATIONS.get(op.split("@", 1)[0], {}).get("requires_auth", True)),
                     ).as_dict()
                     for op, spec in operation_specs.items()
                 ]
@@ -159,6 +160,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "identity": identity.as_dict(),
                     "ready": system.ready,
                     "operations": [
+                        "sara.health@1.0.0",
                         "sara.cycle@1.0.0",
                         "sara.audit@1.0.0",
                         "sara.regenerate@1.0.0",
