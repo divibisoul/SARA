@@ -188,6 +188,8 @@ class ConnectedRuntime:
             "current": getattr(ctx, "current", ""),
             "input": getattr(ctx, "input", ""),
             "phase": phase.value,
+            "artifacts": getattr(ctx, "artifacts", {}),
+            "external_context": getattr(ctx, "external_context", {}),
         }
 
         if phase == CyclePhase.PERSISTENCE and name == "ERU_Engine":
@@ -208,6 +210,8 @@ class ConnectedRuntime:
                 facts={
                     "parent_cycle_id": parent_cycle_id,
                     "current_input_length": len(state["current"]),
+                    "probabilistic": state["artifacts"].get("probabilistic"),
+                    "user_feedback_refs": state["external_context"].get("user_feedback_refs"),
                 },
             )
             return {
