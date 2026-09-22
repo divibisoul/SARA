@@ -46,6 +46,13 @@ jobs:
             test "$before" = "$after"
           done
 
+      - name: Repository-wide additive preservation gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --unshallow origin main 2>/dev/null || git fetch origin main
+          python scripts/preservation_gate.py origin/main
+
       - name: Engineering gate report
         run: |
           python -m sara.audit.engineering_gate | tee /tmp/engineering-gate.json
