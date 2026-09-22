@@ -45,7 +45,7 @@ class _PhaseTraceProxy:
         self.sink = ctx.sink
         self.phase = phase
 
-    def record(self, _phase: str, module: str, ok: bool, **info: Any) -> None:
+    def record(self, _phase: str, module: str, success: bool, **info: Any) -> None:
         self._ctx.record(self.phase.value, module, ok, **info)
 
     def emit_decision(self, decision: dict) -> None:
@@ -519,8 +519,8 @@ class RegenerativeLoop:
 
     def _record(self, ctx: CycleContext, phase: CyclePhase,
                 module: str, ok: bool, **info: Any) -> None:
-        """Registra uma evidência de fase no contexto canônico."""
-        ctx.record(phase.value, module, ok, **info)
+        """Registra evidência sem colidir com um campo de informação chamado ok."""
+        ctx.record(phase.value, module, success, **info)
 
     def history(self) -> list[LoopReport]:
         return list(self._history)
