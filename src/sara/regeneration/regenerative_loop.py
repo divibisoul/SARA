@@ -141,6 +141,17 @@ class RegenerativeLoop:
             cycle["pre_hash"] = pre_hash
             try:
                 self._run_phases_canonical(ctx, cycle, idx)
+                if self._auditor is not None and hasattr(self._auditor, "check"):
+                    audit_results = self._auditor.check(ctx, cycle)
+                    cycle["cycle_audit"] = audit_results
+                    audit_failures = [r for r in audit_results if not r.get("ok", False)]
+                    if audit_failures:
+                        raise _Aborted(
+                            "VALIDATION",
+                            "cycle_auditor_failure:" + ";".join(
+                                r.get("name", "unknown") for r in audit_failures
+                            ),
+                        )
                 invariant_report = self._invariants.validate_cycle(ctx, cycle)
                 cycle["invariants"] = invariant_report.as_dict()
                 if not invariant_report.ok:
@@ -382,7 +393,16 @@ class RegenerativeLoop:
             if hasattr(self._etr, "validate_semantic_frame")
             else {"ok": result.approved, "fingerprint": None}
         )
-        approved = result.approved and bool(semantic_validation.get("ok", True))
+        filter_validation = (
+            self._filters.evaluate_structured(ctx.current)
+            if hasattr(self._filters, "evaluate_structured")
+            else {"ok": True, "results": [], "failures": []}
+        )
+        approved = (
+            result.approved
+            and bool(semantic_validation.get("ok", True))
+            and bool(filter_validation.get("ok", True))
+        )
         cycle["phases"]["validation"] = {
             "approved": approved,
             "reason": result.reason,
@@ -390,6 +410,9 @@ class RegenerativeLoop:
             "semantic_approved": bool(semantic_validation.get("ok", True)),
             "semantic_fingerprint": semantic_validation.get("fingerprint"),
             "semantic_findings": semantic_validation.get("findings", []),
+            "filter_chain_ok": bool(filter_validation.get("ok", True)),
+            "filter_chain_results": filter_validation.get("results", []),
+            "filter_chain_failures": filter_validation.get("failures", []),
         }
         self._record(ctx, CyclePhase.VALIDATION, "ETR", approved,
                      **cycle["phases"]["validation"])
