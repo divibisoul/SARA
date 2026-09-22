@@ -23,6 +23,7 @@ from sara.core.itr import (
 from sara.core.provenance import Provenance, ProvenanceTracker
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.core.semantic_engine import SemanticEngine, SemanticFrame
+from sara.infra.hashing import hash_json
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class StrategicPlan:
     phases: tuple[dict, ...]
     convergence_criteria: tuple[str, ...]
     rollback_points: tuple[str, ...]
+    ethical_gate: bool | None = None
     provenance: str = "RECONSTRUCTED"
 
 
@@ -199,6 +201,7 @@ class ITR_Extended(ITR):
             phases=tuple(phases),
             convergence_criteria=criteria,
             rollback_points=rollbacks,
+            ethical_gate=ctx.get("etr_approved") if "etr_approved" in ctx else None,
         )
 
     # -----------------------------------------------------------------
@@ -274,6 +277,8 @@ class ITR_Extended(ITR):
             metrics={
                 "input_len": len(plan.objective),
                 "output_len": len(text),
+                "input_hash": hash_json(plan.objective),
+                "output_hash": hash_json(text),
                 "phases": len(plan.phases),
                 "rollbacks": sum(1 for p in phase_results if p.get("rolled_back")),
                 "baseline_semantic_fingerprint": baseline.fingerprint,
@@ -281,6 +286,14 @@ class ITR_Extended(ITR):
                     bool(p.get("semantic_actions_lost"))
                     for p in phase_results
                 ),
+                "criteria": {
+                    "output_maior_que_input": len(text) > len(plan.objective),
+                    "keywords_extraidas >= 3": len(
+                        _extract_keywords(plan.objective).split("|")
+                    ) >= 3,
+                    "guardrails_presentes": "GUARDRAILS:" in text,
+                    "alinhamento_ético_confirmado": plan.ethical_gate,
+                },
             },
         )
 
