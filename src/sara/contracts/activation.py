@@ -91,9 +91,9 @@ CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
 ))
 CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
     module="GovernanceBackend",
-    required_infrastructure="Framework web (React/Vue) + endpoint HTTP",
-    activation_method="inject_ui_backend",
-    fallback_behavior="backend local permanece; UI levanta NotImplementedError",
+    required_infrastructure="HTTP SARA ativo para publicar a interface administrativa local",
+    activation_method="built_in_html_ui",
+    fallback_behavior="backend e UI HTML local permanecem disponíveis no serviço SARA autenticado",
     activates_phases=("monitoring",),
     verification_hook="is_ui_ready",
 ))
