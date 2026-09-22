@@ -72,6 +72,22 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "purpose": "recuperar evidência correlacionada de um ciclo",
         "requires_auth": True,
     },
+    "sara.clareira.state": {
+        "version": "1.1.0",
+        "endpoint": "/v1/clareira/state",
+        "method": "POST",
+        "phases": ["audit", "validation", "persistence", "monitoring"],
+        "purpose": "receber, validar e congelar estado real do runtime Clareira",
+        "requires_auth": True,
+    },
+    "sara.clareira.vagus": {
+        "version": "1.1.0",
+        "endpoint": "/v1/clareira/vagus",
+        "method": "POST",
+        "phases": ["strategy", "execution", "monitoring"],
+        "purpose": "disparar comando vagal somente para o barramento SARA, sem alegar execução no SOUL",
+        "requires_auth": True,
+    },
 }
 
 
