@@ -43,6 +43,7 @@ from sara.meta.eru_engine import ERU_Engine
 from sara.meta.eru_trinity_bridge import ERUTrinityBridge
 from sara.core.trinity_eru_unified import TrinityERUUnified
 from sara.meta.transystem_sara import TransystemSARA
+from sara.meta.aeternum_chimera import AeternumChimeraBridge
 from sara.research.innovation_radar import InnovationRadar
 from sara.research.neuro_integrator import NeuroIntegrator
 from sara.research.neural_lens import NeuralLens
@@ -142,6 +143,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara_extended, etr_extended, itr_extended, eru=eru, bridge=eru_bridge
     )
     connected_runtime = ConnectedRuntime(registry)
+    aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler)
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
 
     loop = RegenerativeLoop(
@@ -166,7 +168,8 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara_forge, quantum_snapshot, eru, eru_bridge, trinity_eru,
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
-        storm, governance_backend, auditor, loop, trinity, sistema, omega,
+        storm, governance_backend, auditor, loop, trinity, sistema,
+        aeternum_chimera, omega,
     ]
 
     for module in candidates:
@@ -229,6 +232,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "transystem": transystem, "auditor": auditor, "provenance": prov,
             "decision_trace": trace, "activation_plan": CANONICAL_ACTIVATION_PLAN,
             "connected_runtime": connected_runtime,
+            "aeternum_chimera": aeternum_chimera,
             "omega": omega,
         },
     )
