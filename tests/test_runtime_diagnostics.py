@@ -55,3 +55,16 @@ def test_runtime_diagnostic_execution_failure_is_explicit():
         assert result.loop_report.cycles, "ciclo sem evidência"
         cycle = result.loop_report.cycles[-1]
         assert "execution" in cycle["phases"], json.dumps(cycle, ensure_ascii=False, default=str)
+
+
+
+def test_runtime_diagnostic_itr_extended_consciousness_path():
+    import json
+    system = build_default_system(fail_closed=True)
+    itr = system.components["itr_extended"]
+    plan = itr.generate_strategic(
+        "promover consciência comunitária",
+        {"cycle": 1, "ara_audit": {"flaws": []}},
+    )
+    composed = itr.execute_composed(plan)
+    assert composed.rollback_triggered is False, json.dumps(composed.phase_results, ensure_ascii=False, default=str)
