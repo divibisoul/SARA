@@ -166,6 +166,9 @@ class ERU_Engine:
         snapshot_hash = self.freeze(snapshot_name, state)
         return snapshot_hash
 
+    def has_snapshot(self, name: str) -> bool:
+        return name in self._snapshots
+
     def record_behavior_observation(
         self,
         snapshot_name: str,
