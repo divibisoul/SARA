@@ -94,3 +94,26 @@ When a defect, incompatibility, performance regression or incomplete logic is di
 - do not replace a working local mechanism with a distributed dependency without measured need and evidence.
 
 Optimization is therefore evolutionary: improve the implementation, preserve capabilities, and revalidate the affected surface.
+## 11. SoulETR Omega integration
+
+SoulETR Omega is an additive SARA meta-layer derived from the Soul + ETR-Genesis audit.
+
+It must be implemented through existing SARA contracts and analogous SOUL nuclei, never by replacing ARA, ETR, ITR, ERU, Trinity, memory, security, or governance.
+
+Required capabilities:
+- real host-observable metrics only;
+- ETR Analysis, Asymmetry, Shannon Entropy, Reality Filter;
+- Symbiosis planning and deterministic prioritization;
+- reverse execution with explicit rollback contracts;
+- adaptive policy using measured feedback;
+- device abstraction without manufacturer lock-in;
+- habit observation, anticipation and micro/mid/macro state management;
+- code validation, permission inspection and audit logging.
+
+Android-specific privileges are external capabilities. SARA Python must not claim Shizuku, root, Device Owner, SpeechRecognizer, UsageStats, or vendor APIs unless a real bridge returns correlated evidence.
+
+The Infinix Note 10 Pro is not an architectural dependency. Vendor adapters belong to SOUL/HAL and are optional.
+
+No "quantum" or performance percentage is asserted without measured evidence. A matrix/weight terminology is used when the operation is classical.
+
+Every Omega cycle must produce an evidence-bearing report. Configuration alone is never execution.
