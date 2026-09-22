@@ -68,3 +68,29 @@ No nucleus is reduced to a SARA wrapper.
 Local deterministic tests -> containerized monolith -> persistent deployment -> bounded-context extraction -> event broker only after contracts and distributed invariants are proven.
 
 Do not introduce distributed infrastructure merely to satisfy a directory diagram.
+## 9. Live-update adaptive audit
+
+The federated ecosystem is mutable: SOUL nuclei and SARA may change between audits.
+
+At the start of every audit/intervention:
+1. refresh the current branch/commit identity of every affected repository;
+2. compare the current revision with the revision on which prior evidence was produced;
+3. downgrade only stale evidence claims, never delete or disable the implementation because evidence became stale;
+4. re-audit interfaces, contracts, dependencies and capability ownership affected by the delta;
+5. propagate compatible improvements to adjacent modules through additive adapters/contracts;
+6. keep independent READY work running while one dependency is blocked;
+7. record the exact revision, timestamp, test run and evidence scope for each conclusion.
+
+A newer revision supersedes the freshness of an older validation result, but does not erase the historical result. Historical evidence remains traceable and the new revision requires its own validation.
+
+## 10. Optimization without capability loss
+
+When a defect, incompatibility, performance regression or incomplete logic is discovered:
+- identify the failing boundary and root cause;
+- correct the implementation or add a compatible adapter;
+- preserve prior behavior that remains valid;
+- add regression coverage for the discovered failure;
+- use current stable technical patterns only where they preserve contracts and ownership;
+- do not replace a working local mechanism with a distributed dependency without measured need and evidence.
+
+Optimization is therefore evolutionary: improve the implementation, preserve capabilities, and revalidate the affected surface.
