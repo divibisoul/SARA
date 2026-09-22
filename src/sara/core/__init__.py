@@ -9,6 +9,7 @@ from .ara_extended import ARA_Extended, StructuralFlaw, RuleUpgrade
 from .etr_extended import ETR_Extended, MultiFrameworkResult, FrameworkAssessment, DecisionExplanation
 from .itr_extended import ITR_Extended, StrategicPlan, ComposedResult, PatternReport, RegistryOptimization
 from .trinity_synergy import TrinitySynergy, TrinityReport, TrinityIteration
+from .connected_runtime import ConnectedRuntime, ConnectedAction
 
 __all__ = [
     "Provenance", "RuleProvenance", "ProvenanceTracker",
@@ -21,4 +22,5 @@ __all__ = [
     "ETR_Extended", "MultiFrameworkResult", "FrameworkAssessment", "DecisionExplanation",
     "ITR_Extended", "StrategicPlan", "ComposedResult", "PatternReport", "RegistryOptimization",
     "TrinitySynergy", "TrinityReport", "TrinityIteration",
+    "ConnectedRuntime", "ConnectedAction",
 ]
