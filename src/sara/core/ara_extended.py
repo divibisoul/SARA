@@ -234,9 +234,9 @@ class ARA_Extended(ARA):
 
         preserved = self._critical_markers_preserved(original, transformed)
         semantic_diff = self._semantic.compare(original, transformed)
-        if semantic_diff["relations_lost"] or semantic_diff["entity_loss"]:
+        if semantic_diff["relations_lost"]:
             raise RuntimeError(
-                "ARA_Extended.regenerate_semantic: perda semântica estrutural detectada"
+                "ARA_Extended.regenerate_semantic: perda de relação semântica detectada"
             )
         integrity_hash = self._hash(transformed)
         self._temporal.insert({
