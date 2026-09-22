@@ -43,7 +43,6 @@ class TrinityIteration:
     details: dict = field(default_factory=dict)
 
 
-@dataclass
 @dataclass(frozen=True)
 class FusionMirror:
     cycle_id: str
