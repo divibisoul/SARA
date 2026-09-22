@@ -39,6 +39,8 @@ from sara.meta.ara_forge import ARAForge
 from sara.meta.assimilation_committee import AssimilationReviewCommittee
 from sara.meta.quantum_snapshot import QuantumSnapshotSystem
 from sara.meta.eru_engine import ERU_Engine
+from sara.meta.eru_trinity_bridge import ERUTrinityBridge
+from sara.core.trinity_eru_unified import TrinityERUUnified
 from sara.meta.transystem_sara import TransystemSARA
 from sara.research.innovation_radar import InnovationRadar
 from sara.research.neuro_integrator import NeuroIntegrator
@@ -110,6 +112,11 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     governance_backend = GovernanceBackend(module_status={})
     auditor = CycleAuditor()
     trinity = TrinitySynergy(ara_extended, etr_extended, itr_extended, eru=eru)
+    eru_bridge = ERUTrinityBridge(eru)
+    eru_bridge.register_trinity(ara_extended, etr_extended, itr_extended)
+    trinity_eru = TrinityERUUnified(
+        ara_extended, etr_extended, itr_extended, eru=eru, bridge=eru_bridge
+    )
     connected_runtime = ConnectedRuntime(registry)
 
     loop = RegenerativeLoop(
@@ -119,7 +126,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         provenance=prov, registry=registry, governance_backend=governance_backend,
         cycle_auditor=auditor, max_cycles=3,
         connected_runtime=connected_runtime,
-        trinity=trinity,
+        trinity=trinity_eru,
     )
     sistema = SistemaVivo(
         loop, storm, trace, registry=registry, provenance=prov,
@@ -130,7 +137,8 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
         safe_sandbox, itr, itr_extended, filters,
         legal_compliance, legal_ai, committee, radar, governed,
-        ara_forge, quantum_snapshot, eru, neuro, neural_lens,
+        ara_forge, quantum_snapshot, eru, eru_bridge, trinity_eru,
+        neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
     ]
@@ -179,7 +187,8 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "ara": ara, "ara_extended": ara_extended,
             "etr": etr, "etr_extended": etr_extended,
             "itr": itr, "itr_extended": itr_extended,
-            "trinity": trinity, "identity": identity,
+            "trinity": trinity, "trinity_eru": trinity_eru,
+            "eru_bridge": eru_bridge, "identity": identity,
             "memory": memory, "temporal": temporal, "dna": dna,
             "filters": filters, "rollback": rollback, "trace": trace,
             "loop": loop, "sistema_vivo": sistema, "governed": governed,
