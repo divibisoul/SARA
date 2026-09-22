@@ -186,6 +186,20 @@ class ClareiraSubsystem:
                 raise ValueError("CLAREIRA_DEVICE_NETWORK_INVALID")
             if not isinstance(device.get("shizukuStatus"), str):
                 raise ValueError("CLAREIRA_DEVICE_SHIZUKU_INVALID")
+            optional_numeric = ("cpuFreqMhz", "ramUsedMb", "ramTotalMb")
+            for field_name in optional_numeric:
+                value = device.get(field_name)
+                if value is not None and (
+                    not isinstance(value, (int, float)) or not math.isfinite(float(value)) or float(value) < 0
+                ):
+                    raise ValueError(f"CLAREIRA_DEVICE_{field_name.upper()}_INVALID")
+            for field_name in ("wifiEnabled", "bluetoothEnabled"):
+                value = device.get(field_name)
+                if value is not None and not isinstance(value, bool):
+                    raise ValueError(f"CLAREIRA_DEVICE_{field_name.upper()}_INVALID")
+            foreground = device.get("foregroundPackage")
+            if foreground is not None and not isinstance(foreground, str):
+                raise ValueError("CLAREIRA_DEVICE_FOREGROUND_PACKAGE_INVALID")
 
         for node in snapshot["nodes"]:
             if not isinstance(node, dict) or not isinstance(node.get("id"), str):
