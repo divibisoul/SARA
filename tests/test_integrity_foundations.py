@@ -63,8 +63,5 @@ def test_decision_trace_ipfs_path_requires_real_endpoint():
     trace = DecisionTrace()
     entry = trace.log({"event": "test"})
     assert trace.verify() is True
-    try:
+    with __import__("pytest").raises(RuntimeError, match="IPFS_NOT_CONFIGURED"):
         trace.publish_to_ipfs(entry)
-        assert False, "IPFS should require explicit real endpoint configuration"
-    except NotImplementedError:
-        pass
