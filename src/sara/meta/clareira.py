@@ -96,6 +96,8 @@ class ClareiraSubsystem:
             "blueprint_version": CLAREIRA_BLUEPRINT_VERSION,
             "schema_version": CLAREIRA_SCHEMA_VERSION,
             "blueprint_class_count": len(BLUEPRINT_ROLES),
+            "blueprint_instance_count": 61,
+            "directional_channel_count": 120,
             "latest_snapshot_hash": self._latest_hash or None,
             "snapshot_count": len(self._snapshots),
             "vagal_command_count": len(self._vagal_commands),
@@ -240,6 +242,8 @@ class ClareiraSubsystem:
         record = {
             "schema_version": CLAREIRA_SCHEMA_VERSION,
             "blueprint_version": CLAREIRA_BLUEPRINT_VERSION,
+            "blueprint_instance_count": 61,
+            "directional_channel_count": 120,
             "correlation_id": correlation_id,
             "source": source,
             "hash": digest,
