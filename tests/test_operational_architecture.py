@@ -15,9 +15,9 @@ def test_all_pending_modules_are_explicit():
     pending = set(system.registration_report["pending"])
     assert ("SafeSandbox" in pending) == (not system.components["safe_sandbox"].is_isolation_ready())
     assert ("QuantumCrawler" in pending) == (not system.components["quantum_crawler"].is_backends_ready())
-    assert "QuantumScanner" in pending
-    assert "TransystemSARA" in pending
-    assert "LegalAI" in pending
+    assert ("QuantumScanner" in pending) == (not system.components["quantum_scanner"].is_target_access_ready())
+    assert ("TransystemSARA" in pending) == (not system.components["transystem"].is_credentials_ready())
+    assert ("LegalAI" in pending) == (not system.components["legal_ai"].is_patent_oracle_ready())
 
 
 def test_cycle_has_12_canonical_phases_and_evidence():
