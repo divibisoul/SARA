@@ -139,6 +139,22 @@ class RegenerativeLoop:
             pre_state = {"cycle": idx, "input": ctx.current, "ts": now_iso()}
             pre_hash = self._rollback.capture(f"{cid}::{idx}::pre", pre_state, scope="cycle")
             cycle["pre_hash"] = pre_hash
+
+            # Ponte ERU: o ciclo operacional também é observado pela memória
+            # histórica. A Trindade continua operando normalmente; a ERU apenas
+            # congela os limites do estado para detectar drift posteriormente.
+            eru_bridge = (
+                self._trinity.bridge()
+                if self._trinity is not None and hasattr(self._trinity, "bridge")
+                else None
+            )
+            if eru_bridge is not None:
+                eru_bridge.observe(
+                    cid, f"LOOP_{idx}_INPUT",
+                    {"iteration": idx, "state": ctx.current},
+                )
+                eru_bridge.observe_capabilities(cid, f"LOOP_{idx}_INPUT")
+
             try:
                 self._run_phases_canonical(ctx, cycle, idx)
                 if self._auditor is not None and hasattr(self._auditor, "check"):
@@ -152,6 +168,18 @@ class RegenerativeLoop:
                                 r.get("name", "unknown") for r in audit_failures
                             ),
                         )
+                if eru_bridge is not None:
+                    eru_bridge.observe(
+                        cid, f"LOOP_{idx}_FINAL",
+                        {
+                            "iteration": idx,
+                            "state": ctx.current,
+                            "phases": list(cycle.get("phases", {}).keys()),
+                        },
+                    )
+                    eru_bridge.observe_capabilities(cid, f"LOOP_{idx}_FINAL")
+                    cycle["eru_audit"] = eru_bridge.audit_cycle(cid)
+
                 invariant_report = self._invariants.validate_cycle(ctx, cycle)
                 cycle["invariants"] = invariant_report.as_dict()
                 if not invariant_report.ok:
