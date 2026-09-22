@@ -1,0 +1,185 @@
+name: SARA ↔ N07 current real E2E
+
+on:
+  push:
+    branches:
+      - feat/integrated-engineering-gate-current
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sara-n07-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout SARA
+        uses: actions/checkout@v4
+
+      - name: Checkout current N07
+        uses: actions/checkout@v4
+        with:
+          repository: divibisoul/Orquestrador-
+          ref: 7a01af71d8ea2bc18446e596f0ee92e6bd2dca1e
+          path: n07
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Install SARA
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Build N07
+        working-directory: n07
+        run: go build ./cmd/nexus -o nexus
+
+      - name: Start real SARA
+        env:
+          SARA_API_TOKEN: e2e-sara-token
+          SARA_HOST: 127.0.0.1
+          SARA_PORT: "8090"
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -euo pipefail
+          python -m sara.service.main > /tmp/sara-e2e.log 2>&1 &
+          echo $! > /tmp/sara.pid
+
+      - name: Wait for SARA
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8090/health > /tmp/sara-health.json; then
+              python - <<'PY'
+          import json
+          payload = json.load(open("/tmp/sara-health.json", encoding="utf-8"))
+          assert payload["service"] == "SARA"
+          assert payload["ready"] is True
+          assert payload["invariants_ok"] is True
+          print("SARA ready:", payload["module_count"])
+          PY
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/sara-e2e.log
+          exit 1
+
+      - name: Start real N07 connected to SARA
+        working-directory: n07
+        env:
+          N07_HTTP_ADDR: 127.0.0.1:8080
+          N07_APP_TOKEN: e2e-n07-token
+          SARA_SERVICE_URL: http://127.0.0.1:8090
+          SARA_SERVICE_TOKEN: e2e-sara-token
+          SARA_REQUEST_TIMEOUT: 30s
+        run: |
+          set -euo pipefail
+          ./nexus > /tmp/n07-e2e.log 2>&1 &
+          echo $! > /tmp/n07.pid
+
+      - name: Wait for N07
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent               -H 'Authorization: Bearer e2e-n07-token'               http://127.0.0.1:8080/v1/capabilities > /tmp/n07-capabilities.json; then
+              python - <<'PY'
+          import json
+          payload = json.load(open("/tmp/n07-capabilities.json", encoding="utf-8"))
+          assert payload["sara"]["configured"] is True
+          assert "sara.cycle@1.0.0" in payload["sara"]["operations"]
+          assert "sara.trace@1.0.0" in payload["sara"]["operations"]
+          print("N07 ↔ SARA transport configured")
+          PY
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/n07-e2e.log
+          exit 1
+
+      - name: Execute real N07 → SARA cycle
+        run: |
+          set -euo pipefail
+          cat > /tmp/cycle-request.json <<'JSON'
+          {
+            "operation": "sara.cycle@1.0.0",
+            "payload": [0],
+            "metadata": {
+              "sara_input": "promover autonomia comunitária",
+              "sara_cycle_id": "current-sara-n07-e2e-001"
+            },
+            "correlationId": "current-sara-n07-correlation-001"
+          }
+          JSON
+
+          curl --fail --silent             -H 'Authorization: Bearer e2e-n07-token'             -H 'Content-Type: application/json'             --data-binary @/tmp/cycle-request.json             http://127.0.0.1:8080/v1/execute > /tmp/n07-cycle.json
+
+          python - <<'PY'
+          import json
+          outer = json.load(open("/tmp/n07-cycle.json", encoding="utf-8"))
+          assert outer["status"] == "ok", outer
+          assert outer["correlationId"] == "current-sara-n07-correlation-001"
+          sara = json.loads(outer["metadata"]["sara_result_json"])
+          assert sara["cycle_id"] == "current-sara-n07-e2e-001"
+          assert sara["execution_report"]["cycle_id"] == "current-sara-n07-e2e-001"
+          assert sara["fusion"] is not None
+          assert sara["fusion"]["integrity_ok"] is True
+          assert sara["converged"] is True, sara
+          print("SARA convergence:", sara["converged"])
+          print("Fusion hash:", sara["fusion"]["fused_hash"])
+          PY
+
+      - name: Read real SARA trace through N07
+        run: |
+          set -euo pipefail
+          cat > /tmp/trace-request.json <<'JSON'
+          {
+            "operation": "sara.trace@1.0.0",
+            "payload": [0],
+            "metadata": {
+              "sara_cycle_id": "current-sara-n07-e2e-001"
+            },
+            "correlationId": "current-sara-n07-trace-correlation-001"
+          }
+          JSON
+
+          curl --fail --silent             -H 'Authorization: Bearer e2e-n07-token'             -H 'Content-Type: application/json'             --data-binary @/tmp/trace-request.json             http://127.0.0.1:8080/v1/execute > /tmp/n07-trace.json
+
+          python - <<'PY'
+          import json
+          outer = json.load(open("/tmp/n07-trace.json", encoding="utf-8"))
+          assert outer["status"] == "ok", outer
+          sara = json.loads(outer["metadata"]["sara_result_json"])
+          assert sara["cycle_id"] == "current-sara-n07-e2e-001"
+          assert sara["integrity"] is True
+          assert sara["provenance_integrity"] is True
+          assert sara["entries"]
+          assert sara["temporal_records"]
+          print("Trace entries:", len(sara["entries"]))
+          print("Temporal records:", len(sara["temporal_records"]))
+          PY
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          echo '--- SARA ---'
+          cat /tmp/sara-e2e.log || true
+          echo '--- N07 ---'
+          cat /tmp/n07-e2e.log || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          kill "$(cat /tmp/n07.pid)" 2>/dev/null || true
+          kill "$(cat /tmp/sara.pid)" 2>/dev/null || true
