@@ -210,22 +210,31 @@ class RegenerativeLoop:
         relational = getattr(self._ara, "detect_relational", lambda _t: [])(text)
         return flaws + list(relational) + list(structural)
 
-    def _run_phases_canonical(self, ctx: CycleContext, cycle: dict, idx: int) -> None:
+    def _run_phases_canonical(self, ctx: CycleContext, cycle: dict, idx: int, pre_hash: str | None = None) -> None:
         self._phase_ingestion(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.INGESTION)
         self._phase_audit(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.AUDIT)
         self._phase_regeneration(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.REGENERATION)
         self._phase_identity(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.IDENTITY)
         etr_result = self._phase_ethics(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.ETHICS)
         strategy = self._phase_strategy(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.STRATEGY)
         result = self._phase_execution(ctx, cycle, strategy)
+        self._dispatch_emit_trace(ctx, CyclePhase.EXECUTION)
         self._phase_validation(ctx, cycle, etr_result)
+        self._dispatch_emit_trace(ctx, CyclePhase.VALIDATION)
         self._phase_persistence(ctx, cycle, idx, result)
+        self._dispatch_emit_trace(ctx, CyclePhase.PERSISTENCE)
         self._phase_snapshot(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.SNAPSHOT)
         self._phase_monitoring(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.MONITORING)
         self._phase_governance(ctx, cycle)
-
-    def _record(self, ctx, phase, module, ok, **info):
-        ctx.record(phase.value if isinstance(phase, CyclePhase) else phase, module, ok, **info)
+        self._dispatch_emit_trace(ctx, CyclePhase.GOVERNANCE)
 
     def _phase_ingestion(self, ctx, cycle, idx):
         guard = self._dna.guard(f"cycle_{idx}", ctx.current)
