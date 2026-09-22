@@ -205,6 +205,16 @@ class ITR_Extended(ITR):
                     fn = _STEP_REGISTRY.get(step_name)
                     if fn is None:
                         raise KeyError(f"passo '{step_name}' não registrado")
+
+                    # "extract_keywords" é uma operação analítica: produz
+                    # informação para o plano, mas não deve destruir a entrada.
+                    # Mantemos o texto intacto e registramos o resultado na fase.
+                    if step_name == "extract_keywords":
+                        phase_metrics["extracted_keywords"] = [
+                            k for k in _extract_keywords(text).split("|") if k
+                        ]
+                        continue
+
                     text = fn(text)
 
                 semantic_delta = self._semantic.compare(plan.objective, text)
