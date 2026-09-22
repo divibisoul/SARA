@@ -104,6 +104,18 @@ class ERU_Engine:
             out[prefix or "$"] = obj
         return out
 
+    def snapshot(self, name: str) -> FrozenState | None:
+        """Retorna cópia isolada do snapshot congelado, sem expor estado interno mutável."""
+        frozen = self._snapshots.get(name)
+        return copy.deepcopy(frozen) if frozen is not None else None
+
+    def verify_snapshot(self, name: str) -> bool:
+        """Verifica a integridade criptográfica de um snapshot ERU existente."""
+        frozen = self._snapshots.get(name)
+        if frozen is None:
+            return False
+        return hash_json(frozen.state) == frozen.hash
+
     def compare(self, older: str, newer: str) -> DiffReport:
         if older not in self._snapshots or newer not in self._snapshots:
             return DiffReport(lost=["__missing_snapshot__"])

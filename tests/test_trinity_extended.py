@@ -203,7 +203,11 @@ def test_trinity_fusion_and_eru_mirror():
         {"phases": 4, "rollback": False},
     )
     assert mirror.integrity_ok is True
+    assert mirror.version == 1
     assert mirror.eru["available"] is True
     assert set(mirror.eru["snapshot_hashes"]) == {"ARA", "ETR", "ITR"}
     assert trinity.mirror("test-fusion") is not None
-    assert trinity.audit_mirror("test-fusion")["ok"] is True
+    mirror_audit = trinity.audit_mirror("test-fusion")
+    assert mirror_audit["ok"] is True
+    assert mirror_audit["component_hashes_ok"] is True
+    assert all(mirror_audit["snapshot_checks"].values())

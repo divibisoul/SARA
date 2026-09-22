@@ -1,5 +1,5 @@
 from .base import ModuleStatus, CycleRole, CyclePhase, SaraModule, Traceable
-from .context import CycleContext, TraceSink, CycleStep
+from .context import CycleContext, TraceSink, CycleStep, CycleFusionState
 from .registry import ModuleRegistry, RegistryError, RegisteredModule
 from .lifecycle import CANONICAL_ORDER
 from .activation import ActivationPlan, ActivationRequirement, CANONICAL_ACTIVATION_PLAN
@@ -11,7 +11,7 @@ from .federation import (
 
 __all__ = [
     "ModuleStatus", "CycleRole", "CyclePhase", "SaraModule", "Traceable",
-    "CycleContext", "TraceSink", "CycleStep",
+    "CycleContext", "TraceSink", "CycleStep", "CycleFusionState",
     "ModuleRegistry", "RegistryError", "RegisteredModule",
     "CANONICAL_ORDER",
     "ActivationPlan", "ActivationRequirement", "CANONICAL_ACTIVATION_PLAN",

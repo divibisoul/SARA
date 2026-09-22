@@ -18,6 +18,8 @@ from sara.memory.temporal_vector_db import TemporalVectorDB
 from sara.memory.dna_tags import DNA_Tags
 from sara.infra.clock import now_iso
 from sara.monitoring.execution_report import ExecutionReport, PhaseEvidence
+from sara.contracts.context import CycleFusionState
+from sara.infra.hashing import hash_json
 from sara.regeneration.regenerative_state import CycleState, RegenerativeState
 from sara.core.connected_runtime import ConnectedRuntime
 
@@ -35,6 +37,7 @@ class LoopReport:
     context_steps: list = field(default_factory=list)
     invariants: list = field(default_factory=list)
     execution_report: dict = field(default_factory=dict)
+    fusion: dict | None = None
 
 
 class _PhaseTraceProxy:
@@ -186,6 +189,7 @@ class RegenerativeLoop:
                     report.rollback_performed = restored.restored
                     if restored.restored:
                         ctx.current = restored.state.get("input", ctx.input)
+                        ctx.fusion = None
                         state.transition(CycleState.ROLLED_BACK, "max_iterations_without_convergence", now_iso())
             except _Aborted as exc:
                 ctx.abort(f"{exc.phase}:{exc.reason}")
@@ -194,6 +198,24 @@ class RegenerativeLoop:
                 report.rollback_performed = restored.restored
                 if restored.restored:
                     ctx.current = restored.state.get("input", ctx.input)
+                    ctx.fusion = None
+
+                # Divergência do espelho é tratada como evento regenerativo RGO:
+                # rollback do estado inválido, registro do evento e nova iteração.
+                if exc.reason == "fusion_integrity_failed" and idx < self._max_cycles:
+                    ctx.flags.setdefault("rgo_regeneration_inputs", []).append({
+                        "type": "FUSION_DIVERGENCE",
+                        "cycle_id": ctx.cycle_id,
+                        "version": idx,
+                        "phase": exc.phase,
+                    })
+                    ctx.aborted = False
+                    ctx.abort_reason = ""
+                    state.transition(CycleState.REGENERATING,
+                                     "rgo_fusion_divergence_retry", now_iso())
+                    report.cycles.append(cycle)
+                    continue
+
                 state.transition(CycleState.ROLLED_BACK if restored.restored else CycleState.ABORTED,
                                  exc.reason, now_iso())
                 report.cycles.append(cycle)
@@ -205,6 +227,7 @@ class RegenerativeLoop:
                 report.rollback_performed = restored.restored
                 if restored.restored:
                     ctx.current = restored.state.get("input", ctx.input)
+                    ctx.fusion = None
                 state.transition(CycleState.ROLLED_BACK if restored.restored else CycleState.ABORTED,
                                  str(exc), now_iso())
                 report.cycles.append(cycle)
@@ -234,6 +257,23 @@ class RegenerativeLoop:
         er.phases = [
             PhaseEvidence(s.phase, s.module, s.ok, s.info, s.ts) for s in ctx.steps
         ]
+        report.fusion = (
+            {
+                "cycle_id": ctx.fusion.cycle_id,
+                "version": ctx.fusion.version,
+                "target_hash": ctx.fusion.target_hash,
+                "ara_hash": ctx.fusion.ara_hash,
+                "etr_hash": ctx.fusion.etr_hash,
+                "itr_hash": ctx.fusion.itr_hash,
+                "eru_snapshot_hashes": dict(ctx.fusion.eru_snapshot_hashes),
+                "fusion_snapshot_hash": ctx.fusion.fusion_snapshot_hash,
+                "fused_hash": ctx.fusion.fused_hash,
+                "integrity_ok": ctx.fusion.integrity_ok,
+                "created_at": ctx.fusion.created_at,
+            }
+            if ctx.fusion is not None else None
+        )
+        er.artifacts["fusion_mirror"] = report.fusion
         report.execution_report = er.finalize().as_dict()
         self._history.append(report)
         return report
@@ -261,6 +301,7 @@ class RegenerativeLoop:
         self._dispatch_emit_trace(ctx, CyclePhase.EXECUTION)
         self._phase_validation(ctx, cycle, etr_result)
         self._dispatch_emit_trace(ctx, CyclePhase.VALIDATION)
+        self._synchronize_fusion(ctx, cycle, idx)
         self._phase_persistence(ctx, cycle, idx, result)
         self._dispatch_emit_trace(ctx, CyclePhase.PERSISTENCE)
         self._phase_snapshot(ctx, cycle, idx)
@@ -284,6 +325,8 @@ class RegenerativeLoop:
         structural = list(getattr(self._ara, "detect_structural", lambda _t: [])(ctx.current))
         relational = list(getattr(self._ara, "detect_relational", lambda _t: [])(ctx.current))
         cycle["_flaws"] = lexical + semantic + relational + structural
+        if hasattr(self._ara, "analyze_semantics"):
+            ctx.register_artifact("audit_semantic_fingerprint", self._ara.analyze_semantics(ctx.current).fingerprint)
         cycle["phases"]["audit"] = {
             "lexical": [f.kind for f in lexical],
             "semantic": [f.kind for f in semantic],
@@ -352,18 +395,43 @@ class RegenerativeLoop:
         return base
 
     def _phase_strategy(self, ctx, cycle, idx):
-        if hasattr(self._itr, "generate_strategic"):
-            strategy = self._itr.generate_strategic(ctx.current, {"cycle": idx})
+        try:
+            if hasattr(self._itr, "generate_strategic"):
+                strategy_context = {
+                    "cycle": idx,
+                    "ara_audit": {
+                        "flaws": [getattr(f, "kind", str(f)) for f in cycle.get("_flaws", [])],
+                        "semantic_fingerprint": ctx.artifacts.get("audit_semantic_fingerprint"),
+                    },
+                    "rgo_regeneration_inputs": list(ctx.flags.get("rgo_regeneration_inputs", [])),
+                }
+                strategy = self._itr.generate_strategic(ctx.current, strategy_context)
+                cycle["phases"]["strategy"] = {
+                    "type": "StrategicPlan",
+                    "phases": len(strategy.phases),
+                    "criteria": list(strategy.convergence_criteria),
+                }
+            else:
+                strategy = self._itr.generate(ctx.current, context={"cycle": idx})
+                cycle["phases"]["strategy"] = {"type": "Strategy", "variant": strategy.variant}
+            self._record(ctx, CyclePhase.STRATEGY, "ITR", True, **cycle["phases"]["strategy"])
+            return strategy
+        except Exception as exc:
             cycle["phases"]["strategy"] = {
-                "type": "StrategicPlan",
-                "phases": len(strategy.phases),
-                "criteria": list(strategy.convergence_criteria),
+                "type": "failure",
+                "error": f"{type(exc).__name__}: {exc}",
             }
-        else:
-            strategy = self._itr.generate(ctx.current, context={"cycle": idx})
-            cycle["phases"]["strategy"] = {"type": "Strategy", "variant": strategy.variant}
-        self._record(ctx, CyclePhase.STRATEGY, "ITR", True, **cycle["phases"]["strategy"])
-        return strategy
+            self._record(
+                ctx,
+                CyclePhase.STRATEGY,
+                "ITR",
+                False,
+                **cycle["phases"]["strategy"],
+            )
+            raise _Aborted(
+                "STRATEGY",
+                f"itr_strategy_failure:{type(exc).__name__}:{exc}",
+            ) from exc
 
     def _phase_execution(self, ctx, cycle, strategy):
         if hasattr(strategy, "phases") and hasattr(self._itr, "execute_composed"):
@@ -381,7 +449,8 @@ class RegenerativeLoop:
         ctx.register_artifact("final_output", transformed)
         ctx.flags["execution_ok"] = ok
         cycle["phases"]["execution"] = {"ok": ok, **info}
-        self._record(ctx, CyclePhase.EXECUTION, "ITR", ok, **cycle["phases"]["execution"])
+        # "ok" já é o argumento posicional do registro; não o repassamos em **info.
+        self._record(ctx, CyclePhase.EXECUTION, "ITR", ok, **info)
         if not ok:
             raise _Aborted("EXECUTION", "execution_rollback_triggered")
         return result
@@ -425,11 +494,94 @@ class RegenerativeLoop:
                 reason = "ethical_filter_chain_failure"
             raise _Aborted("VALIDATION", reason)
 
+    def _synchronize_fusion(self, ctx, cycle, idx):
+        """Sincroniza ARA/ETR/ITR/ERU no mesmo estado versionado do ciclo."""
+        if self._trinity is None or not hasattr(self._trinity, "fuse_and_mirror"):
+            return
+        ara_phase = dict(cycle.get("phases", {}).get("audit", {}))
+        etr_phase = dict(cycle.get("phases", {}).get("validation", {}))
+        itr_phase = dict(cycle.get("phases", {}).get("execution", {}))
+        mirror = self._trinity.fuse_and_mirror(
+            cycle_id=ctx.cycle_id,
+            target=ctx.current,
+            version=idx,
+            ara_output={
+                "cycle_id": ctx.cycle_id,
+                "version": idx,
+                "input_hash": hash_json(ctx.input),
+                "state_hash": hash_json(ara_phase),
+                "flaws": cycle.get("phases", {}).get("audit", {}),
+                "semantic_fingerprint": ctx.artifacts.get("audit_semantic_fingerprint"),
+            },
+            etr_output={
+                "cycle_id": ctx.cycle_id,
+                "version": idx,
+                "state_hash": hash_json(etr_phase),
+                "approved": bool(etr_phase.get("approved", False)),
+                "semantic_approved": bool(etr_phase.get("semantic_approved", False)),
+                "filter_chain_ok": bool(etr_phase.get("filter_chain_ok", False)),
+            },
+            itr_output={
+                "cycle_id": ctx.cycle_id,
+                "version": idx,
+                "state_hash": hash_json(itr_phase),
+                "rollback": bool(itr_phase.get("rollback_triggered", False)),
+                "metrics": itr_phase.get("metrics", {}),
+            },
+        )
+        if mirror.target != ctx.current or mirror.cycle_id != ctx.cycle_id or mirror.version != idx:
+            ctx.flags.setdefault("rgo_regeneration_inputs", []).append({
+                "type": "FUSION_DIVERGENCE",
+                "cycle_id": ctx.cycle_id,
+                "version": idx,
+                "reason": "mirror_target_or_identity_mismatch",
+            })
+            raise _Aborted("VALIDATION", "fusion_integrity_failed")
+
+        audit = self._trinity.audit_mirror(ctx.cycle_id, version=idx)
+        if not audit.get("ok", False):
+            ctx.flags.setdefault("rgo_regeneration_inputs", []).append({
+                "type": "FUSION_DIVERGENCE",
+                "cycle_id": ctx.cycle_id,
+                "version": idx,
+                "reason": audit,
+            })
+            raise _Aborted("VALIDATION", "fusion_integrity_failed")
+
+        target_hash = hash_json(ctx.current)
+        snapshot_hashes = tuple(sorted((mirror.eru.get("snapshot_hashes") or {}).items()))
+        ctx.fusion = CycleFusionState(
+            cycle_id=mirror.cycle_id,
+            version=mirror.version,
+            target_hash=target_hash,
+            ara_hash=mirror.eru.get("ara_hash", ""),
+            etr_hash=mirror.eru.get("etr_hash", ""),
+            itr_hash=mirror.eru.get("itr_hash", ""),
+            eru_snapshot_hashes=snapshot_hashes,
+            fusion_snapshot_hash=mirror.eru.get("fusion_snapshot_hash"),
+            fused_hash=mirror.fused_hash,
+            integrity_ok=bool(audit.get("ok", False)),
+        )
+        ctx.register_artifact("fusion_mirror", {
+            "cycle_id": mirror.cycle_id,
+            "version": mirror.version,
+            "fused_hash": mirror.fused_hash,
+            "integrity_ok": mirror.integrity_ok,
+            "eru": mirror.eru,
+        })
+        cycle["fusion"] = {
+            "version": idx,
+            "fused_hash": mirror.fused_hash,
+            "integrity_ok": mirror.integrity_ok,
+            "audit": audit,
+        }
+
     def _phase_persistence(self, ctx, cycle, idx, result):
         rid = self._temporal.insert({
             "cycle_id": ctx.cycle_id, "iteration": idx,
             "input": ctx.input, "state": ctx.current,
             "execution": getattr(result, "metrics", {}),
+            "fusion": cycle.get("fusion"),
         })
         self._memory.store({
             "cycle_id": ctx.cycle_id, "iteration": idx,
@@ -442,7 +594,18 @@ class RegenerativeLoop:
     def _phase_snapshot(self, ctx, cycle, idx):
         snap = self._rollback.capture(
             f"{ctx.cycle_id}::{idx}::post",
-            {"cycle_id": ctx.cycle_id, "iteration": idx, "state": ctx.current},
+            {
+                "cycle_id": ctx.cycle_id,
+                "iteration": idx,
+                "state": ctx.current,
+                "fusion": (
+                    {
+                        "version": ctx.fusion.version,
+                        "fused_hash": ctx.fusion.fused_hash,
+                        "integrity_ok": ctx.fusion.integrity_ok,
+                    } if ctx.fusion is not None else None
+                ),
+            },
             scope="full",
         )
         cycle["phases"]["snapshot"] = {"snapshot_hash": snap}
@@ -516,6 +679,12 @@ class RegenerativeLoop:
                 emitter(_PhaseTraceProxy(ctx, phase))
             except Exception as exc:
                 ctx.record(phase.value, registered.name, False, error=str(exc))
+
+    @staticmethod
+    def _record(ctx: CycleContext, phase: CyclePhase,
+                module: str, ok: bool, **info: Any) -> None:
+        """Registra evidência de uma etapa no contexto real do ciclo."""
+        ctx.record(phase.value, module, ok, **info)
 
     def history(self) -> list[LoopReport]:
         return list(self._history)

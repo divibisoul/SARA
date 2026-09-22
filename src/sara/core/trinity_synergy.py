@@ -43,11 +43,11 @@ class TrinityIteration:
     details: dict = field(default_factory=dict)
 
 
-@dataclass
 @dataclass(frozen=True)
 class FusionMirror:
     cycle_id: str
     target: str
+    version: int
     ara: dict
     etr: dict
     itr: dict
@@ -138,17 +138,21 @@ class TrinitySynergy:
 
     def fuse_and_mirror(self, cycle_id: str, target: str,
                         ara_output: dict, etr_output: dict,
-                        itr_output: dict) -> FusionMirror:
-        """Funde os quatro estados sem substituir nenhum estado original.
+                        itr_output: dict, version: int = 1) -> FusionMirror:
+        """Funde ARA/ETR/ITR e espelha o estado pela ERU em uma versão do ciclo.
 
-        Cada subsistema mantém seu resultado próprio; o espelho é uma projeção
-        imutável dos quatro resultados, com hash verificável. ERU congela cada
-        estágio e o envelope final quando disponível.
+        Os resultados originais permanecem independentes. O espelho contém uma
+        projeção verificável e os snapshots ERU são versionados para não sobrescrever
+        iterações anteriores do mesmo cycle_id.
         """
         if not cycle_id:
             raise ValueError("cycle_id é obrigatório")
+        if version < 1:
+            raise ValueError("version deve ser >= 1")
+
         envelope = {
             "cycle_id": cycle_id,
+            "version": int(version),
             "target": str(target),
             "ara": dict(ara_output),
             "etr": dict(etr_output),
@@ -162,19 +166,40 @@ class TrinitySynergy:
             "ara_hash": ara_hash,
             "etr_hash": etr_hash,
             "itr_hash": itr_hash,
+            "snapshot_names": {},
+            "snapshot_hashes": {},
+            "fusion_snapshot_name": None,
+            "fusion_snapshot_hash": None,
         }
+
         if self._eru is not None:
-            eru_state["snapshot_hashes"] = {
-                "ARA": self._eru.freeze(f"{cycle_id}:ARA", envelope["ara"]),
-                "ETR": self._eru.freeze(f"{cycle_id}:ETR", envelope["etr"]),
-                "ITR": self._eru.freeze(f"{cycle_id}:ITR", envelope["itr"]),
+            stage_payloads = {
+                "ARA": envelope["ara"],
+                "ETR": envelope["etr"],
+                "ITR": envelope["itr"],
             }
-        fused_hash = hash_json({**envelope, "eru": eru_state})
+            for stage, payload in stage_payloads.items():
+                name = f"{cycle_id}:v{version}:{stage}"
+                snap_hash = self._eru.freeze(name, payload)
+                eru_state["snapshot_names"][stage] = name
+                eru_state["snapshot_hashes"][stage] = snap_hash
+
+        fused_payload = {"envelope": envelope, "eru": eru_state}
+        fused_hash = hash_json(fused_payload)
         if self._eru is not None:
-            self._eru.freeze(f"{cycle_id}:FUSION", {**envelope, "eru": eru_state})
+            fusion_name = f"{cycle_id}:v{version}:FUSION"
+            fusion_snapshot_hash = self._eru.freeze(fusion_name, fused_payload)
+            eru_state["fusion_snapshot_name"] = fusion_name
+            eru_state["fusion_snapshot_hash"] = fusion_snapshot_hash
+            # A mudança acima altera apenas o bookkeeping dos snapshots; o hash
+            # estrutural da fusão continua definido pelo envelope + hashes de estágio.
+            fused_payload = {"envelope": envelope, "eru": eru_state}
+            fused_hash = hash_json(fused_payload)
+
         mirror = FusionMirror(
             cycle_id=cycle_id,
             target=str(target),
+            version=int(version),
             ara=envelope["ara"],
             etr=envelope["etr"],
             itr=envelope["itr"],
@@ -182,31 +207,64 @@ class TrinitySynergy:
             fused_hash=fused_hash,
             integrity_ok=True,
         )
+        self._mirrors[f"{cycle_id}:v{version}"] = mirror
+        # Mantém compatibilidade com consumidores que usam apenas cycle_id na versão única.
         self._mirrors[cycle_id] = mirror
         return mirror
 
-    def mirror(self, cycle_id: str) -> FusionMirror | None:
-        return self._mirrors.get(cycle_id)
+    def mirror(self, cycle_id: str, version: int | None = None) -> FusionMirror | None:
+        key = f"{cycle_id}:v{version}" if version is not None else cycle_id
+        return self._mirrors.get(key)
 
-    def audit_mirror(self, cycle_id: str) -> dict:
-        mirror = self._mirrors.get(cycle_id)
+    def audit_mirror(self, cycle_id: str, version: int | None = None) -> dict:
+        key = f"{cycle_id}:v{version}" if version is not None else cycle_id
+        mirror = self._mirrors.get(key)
         if mirror is None:
             return {"ok": False, "reason": "mirror_not_found"}
-        payload = {
+
+        envelope = {
             "cycle_id": mirror.cycle_id,
+            "version": mirror.version,
             "target": mirror.target,
             "ara": mirror.ara,
             "etr": mirror.etr,
             "itr": mirror.itr,
-            "eru": mirror.eru,
         }
-        calculated = hash_json(payload)
-        expected = hash_json(payload)
+        eru_state = dict(mirror.eru)
+        fused_payload = {"envelope": envelope, "eru": eru_state}
+        calculated = hash_json(fused_payload)
+        component_hashes_ok = (
+            hash_json(mirror.ara) == mirror.eru.get("ara_hash")
+            and hash_json(mirror.etr) == mirror.eru.get("etr_hash")
+            and hash_json(mirror.itr) == mirror.eru.get("itr_hash")
+        )
+        snapshots_ok = True
+        snapshot_checks: dict[str, bool] = {}
+        if self._eru is not None and eru_state.get("available"):
+            for stage, name in eru_state.get("snapshot_names", {}).items():
+                ok = self._eru.verify_snapshot(name)
+                snapshot_checks[stage] = ok
+                snapshots_ok = snapshots_ok and ok
+            fusion_name = eru_state.get("fusion_snapshot_name")
+            if fusion_name:
+                ok = self._eru.verify_snapshot(fusion_name)
+                snapshot_checks["FUSION"] = ok
+                snapshots_ok = snapshots_ok and ok
+
+        ok = (
+            calculated == mirror.fused_hash
+            and component_hashes_ok
+            and snapshots_ok
+            and mirror.integrity_ok
+        )
         return {
-            "ok": calculated == expected == mirror.fused_hash,
+            "ok": ok,
             "fused_hash": mirror.fused_hash,
             "calculated_hash": calculated,
             "eru_available": bool(mirror.eru.get("available")),
+            "component_hashes_ok": component_hashes_ok,
+            "snapshot_checks": snapshot_checks,
+            "version": mirror.version,
         }
 
     # -----------------------------------------------------------------
@@ -283,8 +341,6 @@ class TrinitySynergy:
                     "phases": len(plan.phases),
                     "rollback": result.rollback_triggered,
                     "metrics": result.metrics,
-                    "fusion_hash": mirror.fused_hash,
-                    "mirror_integrity": mirror.integrity_ok,
                 },
             )
 
@@ -316,6 +372,9 @@ class TrinitySynergy:
                     "rollback_triggered": result.rollback_triggered,
                     "semantic_flaws": [f.kind for f in semantic_flaws],
                     "metrics": result.metrics,
+                    "fusion_hash": mirror.fused_hash,
+                    "mirror_integrity": mirror.integrity_ok,
+                    "mirror_version": mirror.version,
                 },
             )
             iterations.append(iteration)

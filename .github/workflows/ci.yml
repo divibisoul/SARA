@@ -2,7 +2,7 @@ name: SARA CI
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "feat/**"]
   pull_request:
 
 jobs:
