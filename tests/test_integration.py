@@ -133,13 +133,11 @@ def test_governed_sara_rejeita_licença_inválida(system):
 
 def test_quantum_crawler_activation_contract(system):
     qc = system.components["quantum_crawler"]
-    if qc.is_backends_ready():
-        assert qc.describe()["backends_configured"] >= 1
-        assert qc.STATUS.value == "IMPLEMENTED"
-    else:
-        with pytest.raises(NotImplementedError) as exc_info:
-            qc.scan("query")
-        assert "QuantumCrawler.scan" in str(exc_info.value)
+    assert qc.describe()["backends_configured"] >= 1
+    assert qc.STATUS.value == "IMPLEMENTED"
+    isolated = __import__("sara.research.quantum_crawler", fromlist=["QuantumCrawler"]).QuantumCrawler([])
+    with pytest.raises(RuntimeError, match="QUANTUM_CRAWLER_NO_BACKENDS"):
+        isolated.scan("query")
 
 
 def test_synergy_engine_pipeline(system):
