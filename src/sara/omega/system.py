@@ -79,6 +79,10 @@ class SoulETROmegaSystem:
         battery = context.metric("battery_percent")
         if battery is not None:
             anticipation_context["battery_percent"] = battery.value
+        elif isinstance(facts_map.get("battery_percent"), (int, float)):
+            value = float(facts_map["battery_percent"])
+            if math.isfinite(value) and 0 <= value <= 100:
+                anticipation_context["battery_percent"] = value
         for key in ("network", "hour"):
             if key in facts_map:
                 anticipation_context[key] = facts_map[key]
