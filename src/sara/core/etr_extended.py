@@ -196,16 +196,22 @@ class ETR_Extended(ETR):
         care_terms = ("comunidade", "coletivo", "gerações", "natureza",
                        "solidariedade", "vulnerável", "cuidar")
         hits = sum(1 for c in care_terms if c in lower)
-        # Ubuntu e BuenVivir reforçam o framework do cuidado
-        ubuntu = self._ubuntu.evaluate(text)
-        buen = self._buen.evaluate(text)
-        score = min((hits + (1 if ubuntu.aligned else 0) +
-                     (1 if buen.aligned else 0)) / 4.0, 1.0)
+        # Ubuntu e BuenVivir reforçam o framework do cuidado.
+        ubuntu = self._ubuntu.evaluate_structured(text) if hasattr(self._ubuntu, "evaluate_structured") else self._ubuntu.evaluate(text).__dict__
+        buen = self._buen.evaluate_structured(text) if hasattr(self._buen, "evaluate_structured") else self._buen.evaluate(text).__dict__
+        ubuntu_aligned = bool(ubuntu.get("aligned", False))
+        buen_aligned = bool(buen.get("aligned", False))
+        semantic_evidence = len(ubuntu.get("semantic_evidence", ())) + len(buen.get("semantic_evidence", ()))
+        score = min((hits + (1 if ubuntu_aligned else 0) +
+                     (1 if buen_aligned else 0) + semantic_evidence) / 6.0, 1.0)
         return FrameworkAssessment(
             framework="cuidado",
             approved=score >= 0.25,
             score=round(score, 3),
-            reasoning=f"termos_cuidado={hits} ubuntu={ubuntu.aligned} buen={buen.aligned}",
+            reasoning=(
+                f"termos_cuidado={hits} ubuntu={ubuntu_aligned} "
+                f"buen={buen_aligned} semantic_evidence={semantic_evidence}"
+            ),
         )
 
     # -----------------------------------------------------------------
