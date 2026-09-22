@@ -40,7 +40,7 @@ Extensões de integração não são novos núcleos SOUL.
 | ARAForge | adaptação de manifestos | aplica restrições preservando prompt original | GOVERNANCE | REAL |
 | AssimilationReviewCommittee | quórum de assimilação | avaliadores independentes e cálculo de quórum | GOVERNANCE | REAL |
 | QuantumSnapshotSystem | snapshot meta | cópia de estado + ID + restauração | SNAPSHOT | REAL LOCAL |
-| ERU_Engine | reversibilidade | freeze, diff profundo, recuperação de chaves/listas e fusão | PERSISTENCE | REAL LOCAL |
+| ERU_Engine | reversibilidade | freeze/diff estrutural + snapshots de capacidades, assinaturas e origem de métodos; candidatos de recuperação sem reintegração automática | PERSISTENCE | REAL LOCAL |
 | TransystemSARA | assimilação externa | interface para sistemas externos e credenciais | — | BLOQUEADO POR INFRA |
 | CycleAuditor | auditoria do ciclo | verifica fases, abortos, persistência e snapshot | AUDIT, VALIDATION, MONITORING | REAL |
 
