@@ -11,6 +11,7 @@ from .itr_extended import ITR_Extended, StrategicPlan, ComposedResult, PatternRe
 from .trinity_synergy import TrinitySynergy, TrinityReport, TrinityIteration
 from .trinity_eru_unified import TrinityERUUnified, UnifiedERUReport
 from .connected_runtime import ConnectedRuntime, ConnectedAction
+from sara.meta.aeternum_chimera import AeternumChimeraBridge
 
 __all__ = [
     "Provenance", "RuleProvenance", "ProvenanceTracker",
@@ -25,4 +26,5 @@ __all__ = [
     "TrinitySynergy", "TrinityReport", "TrinityIteration",
     "TrinityERUUnified", "UnifiedERUReport",
     "ConnectedRuntime", "ConnectedAction",
+    "AeternumChimeraBridge",
 ]
