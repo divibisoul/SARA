@@ -18,6 +18,7 @@ class Record:
     ts: str
     inserted_at: str
     vector: Optional[list[float]] = None
+    integrity: str = ""
 
 
 def _cosine(a: list[float], b: list[float]) -> float:
@@ -54,9 +55,10 @@ class TemporalVectorDB:
                vector: Optional[list[float]] = None) -> str:
         ts_val = ts or now_iso()
         rid = short_hash({"data": data, "ts": ts_val})
+        integrity = short_hash({"id": rid, "data": data, "ts": ts_val, "vector": vector})
         self._records.append(
             Record(id=rid, data=dict(data), ts=ts_val,
-                   inserted_at=now_iso(), vector=vector)
+                   inserted_at=now_iso(), vector=vector, integrity=integrity)
         )
         return rid
 
@@ -78,6 +80,24 @@ class TemporalVectorDB:
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:top_k]
 
+    def by_data(self, filters: dict[str, Any]) -> list[Record]:
+        return [
+            r for r in self._records
+            if all(r.data.get(key) == value for key, value in filters.items())
+        ]
+
+    def verify_record(self, record_id: str) -> bool:
+        record = self.by_id(record_id)
+        if record is None:
+            return False
+        expected = short_hash({
+            "id": record.id,
+            "data": record.data,
+            "ts": record.ts,
+            "vector": record.vector,
+        })
+        return record.integrity == expected
+
     def count(self) -> int:
         return len(self._records)
 
@@ -92,7 +112,12 @@ class TemporalVectorDB:
     def load(self, path: str) -> None:
         with open(path, "r", encoding="utf-8") as f:
             payload = json.load(f)
-        self._records = [Record(**p) for p in payload]
+        self._records = [
+            Record(**{**p, "integrity": p.get("integrity") or short_hash({
+                "id": p["id"], "data": p["data"], "ts": p["ts"], "vector": p.get("vector")
+            })})
+            for p in payload
+        ]
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
