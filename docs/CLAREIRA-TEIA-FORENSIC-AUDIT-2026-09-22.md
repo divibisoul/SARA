@@ -72,3 +72,20 @@ Executar CI, corrigir primeiro erro real, repetir até obter execução verde e 
 - Comandos vagais possuem ciclo PENDING→EXECUTED/DELIVERY_FAILED e não são tratados como executados antes de ACK.
 - O CI do SARA foi configurado para rodar também em pushes da branch de fusão.
 - Não há evidência de execução verde do pytest nesta sessão; a limitação do conector de workflow impede declarar o resultado sem logs.
+
+## Descongelamento e entrelaçamento ERU ↔ MMD/RGO ↔ Tríade ↔ Clareira
+
+Nesta frente, as autoridades existentes permanecem separadas e cooperativas:
+- ERU_Engine continua como autoridade canônica dos snapshots/reversibilidade.
+- MMD é representado por um adaptador de transição que deriva massa perdida, adicionada e alterada a partir de diferenças reais entre snapshots ERU de Clareira.
+- RGO é representado por propostas de capacidade complementar derivadas dos achados; propostas não são execução.
+- A Tríade existente (ARA_Extended, ETR_Extended, ITR_Extended via TrinityERUUnified) recebe a evidência serializada para auditoria/estratégia/validação, sem mutação automática.
+- Clareira continua proprietária do runtime neural e envia o estado observado ao SARA.
+
+O novo contrato transversal é exposto como `sara.clareira.audit` e preserva correlação, proveniência e a distinção entre estado aceito, avaliação derivada, proposta e execução efetiva.
+
+### Evidência atual
+- E2 — implementação GitHub presente nos branches de fusão.
+- E3/E4 — ainda não promovido: os gates CI anteriores terminaram em falha com logs/steps não disponibilizados pelo conector; nenhum resultado verde é afirmado.
+- E5 — bloqueado até execução reproduzível, validação independente e reaudição final.
+
