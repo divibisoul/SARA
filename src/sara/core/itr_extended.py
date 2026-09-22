@@ -255,7 +255,8 @@ class ITR_Extended(ITR):
                 "rollbacks": sum(1 for p in phase_results if p.get("rolled_back")),
                 "baseline_semantic_fingerprint": baseline.fingerprint,
                 "semantic_guard_passed": not any(
-                    p.get("semantic_relations_lost", 0) > 0 for p in phase_results
+                    bool(p.get("semantic_actions_lost"))
+                    for p in phase_results
                 ),
             },
         )
