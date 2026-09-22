@@ -53,6 +53,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
     def _body(self) -> dict:
         try:
             length = int(self.headers.get("Content-Length", "0"))
+            if length < 0 or length > (1 << 20):
+                raise ValueError("request body exceeds 1 MiB")
             data = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(data, dict):
                 raise ValueError("JSON deve ser objeto")
@@ -107,11 +109,13 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if path.startswith("/v1/trace/"):
                 cycle_id = path.rsplit("/", 1)[-1]
                 entries = system.components["trace"].query({"cycle_id": cycle_id})
+                temporal = system.components["temporal"].by_data({"cycle_id": cycle_id})
                 self._json(200, {
                     "cycle_id": cycle_id,
                     "integrity": system.components["trace"].verify(),
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "entries": [e.__dict__ for e in entries],
+                    "temporal_records": [r.__dict__ for r in temporal],
                 })
                 return
             raise SaraAPIError(404, "NOT_FOUND", f"Endpointo não existe: {path}")
@@ -134,6 +138,13 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
                 cycle_id = body.get("cycle_id")
+                correlation = self.headers.get("X-Correlation-ID", "").strip()
+                if cycle_id is None and correlation:
+                    cycle_id = correlation
+                if cycle_id is not None and (
+                    not isinstance(cycle_id, str) or not cycle_id.strip()
+                ):
+                    raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
                 result = system.sistema_vivo.process(text, cycle_id=cycle_id)
                 self._json(200, {
                     "cycle_id": result.cycle_id,
@@ -159,8 +170,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 all_flaws = [*flaws, *semantic, *structural, *relational]
                 if path == "/v1/audit":
                     ethical = etr.validate_multi_framework(text)
+                    request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                     self._json(200, {
-                        "request_id": str(uuid.uuid4()),
+                        "request_id": request_id,
+                        "correlation_id": request_id,
                         "operation": "audit",
                         "flaws": [getattr(f, "__dict__", str(f)) for f in all_flaws],
                         "count": len(all_flaws),
@@ -171,8 +184,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     return
                 regenerated = ara.regenerate_semantic(text, all_flaws)
                 ethical = etr.validate_multi_framework(regenerated.transformed)
+                request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 self._json(200, {
-                    "request_id": str(uuid.uuid4()),
+                    "request_id": request_id,
+                    "correlation_id": request_id,
                     "operation": "regenerate",
                     "original": regenerated.original,
                     "transformed": regenerated.transformed,
