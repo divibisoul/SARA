@@ -139,3 +139,19 @@ def test_bridge_capability_observation_and_drift():
         item["role"] == "ARA"
         for item in audit["capability_drifts"]
     )
+def test_live_regenerative_loop_is_observed_by_eru():
+    from sara.bootstrap import build_default_system
+
+    system = build_default_system(fail_closed=True)
+    result = system.sistema_vivo.process(
+        "promover autonomia comunitária",
+        cycle_id="eru-live-cycle",
+    )
+    assert result.loop_report.converged is True
+
+    bridge = system.components["eru_bridge"]
+    assert "eru-live-cycle" in bridge.observed_cycle_ids()
+    audit = bridge.audit_cycle("eru-live-cycle")
+    assert audit["observations"]
+    assert audit["capability_observations"]
+    assert audit["capability_drifts"]
