@@ -22,6 +22,7 @@ from sara.memory.dna_tags import DNA_Tags
 from sara.memory.temporal_vector_db import TemporalVectorDB
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.clock import now_iso
+from sara.core.semantic_engine import SemanticEngine, SemanticFrame
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ class ARA_Extended(ARA):
     def __init__(self, dna: DNA_Tags, temporal: TemporalVectorDB,
                  provenance: ProvenanceTracker) -> None:
         super().__init__(dna, temporal, provenance)
+        self._semantic = SemanticEngine()
         self._prov.register(
             "ARA_Extended.detect_structural",
             Provenance.RECONSTRUCTED,
@@ -74,6 +76,40 @@ class ARA_Extended(ARA):
             "Evolução proposta a partir de meta-análise das regras ativas",
             source="ara_extended_v3",
         )
+
+    # -----------------------------------------------------------------
+    # 1. ANÁLISE SEMÂNTICA COMPARTILHADA
+    # -----------------------------------------------------------------
+
+    def analyze_semantics(self, text: str) -> SemanticFrame:
+        """Produz frame semântico verificável para ARA/ETR/ITR."""
+        return self._semantic.analyze(text)
+
+    def detect_semantic(self, text: str) -> list[Flaw]:
+        """Converte sinais semânticos estruturados em falhas auditáveis."""
+        frame = self.analyze_semantics(text)
+        flaws: list[Flaw] = []
+        for relation in frame.relations:
+            if relation.action in {"remover", "apagar", "deletar", "substituir"}:
+                flaws.append(Flaw(
+                    kind="RELACAO_ACAO_DESTRUTIVA",
+                    detail=(
+                        f"subject={relation.subject}; action={relation.action}; "
+                        f"object={relation.object}; negated={relation.negated}"
+                    ),
+                    provenance="RECONSTRUCTED",
+                    severity=0.65 if not relation.negated else 0.25,
+                    context=relation.evidence,
+                ))
+        if frame.negations and frame.relations:
+            flaws.append(Flaw(
+                kind="ESCOPO_NEGACAO",
+                detail=f"negacoes={list(frame.negations)}; relacoes={len(frame.relations)}",
+                provenance="INFERRED",
+                severity=0.45,
+                context=frame.negations[:4],
+            ))
+        return flaws
 
     # -----------------------------------------------------------------
     # 1. ANÁLISE ESTRUTURAL
@@ -197,6 +233,11 @@ class ARA_Extended(ARA):
             )
 
         preserved = self._critical_markers_preserved(original, transformed)
+        semantic_diff = self._semantic.compare(original, transformed)
+        if semantic_diff["relations_lost"] or semantic_diff["entity_loss"]:
+            raise RuntimeError(
+                "ARA_Extended.regenerate_semantic: perda semântica estrutural detectada"
+            )
         integrity_hash = self._hash(transformed)
         self._temporal.insert({
             "cycle": "ara_regenerate_semantic",
@@ -204,6 +245,7 @@ class ARA_Extended(ARA):
             "transformed_len": len(transformed),
             "rules": applied,
             "preserved": preserved,
+            "semantic_diff": semantic_diff,
             "integrity": integrity_hash,
             "ts": now_iso(),
         })
