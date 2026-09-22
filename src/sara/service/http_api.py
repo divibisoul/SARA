@@ -212,8 +212,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/clareira/audit":
                 audit = system.components["clareira_frontier"].latest_assessment()
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 self._json(200, {
                     "operation": "sara.clareira.audit",
+                    "correlation_id": correlation,
                     "status": "OBSERVED" if audit is not None else "EXECUTION_REQUIRED",
                     "audit": audit,
                 })
