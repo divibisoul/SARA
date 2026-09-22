@@ -8,6 +8,8 @@ import os
 import copy
 import urllib.error
 import urllib.request
+import shutil
+import subprocess
 from dataclasses import dataclass
 from typing import Optional
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
@@ -82,12 +84,30 @@ class DecisionTrace:
 
     def publish_to_ipfs(self, entry: TraceEntry) -> str:
         endpoint = os.getenv("SARA_IPFS_API_URL", "").strip()
+
+
         if not endpoint:
-            raise NotImplementedError(
-                "DecisionTrace.publish_to_ipfs requer SARA_IPFS_API_URL "
-                "apontando para a API RPC HTTP de um nó/gateway IPFS real. "
-                "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('DecisionTrace')."
-            )
+            ipfs_cli = shutil.which("ipfs")
+            if not ipfs_cli:
+                raise RuntimeError("IPFS_NOT_CONFIGURED")
+            try:
+                result = subprocess.run(
+                    [ipfs_cli, "add", "-Q", "-"],
+                    input=payload,
+                    capture_output=True,
+                    timeout=20,
+                    check=False,
+                )
+            except subprocess.SubprocessError as exc:
+                raise RuntimeError(f"IPFS_CLI_ERROR:{exc}") from exc
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"IPFS_CLI_FAILED:{result.stderr.decode('utf-8','replace')[:500]}"
+                )
+            cid = result.stdout.decode("utf-8", "replace").strip()
+            if not cid:
+                raise RuntimeError("IPFS_CLI_EMPTY_CID")
+            return cid
 
         boundary = "----SARAIPFSBOUNDARY"
         payload = json.dumps({
