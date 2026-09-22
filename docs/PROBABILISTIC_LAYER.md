@@ -42,7 +42,7 @@ When both evidence and neural logits exist:
 
 with defaults `α=0.5`, `β=0.5`, followed by normalization.
 
-The result reports `source=dirichlet|neural|fused` plus node provenance.
+The result reports `source=dirichlet|neural|fused` plus node provenance. When available, the context also exposes the separate `dirichlet_posterior` and `neural_posterior` components so fusion is auditable rather than opaque.
 
 ## Causal structure and interventions
 
@@ -61,3 +61,12 @@ When the feature is disabled, the SARA cycle remains on its pre-existing path.
 
 Probabilistic output is copied into cycle artifacts and DecisionTrace. Confidence,
 entropy, posterior and provenance are exposed as auxiliary evidence only.
+## Rejeitados nesta integração
+
+- GAN/autotreino de pesos dentro do ciclo: rejeitado; treino permanece fora do path crítico e requer infraestrutura/jobs governados.
+- pgmpy como dependência obrigatória: rejeitado; o caminho básico é puro Python e o adaptador completo permanece opcional/PENDING_INFRASTRUCTURE.
+- Criptografia homomórfica obrigatória: rejeitada como dependência desta camada.
+- NOAA/INMET como dependência climática do core: rejeitada.
+- Firebase como requisito desta fusão: rejeitado.
+- “Quantum” como dependência ou mecanismo de fabricação de resultados: rejeitado nesta camada. Módulos legados existentes não são apagados por causa disso.
+- Sucesso sintético, mock ou resposta final fabricada: rejeitado.
