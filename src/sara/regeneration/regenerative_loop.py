@@ -16,6 +16,7 @@ from sara.security.ethical_filter_chain import EthicalFilterChain
 from sara.memory.regenerative_memory import RegenerativeMemory
 from sara.memory.temporal_vector_db import TemporalVectorDB
 from sara.memory.dna_tags import DNA_Tags
+from sara.memory.working_memory import WorkingMemory
 from sara.infra.clock import now_iso
 from sara.monitoring.execution_report import ExecutionReport, PhaseEvidence
 from sara.regeneration.regenerative_state import CycleState, RegenerativeState
@@ -81,6 +82,7 @@ class RegenerativeLoop:
         cycle_auditor: Any = None, max_cycles: int = 3,
         connected_runtime: ConnectedRuntime | None = None,
         trinity: Any = None,
+        working_memory: WorkingMemory | None = None,
     ) -> None:
         self._ara, self._etr, self._itr = ara, etr, itr
         self._identity, self._memory = identity, memory
@@ -91,6 +93,7 @@ class RegenerativeLoop:
         self._auditor, self._max_cycles = cycle_auditor, max(1, max_cycles)
         self._connected_runtime = connected_runtime
         self._trinity = trinity
+        self._working_memory = working_memory
         self._history: list[LoopReport] = []
         self._invariants = InvariantValidator()
 
@@ -121,6 +124,12 @@ class RegenerativeLoop:
         cid = cycle_id or f"cycle-{now_iso()}"
         sink = TraceSink(self._trace, self._temporal, self._prov)
         ctx = CycleContext(cid, str(input_text), str(input_text), sink)
+        if self._working_memory is not None:
+            self._working_memory.put("cycle_context", {
+                "cycle_id": cid,
+                "input": str(input_text),
+                "stage": "preflight",
+            })
         self._preflight(ctx)
 
         report = LoopReport(
@@ -135,6 +144,12 @@ class RegenerativeLoop:
         for idx in range(1, self._max_cycles + 1):
             state.iteration = idx
             state.transition(CycleState.RUNNING, f"iteration_{idx}", now_iso())
+            if self._working_memory is not None:
+                self._working_memory.put("iteration_context", {
+                    "cycle_id": cid,
+                    "iteration": idx,
+                    "current_state": ctx.current,
+                })
             cycle = {"idx": idx, "phases": {}}
             pre_state = {"cycle": idx, "input": ctx.current, "ts": now_iso()}
             pre_hash = self._rollback.capture(f"{cid}::{idx}::pre", pre_state, scope="cycle")
@@ -205,6 +220,13 @@ class RegenerativeLoop:
                     and invariant_report.ok
                 )
                 cycle["converged"] = converged
+                if self._working_memory is not None:
+                    self._working_memory.put("last_cycle_result", {
+                        "cycle_id": cid,
+                        "iteration": idx,
+                        "converged": converged,
+                        "state": ctx.current,
+                    })
                 report.cycles.append(cycle)
 
                 if converged:
@@ -245,6 +267,13 @@ class RegenerativeLoop:
 
         state.transition(CycleState.COMPLETED, "cycle_finished", now_iso())
         report.final_state = ctx.current
+        if self._working_memory is not None:
+            self._working_memory.put("last_final_state", {
+                "cycle_id": cid,
+                "state": ctx.current,
+                "converged": report.converged,
+                "rollback_performed": report.rollback_performed,
+            })
         report.invariants = [
             x for c in report.cycles for x in c.get("invariants", {}).get("checks", [])
         ]
