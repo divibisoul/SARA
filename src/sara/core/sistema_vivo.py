@@ -107,6 +107,8 @@ class SistemaVivo:
                 "interventions": probabilistic.get("interventions"),
             })
         loop_context = dict(context or {})
+        if not self._probabilistic.enabled:
+            loop_context.pop("probabilistic", None)
         if probabilistic is not None:
             loop_context["probabilistic"] = probabilistic
         report = self._loop.run(
