@@ -189,3 +189,21 @@ def test_trinity_synergy_iteracoes_registradas(trinity):
     # Deve abortar (ETR rejeita)
     first = report.iterations[0]
     assert first.etr_consensus >= 0
+
+
+def test_trinity_fusion_and_eru_mirror():
+    from sara.bootstrap import build_default_system
+    system = build_default_system(fail_closed=True)
+    trinity = system.components["trinity"]
+    mirror = trinity.fuse_and_mirror(
+        "test-fusion",
+        "alvo",
+        {"flaws": ["x"], "semantic_fingerprint": "a"},
+        {"approved": True, "consensus": 1.0},
+        {"phases": 4, "rollback": False},
+    )
+    assert mirror.integrity_ok is True
+    assert mirror.eru["available"] is True
+    assert set(mirror.eru["snapshot_hashes"]) == {"ARA", "ETR", "ITR"}
+    assert trinity.mirror("test-fusion") is not None
+    assert trinity.audit_mirror("test-fusion")["ok"] is True
