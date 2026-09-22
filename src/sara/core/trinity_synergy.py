@@ -212,8 +212,9 @@ class TrinitySynergy:
         self._mirrors[cycle_id] = mirror
         return mirror
 
-    def mirror(self, cycle_id: str) -> FusionMirror | None:
-        return self._mirrors.get(cycle_id)
+    def mirror(self, cycle_id: str, version: int | None = None) -> FusionMirror | None:
+        key = f"{cycle_id}:v{version}" if version is not None else cycle_id
+        return self._mirrors.get(key)
 
     def audit_mirror(self, cycle_id: str, version: int | None = None) -> dict:
         key = f"{cycle_id}:v{version}" if version is not None else cycle_id
@@ -340,8 +341,6 @@ class TrinitySynergy:
                     "phases": len(plan.phases),
                     "rollback": result.rollback_triggered,
                     "metrics": result.metrics,
-                    "fusion_hash": mirror.fused_hash,
-                    "mirror_integrity": mirror.integrity_ok,
                 },
             )
 
@@ -373,6 +372,9 @@ class TrinitySynergy:
                     "rollback_triggered": result.rollback_triggered,
                     "semantic_flaws": [f.kind for f in semantic_flaws],
                     "metrics": result.metrics,
+                    "fusion_hash": mirror.fused_hash,
+                    "mirror_integrity": mirror.integrity_ok,
+                    "mirror_version": mirror.version,
                 },
             )
             iterations.append(iteration)
