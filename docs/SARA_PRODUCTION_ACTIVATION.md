@@ -68,3 +68,19 @@ A integração só é considerada ATIVA depois que:
 8. todos os gates de testes e reauditoria passam.
 
 Sem esses eventos observáveis, o estado permanece PROJETADO/BLOQUEADO, nunca "ativo por configuração".
+
+## 4b. N01, N02, N03 e N05
+
+N01 (branch canonica consolidacao-n01), N02 e N03 expõem as mesmas capacidades sara.* no respectivo gateway Mesh e chamam o serviço SARA por HTTP server-side.
+
+N01/N02/N03 usam SARA_SERVICE_URL e SARA_SERVICE_TOKEN. N05 usa SARA_BASE_URL, SARA_API_TOKEN e SARA_ENABLE_CHAT=true para adicionar evidência regenerativa ao contexto conversacional.
+
+Cada integração deve comprovar uma resposta real com cycle_id/correlation_id e estado de erro explícito quando SARA não estiver configurado.
+
+## 8. Backends de ativação local
+
+SARA_SANDBOX_DOCKER_IMAGE pode apontar para uma imagem Python já presente no host. Quando Docker e a imagem estão disponíveis, o bootstrap injeta DockerIsolationBackend real no SafeSandbox.
+
+O QuantumCrawler inicializa backends HTTP reais para GitHub e HuggingFace. Tokens GITHUB_TOKEN e HF_TOKEN são opcionais para endpoints públicos e nunca são armazenados no código.
+
+A detecção é fail-closed: não há promoção para capacidade ativa sem backend detectado.
