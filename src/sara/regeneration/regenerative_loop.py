@@ -413,6 +413,9 @@ class RegenerativeLoop:
             "base_reason": base.reason,
             "consensus": multi_result.consensus_score if multi_result else None,
             "dissenting": list(multi_result.dissenting_frameworks) if multi_result else [],
+            "decision_status": getattr(multi_result, "decision_status", None),
+            "evidence_sufficient": getattr(multi_result, "evidence_sufficient", None),
+            "conflicts": list(getattr(multi_result, "conflicts", ())),
         }
         self._record(ctx, CyclePhase.ETHICS, "ETR", approved, **cycle["phases"]["ethics"])
         if not approved:
@@ -508,6 +511,8 @@ class RegenerativeLoop:
             "filter_chain_ok": bool(filter_validation.get("ok", True)),
             "filter_chain_results": filter_validation.get("results", []),
             "filter_chain_failures": filter_validation.get("failures", []),
+            "decision_status": getattr(result, "reason", None),
+            "evidence_count": len(getattr(result, "evidence", ())),
         }
         self._record(ctx, CyclePhase.VALIDATION, "ETR", approved,
                      **cycle["phases"]["validation"])
