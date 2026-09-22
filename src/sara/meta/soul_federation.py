@@ -86,6 +86,8 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "method": "GET",
         "phases": ["audit", "strategy", "validation", "persistence"],
         "purpose": "consultar a avaliação cruzada ERU→MMD→RGO→Tríade do último estado Clareira",
+        "read_only": True,
+        "consumers": ["N01", "N02", "N03", "N04", "N05", "N06"],
         "requires_auth": True,
     },
     "sara.clareira.vagus": {
