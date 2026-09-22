@@ -31,7 +31,8 @@ class StrategicPlan:
     phases: tuple[dict, ...]
     convergence_criteria: tuple[str, ...]
     rollback_points: tuple[str, ...]
-    provenance: str = "PSEUDOCÓDIGO_HISTÓRICO_v1"
+    provenance: str = "RECONSTRUCTED"
+    legacy_criteria: tuple[str, ...] = ("output_maior_que_input",)
 
 
 @dataclass(frozen=True)
@@ -40,7 +41,7 @@ class ComposedResult:
     phase_results: tuple[dict, ...]
     rollback_triggered: bool
     metrics: dict
-    provenance: str = "PSEUDOCÓDIGO_HISTÓRICO_v1"
+    provenance: str = "RECONSTRUCTED"
 
 
 @dataclass(frozen=True)
@@ -66,8 +67,15 @@ class ITR_Extended(ITR):
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.NUCLEAR
-    DEPENDENCIES = ITR.DEPENDENCIES + ("ITR",)
+    DEPENDENCIES = ITR.DEPENDENCIES
     CYCLE_PHASES = ITR.CYCLE_PHASES
+
+    ANNOTATION_ONLY_STEPS = frozenset({"ethical_align", "resilience_check"})
+
+    @staticmethod
+    def _preserve(text: str) -> str:
+        """Preservação explícita: operação observável, não transformadora."""
+        return str(text)
 
     # Passos adicionais
     EXTRA_STEPS: dict[str, Callable[[str], str]] = {
@@ -87,7 +95,8 @@ class ITR_Extended(ITR):
     def __init__(self, provenance: ProvenanceTracker, safe_sandbox=None) -> None:
         super().__init__(provenance, safe_sandbox)
         self._semantic = SemanticEngine()
-        # Registra os passos extras no registry central
+        # Registra os passos sem apagar os existentes.
+        _STEP_REGISTRY.setdefault("preserve", self._preserve)
         for name, fn in self.EXTRA_STEPS.items():
             _STEP_REGISTRY.setdefault(name, fn)
         self._prov.register(
@@ -185,20 +194,20 @@ class ITR_Extended(ITR):
                 {
                     "phase": 3, "name": "structure",
                     "steps": ["structure", "deep_structure"],
-                    "purpose": "organizar e enquadrar",
+                    "purpose": "organizar e enquadrar com transformação idempotente",
                 },
                 {
                     "phase": 4, "name": "guard",
-                    "steps": ["guardrails", "ethical_align", "resilience_check"],
-                    "purpose": "aplicar guardrails éticos e de resiliência",
+                    "steps": ["guardrails"],
+                    "purpose": "aplicar guardrails executáveis e verificáveis",
                 },
             )
 
         criteria = (
-            "output_maior_que_input",
-            "keywords_extraidas >= 3",
-            "guardrails_presentes",
-            "alinhamento_ético_confirmado",
+            "semantic_relations_preserved",
+            "postconditions_all_pass",
+            "no_annotation_only_steps",
+            "output_non_degrading",
         )
         rollbacks = ("after_phase_2", "after_phase_3")
 
@@ -228,6 +237,11 @@ class ITR_Extended(ITR):
             semantic_violation = False
             try:
                 for step_name in phase["steps"]:
+                    if step_name in self.ANNOTATION_ONLY_STEPS:
+                        raise RuntimeError(
+                            f"passo '{step_name}' é somente anotação histórica e "
+                            "não pode ser classificado como execução"
+                        )
                     fn = _STEP_REGISTRY.get(step_name)
                     if fn is None:
                         raise KeyError(f"passo '{step_name}' não registrado")
@@ -254,8 +268,13 @@ class ITR_Extended(ITR):
                         f"{semantic_delta['relations_lost']}"
                     )
 
+                if not isinstance(text, str) or not text.strip():
+                    raise RuntimeError(
+                        f"fase {phase['phase']} produziu saída vazia"
+                    )
                 phase_metrics["ok"] = True
                 phase_metrics["delta_len"] = len(text) - phase_start_len
+                phase_metrics["postcondition"] = "non_empty_and_semantically_preserved"
             except Exception as exc:
                 phase_metrics["ok"] = False
                 phase_metrics["error"] = str(exc)
@@ -336,15 +355,25 @@ class ITR_Extended(ITR):
     def optimize_registry(self) -> RegistryOptimization:
         """ITR propõe otimizações ao próprio registry de passos."""
         current = set(_STEP_REGISTRY.keys())
-        proposed_new = {"semantic_expand", "context_inject"}
+        proposed_new: set[str] = set()
         deprecated: set[str] = set()
         improvements: list[str] = []
 
         if "structure" in current and "deep_structure" in current:
-            improvements.append("structure e deep_structure podem ser compostos")
-
-        if len(current) < 8:
-            improvements.append("adicionar passos de enriquecimento semântico")
+            improvements.append(
+                "structure e deep_structure podem ser compostos; "
+                "deep_structure deve permanecer idempotente"
+            )
+        for name in sorted(self.ANNOTATION_ONLY_STEPS & current):
+            deprecated.add(name)
+            improvements.append(
+                f"{name} permanece no registry por compatibilidade, "
+                "mas é proibido em planos executáveis"
+            )
+        improvements.append(
+            "semantic_expand/context_inject permanecem propostas até existir "
+            "implementação verificável e teste de pós-condição"
+        )
 
         return RegistryOptimization(
             new_steps=tuple(proposed_new),
