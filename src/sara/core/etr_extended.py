@@ -181,8 +181,8 @@ class ETR_Extended(ETR):
     def _assess_virtue(self, text: str) -> FrameworkAssessment:
         lower = str(text).lower()
         virtues = ("cuidado", "respeito", "responsabilidade", "coragem",
-                   "honestidade", "comunidade", "solidariedade",
-                   "autonomia", "transparência", "transparencia")
+                   "honestidade", "comunidade", "comunitária", "comunitario",
+                   "solidariedade", "autonomia", "transparência", "transparencia")
         hits = sum(1 for v in virtues if v in lower)
         score = min(hits / 3.0, 1.0)
         return FrameworkAssessment(
@@ -194,8 +194,9 @@ class ETR_Extended(ETR):
 
     def _assess_care(self, text: str) -> FrameworkAssessment:
         lower = str(text).lower()
-        care_terms = ("comunidade", "coletivo", "gerações", "natureza",
-                       "solidariedade", "vulnerável", "cuidar",
+        care_terms = ("comunidade", "comunitária", "comunitario",
+                       "coletivo", "gerações", "natureza", "solidariedade",
+                       "vulnerável", "cuidar", "consciência", "consciencia",
                        "autonomia", "transparência", "transparencia")
         hits = sum(1 for c in care_terms if c in lower)
         # Ubuntu e BuenVivir reforçam o framework do cuidado.
