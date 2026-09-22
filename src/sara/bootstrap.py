@@ -109,7 +109,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     storm = StormMonitor(interval_s=0.1)
     governance_backend = GovernanceBackend(module_status={})
     auditor = CycleAuditor()
-    trinity = TrinitySynergy(ara_extended, etr_extended, itr_extended)
+    trinity = TrinitySynergy(ara_extended, etr_extended, itr_extended, eru=eru)
     connected_runtime = ConnectedRuntime(registry)
 
     loop = RegenerativeLoop(
