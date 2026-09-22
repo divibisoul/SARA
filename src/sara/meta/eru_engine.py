@@ -8,6 +8,7 @@ from typing import Any
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.hashing import hash_json
 from sara.infra.clock import now_iso
+from sara.infra.hashing import chain_hash
 
 
 @dataclass
@@ -43,8 +44,10 @@ class ERU_Engine:
     DEPENDENCIES = ("ProvenanceTracker", "TemporalVectorDB")
     CYCLE_PHASES = (CyclePhase.PERSISTENCE,)
 
-    def __init__(self) -> None:
+    def __init__(self, provenance=None, temporal=None) -> None:
         self._snapshots: dict[str, FrozenState] = {}
+        self._provenance = provenance
+        self._temporal = temporal
 
     def describe(self) -> dict:
         return {
@@ -57,8 +60,27 @@ class ERU_Engine:
 
     def freeze(self, name: str, state: Any) -> str:
         h = hash_json(state)
-        self._snapshots[name] = FrozenState(name=name, state=copy.deepcopy(state),
-                                             hash=h, ts=now_iso())
+        previous = self._snapshots[name].hash if name in self._snapshots else None
+        if previous is not None and previous == h:
+            return h
+        self._snapshots[name] = FrozenState(
+            name=name, state=copy.deepcopy(state), hash=h, ts=now_iso()
+        )
+        if self._temporal is not None:
+            self._temporal.insert({
+                "event": "eru_freeze",
+                "name": name,
+                "state_hash": h,
+                "previous_hash": previous,
+                "ts": now_iso(),
+            })
+        if self._provenance is not None:
+            self._provenance.register(
+                f"ERU.freeze.{name}",
+                Provenance.RECONSTRUCTED,
+                "Estado congelado durante ciclo SARA",
+                source="ERU_Engine.freeze",
+            )
         return h
 
     def _walk_keys(self, obj: Any, prefix: str = "") -> dict[str, Any]:
