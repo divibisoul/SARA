@@ -224,23 +224,14 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 clareira = system.components["clareira"]
                 limit_raw = self.headers.get("X-Clareira-Limit", "32")
                 try:
-                    pending = clareira.pending_vagal_commands(limit=int(limit_raw))
+                    limit = int(limit_raw)
+                    pending = clareira.pending_vagal_commands(limit=limit)
                 except (ValueError, TypeError) as exc:
                     raise SaraAPIError(422, "INVALID_CLAREIRA_VAGAL_LIMIT", str(exc)) from exc
                 self._json(200, {
                     "operation": "sara.clareira.vagus.pending",
                     "commands": pending,
                 })
-                return
-            if path == "/v1/clareira/vagus/pending":
-                clareira = system.components["clareira"]
-                limit_raw = self.headers.get("X-Clareira-Limit", "32")
-                try:
-                    limit = int(limit_raw)
-                    pending = clareira.pending_vagal_commands(limit=limit)
-                except (ValueError, TypeError) as exc:
-                    raise SaraAPIError(422, "INVALID_CLAREIRA_VAGAL_LIMIT", str(exc)) from exc
-                self._json(200, {"operation": "sara.clareira.vagus.pending", "commands": pending})
                 return
             if path == "/v1/governance/ui":
                 governance = system.components["governance"]
