@@ -46,6 +46,7 @@ from sara.research.neural_lens import NeuralLens
 from sara.research.quantum_crawler import QuantumCrawler
 from sara.research.quantum_scanner import QuantumScanner
 from sara.audit.cycle_auditor import CycleAuditor
+from sara.audit.engineering_gate import EngineeringGate
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
 
@@ -57,6 +58,7 @@ class SaraSystem:
     components: dict
     registration_report: dict = field(default_factory=dict)
     invariant_report: dict = field(default_factory=dict)
+    engineering_gate_report: dict = field(default_factory=dict)
     ready: bool = False
 
 
@@ -162,11 +164,17 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         })
 
     invariant_report = InvariantValidator().validate_registry(registry).as_dict()
-    if fail_closed and (report["failed"] or not invariant_report["ok"]):
+    engineering_gate_report = EngineeringGate().run()
+    if fail_closed and (
+        report["failed"]
+        or not invariant_report["ok"]
+        or not engineering_gate_report["critical_ok"]
+    ):
         raise RuntimeError({
             "message": "SARA bootstrap fail-closed: invariantes não satisfeitas",
             "registration_report": report,
             "invariant_report": invariant_report,
+            "engineering_gate_report": engineering_gate_report,
         })
 
     return SaraSystem(
@@ -174,7 +182,12 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         sistema_vivo=sistema,
         registration_report=report,
         invariant_report=invariant_report,
-        ready=not bool(report["failed"]) and invariant_report["ok"],
+        engineering_gate_report=engineering_gate_report,
+        ready=(
+            not bool(report["failed"])
+            and invariant_report["ok"]
+            and engineering_gate_report["critical_ok"]
+        ),
         components={
             "ara": ara, "ara_extended": ara_extended,
             "etr": etr, "etr_extended": etr_extended,
@@ -193,5 +206,6 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "transystem": transystem, "auditor": auditor, "provenance": prov,
             "decision_trace": trace, "activation_plan": CANONICAL_ACTIVATION_PLAN,
             "connected_runtime": connected_runtime,
+            "engineering_gate": engineering_gate_report,
         },
     )
