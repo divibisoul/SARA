@@ -23,11 +23,11 @@ Extensões de integração não são novos núcleos SOUL.
 | IdentityCore | fronteiras de identidade | validação de regras identitárias e participação | IDENTITY | REAL |
 | EmergencyRollback | reversão de estado | captura imutável, restauração e cadeia verificável | SNAPSHOT | REAL |
 | EthicalFilterChain | composição ética | múltiplos filtros e gate | VALIDATION | REAL |
-| SafeSandbox | isolamento | análise estática local; execução exige backend de isolamento real | EXECUTION | BLOQUEADO POR INFRA |
+| SafeSandbox | isolamento | análise estática local; DockerIsolationBackend real quando Docker + imagem existem | EXECUTION | PARCIAL / BACKEND EXTERNO CONDICIONAL |
 | StormMonitor | observabilidade operacional | sessões, amostragem de carga e anomalias | MONITORING | REAL LOCAL |
 | DecisionTrace | trilha de decisões | cadeia hash thread-safe; IPFS separado | PERSISTENCE, MONITORING | REAL LOCAL / IPFS BLOQUEADO |
-| GovernanceBackend | governança operacional | decisões, snapshots, overrides reais; UI externa pendente | MONITORING, GOVERNANCE | REAL LOCAL / UI PENDENTE |
-| QuantumCrawler | descoberta tecnológica | interface de backends e verificação de fonte | GOVERNANCE | BLOQUEADO POR INFRA |
+| GovernanceBackend | governança operacional | decisões, snapshots, overrides e API SARA; UI externa permanece apresentação | MONITORING, GOVERNANCE | REAL LOCAL / UI PENDENTE |
+| QuantumCrawler | descoberta tecnológica | backends HTTP reais GitHub/HuggingFace + coleta e verificação de origem; depende de rede no runtime | GOVERNANCE | IMPLEMENTADO COM ATIVAÇÃO HTTP |
 | NeuralLens | análise de código | AST Python local + cliente remoto pendente | GOVERNANCE | REAL LOCAL |
 | InnovationRadar | análise de candidatos | relevância, inovação, ética, estratégia e risco | GOVERNANCE | REAL |
 | NeuroIntegrator | integração de candidatos | snapshot, persistência, validação e rollback transacional | SNAPSHOT, PERSISTENCE | REAL |
