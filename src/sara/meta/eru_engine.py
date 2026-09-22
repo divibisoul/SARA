@@ -49,6 +49,7 @@ class ERU_Engine:
 
     def __init__(self, provenance=None, temporal=None) -> None:
         self._snapshots: dict[str, FrozenState] = {}
+        self._behavior_observations: dict[str, list[dict[str, Any]]] = {}
         self._provenance = provenance
         self._temporal = temporal
 
@@ -59,6 +60,7 @@ class ERU_Engine:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "snapshots": len(self._snapshots),
+            "behavior_observations": sum(len(v) for v in self._behavior_observations.values()),
         }
 
     def freeze(self, name: str, state: Any) -> str:
@@ -163,6 +165,97 @@ class ERU_Engine:
         snapshot_name = f"CAP::{name}"
         snapshot_hash = self.freeze(snapshot_name, state)
         return snapshot_hash
+
+    def record_behavior_observation(
+        self,
+        snapshot_name: str,
+        method: str,
+        probe_id: str,
+        input_digest: str,
+        output_digest: str,
+        *,
+        success: bool,
+        evidence_source: str = "external_execution",
+    ) -> dict[str, Any]:
+        """Registra evidência observada sem alegar equivalência funcional total.
+
+        A ERU não executa métodos arbitrários. O chamador fornece o resultado
+        efetivamente observado e seus digests. A evidência é vinculada ao
+        snapshot CAP::* correspondente para permitir comparação posterior.
+        """
+        if snapshot_name not in self._snapshots:
+            raise ValueError("ERU_BEHAVIOR_SNAPSHOT_MISSING")
+        if not method or not probe_id or not input_digest or not output_digest:
+            raise ValueError("ERU_BEHAVIOR_FIELDS_REQUIRED")
+        observation = {
+            "snapshot_name": snapshot_name,
+            "method": method,
+            "probe_id": probe_id,
+            "input_digest": input_digest,
+            "output_digest": output_digest,
+            "success": bool(success),
+            "evidence_source": evidence_source,
+            "functional_equivalence_proven": False,
+        }
+        self._behavior_observations.setdefault(snapshot_name, []).append(copy.deepcopy(observation))
+        if self._temporal is not None:
+            self._temporal.insert({
+                "event": "eru_behavior_observation",
+                **observation,
+                "ts": now_iso(),
+            })
+        if self._provenance is not None:
+            self._provenance.register(
+                f"ERU.behavior.{snapshot_name}.{method}.{probe_id}",
+                Provenance.RECONSTRUCTED,
+                "Evidência comportamental fornecida por execução externa observada",
+                source="ERU_Engine.record_behavior_observation",
+            )
+        return copy.deepcopy(observation)
+
+    def behavior_diff(self, older: str, newer: str) -> dict[str, Any]:
+        """Compara comportamento apenas para probes observados em ambos snapshots."""
+        if older not in self._snapshots or newer not in self._snapshots:
+            return {"ok": False, "reason": "missing_snapshot"}
+        old = {
+            (o["method"], o["probe_id"], o["input_digest"]): o
+            for o in self._behavior_observations.get(older, [])
+        }
+        new = {
+            (o["method"], o["probe_id"], o["input_digest"]): o
+            for o in self._behavior_observations.get(newer, [])
+        }
+        common = sorted(set(old) & set(new))
+        matched = []
+        changed = []
+        for key in common:
+            a, b = old[key], new[key]
+            item = {
+                "method": key[0],
+                "probe_id": key[1],
+                "input_digest": key[2],
+                "older_output_digest": a["output_digest"],
+                "newer_output_digest": b["output_digest"],
+                "older_success": a["success"],
+                "newer_success": b["success"],
+            }
+            if a["output_digest"] == b["output_digest"] and a["success"] == b["success"]:
+                matched.append(item)
+            else:
+                changed.append(item)
+        return {
+            "ok": True,
+            "older": older,
+            "newer": newer,
+            "matched_observations": matched,
+            "changed_observations": changed,
+            "older_only_observations": sorted(set(old) - set(new)),
+            "newer_only_observations": sorted(set(new) - set(old)),
+            "behavioral_evidence_available": bool(common),
+            "behaviorally_equivalent_for_observed_probes": bool(common) and not changed,
+            "functional_equivalence_proven": False,
+            "proof_scope": "observed_probes_only",
+        }
 
     def capability_diff(self, older: str, newer: str) -> dict[str, Any]:
         """Compara snapshots CAP::* por capacidade nominal/assinatura/código."""
