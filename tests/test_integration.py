@@ -131,11 +131,15 @@ def test_governed_sara_rejeita_licença_inválida(system):
     assert "compliance_rejected" in decision.reasons
 
 
-def test_pending_infrastructure_levanta_erro(system):
+def test_quantum_crawler_activation_contract(system):
     qc = system.components["quantum_crawler"]
-    with pytest.raises(NotImplementedError) as exc_info:
-        qc.scan("query")
-    assert "QuantumCrawler.scan" in str(exc_info.value)
+    if qc.is_backends_ready():
+        assert qc.describe()["backends_configured"] >= 1
+        assert qc.STATUS.value == "IMPLEMENTED"
+    else:
+        with pytest.raises(NotImplementedError) as exc_info:
+            qc.scan("query")
+        assert "QuantumCrawler.scan" in str(exc_info.value)
 
 
 def test_synergy_engine_pipeline(system):
