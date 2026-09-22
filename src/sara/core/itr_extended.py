@@ -31,7 +31,7 @@ class StrategicPlan:
     phases: tuple[dict, ...]
     convergence_criteria: tuple[str, ...]
     rollback_points: tuple[str, ...]
-    provenance: str = "PSEUDOCÓDIGO_HISTÓRICO_v1"
+    provenance: str = "RECONSTRUCTED"
 
 
 @dataclass(frozen=True)
@@ -40,7 +40,7 @@ class ComposedResult:
     phase_results: tuple[dict, ...]
     rollback_triggered: bool
     metrics: dict
-    provenance: str = "PSEUDOCÓDIGO_HISTÓRICO_v1"
+    provenance: str = "RECONSTRUCTED"
 
 
 @dataclass(frozen=True)
@@ -66,10 +66,13 @@ class ITR_Extended(ITR):
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.NUCLEAR
-    DEPENDENCIES = ITR.DEPENDENCIES + ("ITR",)
+    DEPENDENCIES = ITR.DEPENDENCIES
     CYCLE_PHASES = ITR.CYCLE_PHASES
 
-    # Passos adicionais
+    # Passos adicionais. Os dois passos de anotação legados permanecem
+    # registrados para compatibilidade, mas não participam de planos executáveis.
+    ANNOTATION_ONLY_STEPS = frozenset({"ethical_align", "resilience_check"})
+
     EXTRA_STEPS: dict[str, Callable[[str], str]] = {
         "deep_structure": lambda t: (
             t if str(t).lstrip().startswith("[ESTRUTURADO]")
@@ -165,8 +168,8 @@ class ITR_Extended(ITR):
             },
             {
                 "phase": 4, "name": "guard",
-                "steps": ["guardrails", "ethical_align", "resilience_check"],
-                "purpose": "aplicar guardrails éticos e de resiliência",
+                "steps": ["guardrails"],
+                "purpose": "aplicar guardrails executáveis e verificáveis",
             },
         ]
 
@@ -205,6 +208,11 @@ class ITR_Extended(ITR):
             semantic_violation = False
             try:
                 for step_name in phase["steps"]:
+                    if step_name in self.ANNOTATION_ONLY_STEPS:
+                        raise RuntimeError(
+                            f"passo '{step_name}' é somente anotação histórica e "
+                            "não pode ser classificado como execução"
+                        )
                     fn = _STEP_REGISTRY.get(step_name)
                     if fn is None:
                         raise KeyError(f"passo '{step_name}' não registrado")
@@ -316,15 +324,23 @@ class ITR_Extended(ITR):
     def optimize_registry(self) -> RegistryOptimization:
         """ITR propõe otimizações ao próprio registry de passos."""
         current = set(_STEP_REGISTRY.keys())
-        proposed_new = {"semantic_expand", "context_inject"}
+        proposed_new: set[str] = set()
         deprecated: set[str] = set()
         improvements: list[str] = []
 
         if "structure" in current and "deep_structure" in current:
-            improvements.append("structure e deep_structure podem ser compostos")
+            improvements.append("structure e deep_structure podem ser compostos; deep_structure permanece idempotente")
 
-        if len(current) < 8:
-            improvements.append("adicionar passos de enriquecimento semântico")
+        for name in sorted(self.ANNOTATION_ONLY_STEPS & current):
+            deprecated.add(name)
+            improvements.append(
+                f"{name} permanece no histórico, mas é excluído de planos executáveis"
+            )
+
+        if "semantic_expand" not in current:
+            improvements.append(
+                "não adicionar semantic_expand até existir transformação verificável e teste de pós-condição"
+            )
 
         return RegistryOptimization(
             new_steps=tuple(proposed_new),
