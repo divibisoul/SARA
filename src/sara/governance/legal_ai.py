@@ -3,6 +3,11 @@ Status: IMPLEMENTED (cadeia local) | PENDING_INFRASTRUCTURE (blockchain, patente
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import json
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.hashing import chain_hash
 from sara.infra.clock import now_iso
@@ -18,6 +23,37 @@ class LegalDecision:
     hash: str
 
 
+class PatentOracle:
+    def check(self, tech_name: str, jurisdiction: str) -> dict: ...
+
+
+class HTTPPatentOracle:
+    def __init__(self, endpoint: str, timeout_s: float = 20.0) -> None:
+        endpoint = endpoint.strip()
+        if not endpoint.startswith(("http://", "https://")):
+            raise ValueError("patent oracle endpoint deve ser http/https")
+        self.endpoint = endpoint.rstrip("/")
+        self.timeout_s = timeout_s
+
+    def check(self, tech_name: str, jurisdiction: str) -> dict:
+        params = urllib.parse.urlencode({"q": tech_name, "jurisdiction": jurisdiction})
+        request = urllib.request.Request(
+            f"{self.endpoint}?{params}",
+            headers={"Accept": "application/json", "User-Agent": "SARA-LegalAI/2.1"},
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:500]
+            raise RuntimeError(f"PATENT_ORACLE_HTTP_{exc.code}:{detail}") from exc
+        except (urllib.error.URLError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"PATENT_ORACLE_TRANSPORT_ERROR:{exc}") from exc
+        if not isinstance(payload, dict):
+            raise RuntimeError("PATENT_ORACLE_INVALID_RESPONSE")
+        return payload
+
+
 class LegalAI:
     NAME = "LegalAI"
     VERSION = "2.0"
@@ -26,9 +62,10 @@ class LegalAI:
     DEPENDENCIES = ()
     CYCLE_PHASES = (CyclePhase.GOVERNANCE,)
 
-    def __init__(self, allowed_licenses: set[str]) -> None:
+    def __init__(self, allowed_licenses: set[str], patent_oracle: PatentOracle | None = None) -> None:
         self._allowed = set(allowed_licenses)
         self._chain: list[LegalDecision] = []
+        self._patent_oracle = patent_oracle
 
     def describe(self) -> dict:
         return {
@@ -41,7 +78,7 @@ class LegalAI:
         }
 
     def is_patent_oracle_ready(self) -> bool:
-        return False
+        return self._patent_oracle is not None
 
     def validate_license(self, tech_name: str, license_id: str) -> LegalDecision:
         prev = self._chain[-1].hash if self._chain else "GENESIS"
@@ -71,11 +108,22 @@ class LegalAI:
         return result
 
     def check_patent(self, tech_name: str, jurisdiction: str) -> dict:
-        raise NotImplementedError(
-            "LegalAI.check_patent requer integração com bases de patentes reais "
-            "(USPTO, INPI, EPO) ou oracle de patentes. Nenhuma API está disponível. "
-            "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('LegalAI')."
-        )
+        if not self._patent_oracle:
+            return {
+                "verified": False,
+                "status": "BLOCKED_INFRASTRUCTURE",
+                "reason": "patent_oracle_not_configured",
+                "tech": tech_name,
+                "jurisdiction": jurisdiction,
+            }
+        result = self._patent_oracle.check(tech_name, jurisdiction)
+        return {
+            "verified": True,
+            "tech": tech_name,
+            "jurisdiction": jurisdiction,
+            "oracle": type(self._patent_oracle).__name__,
+            "result": result,
+        }
 
     def verify_chain(self) -> bool:
         prev = "GENESIS"
