@@ -1,4 +1,4 @@
-"""SARA — Núcleo: SistemaVivo v4.
+"""SARA — Núcleo: SistemaVivo.
 Status: IMPLEMENTED.
 """
 from __future__ import annotations
@@ -8,6 +8,7 @@ from sara.regeneration.regenerative_loop import RegenerativeLoop, LoopReport
 from sara.monitoring.storm_monitor import StormMonitor
 from sara.monitoring.decision_trace import DecisionTrace
 from sara.contracts import ModuleRegistry
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 
 @dataclass
@@ -23,16 +24,15 @@ class CycleResult:
 
 class SistemaVivo:
     NAME = "SistemaVivo"
-    VERSION = "4.0"
+    VERSION = "5.0"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.NUCLEAR
+    DEPENDENCIES = ("RegenerativeLoop", "StormMonitor", "DecisionTrace", "ModuleRegistry", "ProvenanceTracker")
+    CYCLE_PHASES = tuple(CyclePhase)
 
-    def __init__(
-        self,
-        loop: RegenerativeLoop,
-        monitor: StormMonitor,
-        trace: DecisionTrace,
-        registry: ModuleRegistry | None = None,
-        provenance: Any = None,
-    ) -> None:
+    def __init__(self, loop: RegenerativeLoop, monitor: StormMonitor,
+                 trace: DecisionTrace, registry: ModuleRegistry | None = None,
+                 provenance: Any = None) -> None:
         self._loop = loop
         self._monitor = monitor
         self._trace = trace
@@ -43,19 +43,17 @@ class SistemaVivo:
 
     def describe(self) -> dict:
         return {
-            "name": self.NAME,
-            "version": self.VERSION,
-            "registry_attached": self._registry is not None,
-            "provenance_attached": self._provenance is not None,
+            "name": self.NAME, "version": self.VERSION,
+            "status": self.STATUS.value, "role": self.ROLE.value,
+            "dependencies": list(self.DEPENDENCIES),
+            "phases": [p.value for p in self.CYCLE_PHASES],
         }
 
     def process(self, input_text, cycle_id=None, monitor_hours=0.0) -> CycleResult:
         self._cycle_count += 1
         cid = cycle_id or f"sv-cycle-{self._cycle_count}"
-
-        start_entry = self._trace.log({
-            "event": "cycle_start",
-            "cycle_id": cid,
+        start = self._trace.log({
+            "event": "cycle_start", "cycle_id": cid,
             "input_len": len(str(input_text)),
         })
         report = self._loop.run(input_text, cycle_id=cid)
@@ -66,29 +64,14 @@ class SistemaVivo:
             self._active_monitor = monitoring_id
 
         self._trace.log({
-            "event": "cycle_end",
-            "cycle_id": cid,
+            "event": "cycle_end", "cycle_id": cid,
             "converged": report.converged,
             "rollback": report.rollback_performed,
+            "evidence_hash": report.execution_report.get("evidence_hash"),
         })
-
         snap = self._registry.snapshot() if self._registry else None
-        prov_summary = None
-        if self._provenance is not None:
-            try:
-                prov_summary = self._provenance.report()
-            except Exception:
-                prov_summary = {"error": "report_failed"}
-
-        return CycleResult(
-            cycle_id=cid,
-            input=input_text,
-            loop_report=report,
-            trace_hash=start_entry.hash,
-            monitoring_id=monitoring_id,
-            registry_snapshot=snap,
-            provenance_summary=prov_summary,
-        )
+        prov_summary = self._provenance.report() if self._provenance else None
+        return CycleResult(cid, input_text, report, start.hash, monitoring_id, snap, prov_summary)
 
     def state(self) -> dict:
         return {

@@ -1,10 +1,9 @@
-"""SARA — Auditoria: CycleAuditor.
+"""SARA — Auditoria de ciclo.
 Status: IMPLEMENTED.
 """
 from __future__ import annotations
 from dataclasses import dataclass
-from sara.contracts.base import CyclePhase
-from sara.contracts.lifecycle import CANONICAL_ORDER
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 
 @dataclass
@@ -16,50 +15,50 @@ class InvariantResult:
 
 class CycleAuditor:
     NAME = "CycleAuditor"
-    VERSION = "1.0"
+    VERSION = "2.0"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.MONITORING
+    DEPENDENCIES = ()
+    CYCLE_PHASES = (CyclePhase.AUDIT, CyclePhase.VALIDATION, CyclePhase.MONITORING)
+
+    def describe(self) -> dict:
+        return {
+            "name": self.NAME, "version": self.VERSION,
+            "status": self.STATUS.value, "role": self.ROLE.value,
+            "dependencies": list(self.DEPENDENCIES),
+            "phases": [p.value for p in self.CYCLE_PHASES],
+        }
 
     def check(self, ctx, cycle: dict) -> list[dict]:
-        phases_seen = set()
-        for s in ctx.steps:
-            phases_seen.add(s.phase)
-        for p in cycle.get("phases", {}).keys():
-            phases_seen.add(p)
-
-        results: list[InvariantResult] = []
-        obrigatorias = ("ingestion", "audit", "regeneration",
-                        "identity", "ethics", "strategy",
-                        "execution", "persistence")
-        for req in obrigatorias:
-            results.append(InvariantResult(
-                name=f"phase_executed::{req}",
-                ok=(req in phases_seen),
-                detail="ok" if req in phases_seen else "faltou",
-            ))
-
-        executed = "execution" in phases_seen
-        persisted = "persistence" in phases_seen
-        results.append(InvariantResult(
-            name="execution_implies_persistence",
-            ok=(not executed) or persisted,
-            detail="ok" if (not executed or persisted) else "execução sem persistência",
-        ))
-
-        snapshotted = "snapshot" in phases_seen
-        results.append(InvariantResult(
-            name="execution_implies_snapshot",
-            ok=(not executed) or snapshotted,
-            detail="ok" if (not executed or snapshotted) else "execução sem snapshot",
-        ))
-
-        aborted = "aborted_at" in cycle
-        if aborted:
-            results.append(InvariantResult(
-                name="abort_has_reason",
-                ok=bool(cycle.get("abort_reason")),
-                detail=cycle.get("abort_reason", "sem motivo"),
-            ))
-
-        return [
-            {"name": r.name, "ok": r.ok, "detail": r.detail}
-            for r in results
+        seen = {s.phase for s in ctx.steps}
+        required = (
+            "ingestion", "audit", "regeneration", "identity",
+            "ethics", "strategy", "execution", "validation",
+            "persistence", "snapshot", "monitoring", "governance",
+        )
+        results = [
+            InvariantResult(f"phase_executed::{p}", p in seen,
+                            "ok" if p in seen else "faltou")
+            for p in required
         ]
+        execution = "execution" in seen
+        results.append(InvariantResult(
+            "execution_implies_persistence",
+            not execution or "persistence" in seen,
+            "ok" if not execution or "persistence" in seen else "execução sem persistência",
+        ))
+        results.append(InvariantResult(
+            "execution_implies_snapshot",
+            not execution or "snapshot" in seen,
+            "ok" if not execution or "snapshot" in seen else "execução sem snapshot",
+        ))
+        if cycle.get("aborted_at"):
+            results.append(InvariantResult(
+                "abort_has_reason", bool(cycle.get("abort_reason")),
+                cycle.get("abort_reason", "sem motivo"),
+            ))
+        return [{"name": r.name, "ok": r.ok, "detail": r.detail} for r in results]
+
+    def emit_trace(self, ctx) -> None:
+        if hasattr(ctx, "record"):
+            ctx.record("monitoring", self.NAME, True)

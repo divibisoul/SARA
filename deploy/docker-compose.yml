@@ -1,0 +1,9 @@
+services:
+  sara:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      PYTHONUNBUFFERED: "1"
+    command: ["python", "scripts/run_regenerative_loop.py"]

@@ -1,9 +1,7 @@
-"""SARA — Contexto de Ciclo (CycleContext).
-Status: IMPLEMENTED (foundational).
-"""
+"""SARA — Contexto de ciclo, evidência e rastreabilidade."""
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 from sara.infra.clock import now_iso
 
 
@@ -36,16 +34,33 @@ class CycleContext:
     abort_reason: str = ""
 
     def record(self, phase: str, module: str, ok: bool, **info: Any) -> None:
-        step = CycleStep(phase=phase, module=module, ok=ok, info=dict(info))
+        ts = now_iso()
+        step = CycleStep(phase=phase, module=module, ok=ok, info=dict(info), ts=ts)
         self.steps.append(step)
+
+        temporal_id = None
         if self.sink.temporal is not None:
-            self.sink.temporal.insert({
+            temporal_id = self.sink.temporal.insert({
                 "cycle_id": self.cycle_id,
                 "phase": phase,
                 "module": module,
                 "ok": ok,
                 "info": info,
+                "ts": ts,
             })
+            step.info.setdefault("temporal_id", temporal_id)
+
+        if self.sink.decision_trace is not None:
+            entry = self.sink.decision_trace.log({
+                "event": "cycle_step",
+                "cycle_id": self.cycle_id,
+                "phase": phase,
+                "module": module,
+                "ok": ok,
+                "info": info,
+                "ts": ts,
+            })
+            step.info.setdefault("decision_hash", entry.hash)
 
     def emit_decision(self, decision: dict) -> None:
         if self.sink.decision_trace is not None:

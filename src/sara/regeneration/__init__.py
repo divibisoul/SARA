@@ -1,5 +1,9 @@
 from .regenerative_loop import RegenerativeLoop, LoopReport
-from .synergy_engine import SynergyEngine, Pipeline, PipelineReport
+from .regenerative_state import CycleState, RegenerativeState, StateTransition
+from .synergy_engine import SynergyEngine
 
-__all__ = ["RegenerativeLoop", "LoopReport",
-           "SynergyEngine", "Pipeline", "PipelineReport"]
+__all__ = [
+    "RegenerativeLoop", "LoopReport",
+    "CycleState", "RegenerativeState", "StateTransition",
+    "SynergyEngine",
+]

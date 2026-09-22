@@ -1,19 +1,15 @@
-from .base import (
-    CONTRACT_VERSION, ModuleStatus, CyclePhase, CycleRole,
-    SaraModule, Traceable,
-)
-from .context import CycleContext, CycleStep, TraceSink, CycleContextProtocol
-from .registry import ModuleRegistry, RegisteredModule, RegistryError
+from .base import ModuleStatus, CycleRole, CyclePhase, SaraModule, Traceable
+from .context import CycleContext, TraceSink, CycleStep
+from .registry import ModuleRegistry, RegistryError, RegisteredModule
 from .lifecycle import CANONICAL_ORDER
-from .activation import (
-    ActivationRequirement, ActivationPlan, CANONICAL_ACTIVATION_PLAN,
-)
+from .activation import ActivationPlan, ActivationRequirement, CANONICAL_ACTIVATION_PLAN
+from .invariants import InvariantCheck, InvariantReport, InvariantValidator
 
 __all__ = [
-    "CONTRACT_VERSION", "ModuleStatus", "CyclePhase", "CycleRole",
-    "SaraModule", "Traceable",
-    "CycleContext", "CycleStep", "TraceSink", "CycleContextProtocol",
-    "ModuleRegistry", "RegisteredModule", "RegistryError",
+    "ModuleStatus", "CycleRole", "CyclePhase", "SaraModule", "Traceable",
+    "CycleContext", "TraceSink", "CycleStep",
+    "ModuleRegistry", "RegistryError", "RegisteredModule",
     "CANONICAL_ORDER",
-    "ActivationRequirement", "ActivationPlan", "CANONICAL_ACTIVATION_PLAN",
+    "ActivationPlan", "ActivationRequirement", "CANONICAL_ACTIVATION_PLAN",
+    "InvariantCheck", "InvariantReport", "InvariantValidator",
 ]
