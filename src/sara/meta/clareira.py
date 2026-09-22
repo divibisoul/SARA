@@ -127,6 +127,22 @@ class ClareiraSubsystem:
             raise ValueError("CLAREIRA_HOMEOSTASIS_INVALID")
         if not isinstance(snapshot["vagus"], dict):
             raise ValueError("CLAREIRA_VAGUS_INVALID")
+        device = snapshot.get("deviceState")
+        if device is not None:
+            if not isinstance(device, dict):
+                raise ValueError("CLAREIRA_DEVICE_STATE_INVALID")
+            battery = device.get("batteryPercent")
+            if not isinstance(battery, (int, float)) or not 0 <= float(battery) <= 100:
+                raise ValueError("CLAREIRA_DEVICE_BATTERY_INVALID")
+            if not isinstance(device.get("charging"), bool):
+                raise ValueError("CLAREIRA_DEVICE_CHARGING_INVALID")
+            if not isinstance(device.get("screenOn"), bool):
+                raise ValueError("CLAREIRA_DEVICE_SCREEN_INVALID")
+            if not isinstance(device.get("network"), str):
+                raise ValueError("CLAREIRA_DEVICE_NETWORK_INVALID")
+            if not isinstance(device.get("shizukuStatus"), str):
+                raise ValueError("CLAREIRA_DEVICE_SHIZUKU_INVALID")
+
         for node in snapshot["nodes"]:
             if not isinstance(node, dict) or not isinstance(node.get("id"), str):
                 raise ValueError("CLAREIRA_NODE_INVALID")
@@ -261,6 +277,8 @@ class ClareiraSubsystem:
             raise ValueError("CLAREIRA_VAGAL_COMMAND_UNSUPPORTED")
         if not node_id.strip() or not correlation_id.strip():
             raise ValueError("CLAREIRA_VAGAL_ID_REQUIRED")
+        if target != "SOUL_N01":
+            raise ValueError("CLAREIRA_VAGAL_TARGET_UNAUTHORIZED")
 
         event = await self.bus.publish(
             source="SARA",
@@ -278,6 +296,13 @@ class ClareiraSubsystem:
         record = copy.deepcopy(event)
         record["delivery_status"] = "PENDING"
         self._vagal_commands.append(record)
+        if self.provenance is not None:
+            self.provenance.register(
+                f"Clareira.vagal.dispatch.{event['event_id']}",
+                Provenance.INFERRED,
+                "Comando vagal emitido pela autoridade SARA para SOUL N01; execução ainda não comprovada",
+                source="ClareiraSubsystem.issue_vagal_command",
+            )
         if len(self._vagal_commands) > 256:
             del self._vagal_commands[:-256]
         return {
@@ -311,8 +336,17 @@ class ClareiraSubsystem:
             raise ValueError("CLAREIRA_VAGAL_EVENT_ID_REQUIRED")
         for item in reversed(self._vagal_commands):
             if item.get("event_id") == event_id:
+                if item.get("delivery_status") != "PENDING":
+                    raise ValueError("CLAREIRA_VAGAL_EVENT_ALREADY_ACKNOWLEDGED")
                 item["delivery_status"] = "EXECUTED" if executed else "DELIVERY_FAILED"
                 item["execution_status"] = execution_status
+                if self.provenance is not None:
+                    self.provenance.register(
+                        f"Clareira.vagal.ack.{event_id}",
+                        Provenance.HISTORICAL,
+                        f"ACK recebido do SOUL N01: executed={executed}; status={execution_status}",
+                        source="ClareiraSubsystem.acknowledge_vagal_command",
+                    )
                 return copy.deepcopy(item)
         raise ValueError("CLAREIRA_VAGAL_EVENT_NOT_FOUND")
 
