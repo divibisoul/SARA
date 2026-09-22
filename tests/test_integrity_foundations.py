@@ -38,3 +38,33 @@ def test_governance_override_changes_decision_record():
     result = governance.override(0, "revalidate")
     assert result["ok"] is True
     assert governance.decisions()[0]["override"]["action"] == "revalidate"
+
+
+def test_dna_tags_violation_chain_is_verifiable():
+    from sara.memory.dna_tags import DNA_Tags
+    dna = DNA_Tags()
+    result = dna.explain_guard("alterar", "texto 🔒CORE")
+    assert result["blocked"] is True
+    assert result["integrity"] is True
+
+
+def test_quantum_snapshot_chain_is_verifiable():
+    from sara.meta.quantum_snapshot import QuantumSnapshotSystem
+    snapshots = QuantumSnapshotSystem()
+    first = snapshots.snapshot({"state": {"x": 1}})
+    second = snapshots.snapshot({"state": {"x": 2}})
+    assert first != second
+    assert snapshots.restore(first)["state"]["x"] == 1
+    assert snapshots.verify_integrity() is True
+
+
+def test_decision_trace_ipfs_path_requires_real_endpoint():
+    from sara.monitoring.decision_trace import DecisionTrace
+    trace = DecisionTrace()
+    entry = trace.log({"event": "test"})
+    assert trace.verify() is True
+    try:
+        trace.publish_to_ipfs(entry)
+        assert False, "IPFS should require explicit real endpoint configuration"
+    except NotImplementedError:
+        pass
