@@ -78,3 +78,12 @@ The following remain honestly pending because their real external backends are a
 - GovernanceBackend UI/HTTP frontend.
 
 These are not simulated. Their interfaces remain explicit and raise NotImplementedError until the required infrastructure is injected.
+
+## Persistência local opcional de memória regenerativa
+
+Para manter a memória entre reinícios, configure os caminhos no ambiente do processo SARA:
+
+- `SARA_MEMORY_PERSIST_PATH`: arquivo JSON atômico do RegenerativeMemory;
+- `SARA_TEMPORAL_PERSIST_PATH`: arquivo JSON atômico do TemporalVectorDB.
+
+A restauração verifica a integridade registrada. Ausência dos caminhos mantém o comportamento anterior, sem persistência automática em disco.
