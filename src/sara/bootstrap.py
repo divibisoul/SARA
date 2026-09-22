@@ -132,7 +132,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         legal_compliance, legal_ai, committee, radar, governed,
         ara_forge, quantum_snapshot, eru, neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
-        storm, governance_backend, auditor, connected_runtime, loop, trinity, sistema,
+        storm, governance_backend, auditor, loop, trinity, sistema,
     ]
 
     for module in candidates:
