@@ -442,7 +442,17 @@ class RegenerativeLoop:
         # Primeiro executa a camada de conexão operacional. Ela trata módulos
         # não-nucleares e não duplica as operações do núcleo do loop.
         if self._connected_runtime is not None:
-            self._connected_runtime.dispatch_phase(ctx, phase)
+            actions = self._connected_runtime.dispatch_phase(ctx, phase)
+            blocking = [
+                a for a in actions
+                if getattr(a, "blocking", False) and not a.ok
+            ]
+            if blocking:
+                detail = "; ".join(
+                    f"{a.module}:{a.operation}:{a.detail.get('error', 'failed')}"
+                    for a in blocking
+                )
+                raise _Aborted(phase.value.upper(), f"connected_module_failure:{detail}")
 
         for registered in self._registry.modules_for_phase(phase):
             if (
