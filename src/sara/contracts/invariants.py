@@ -72,6 +72,20 @@ class InvariantValidator:
             "ok" if not pending_missing_metadata else "; ".join(pending_missing_metadata),
         ))
 
+        try:
+            dependency_order = registry.dependency_order()
+            dependency_graph_ok = len(dependency_order) == len(modules)
+            dependency_detail = "ok:" + "->".join(dependency_order)
+        except Exception as exc:
+            dependency_graph_ok = False
+            dependency_detail = str(exc)
+        checks.append(InvariantCheck(
+            "dependency_graph_acyclic",
+            dependency_graph_ok,
+            True,
+            dependency_detail,
+        ))
+
         invalid_phases: list[str] = []
         canonical = {p.value for p in CyclePhase}
         for name, meta in modules.items():
