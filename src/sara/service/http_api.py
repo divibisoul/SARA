@@ -24,7 +24,7 @@ class SaraAPIError(Exception):
 
 
 class SaraHTTPHandler(BaseHTTPRequestHandler):
-    server_version = "SARA/1.0"
+    server_version = "SARA/3.1.0"
 
     def _runtime(self) -> SaraSystem:
         return self.server.sara_system  # type: ignore[attr-defined]
