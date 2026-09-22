@@ -146,7 +146,21 @@ class InvariantValidator:
 
         canonical = [p.value for p in CANONICAL_ORDER]
         positions = [canonical.index(p) for p in phase_order if p in canonical]
-        monotonic = positions == sorted(positions)
+
+        # ctx.steps acumula todas as tentativas regenerativas do mesmo ciclo.
+        # A ordem deve ser monotônica dentro de cada iteração, mas um novo
+        # "ingestion" inicia legitimamente uma nova iteração.
+        monotonic = True
+        previous = -1
+        for phase in phase_order:
+            current = canonical.index(phase) if phase in canonical else previous
+            if phase == canonical[0] and previous > current:
+                previous = current
+                continue
+            if current < previous:
+                monotonic = False
+                break
+            previous = current
         checks.append(InvariantCheck(
             "phase_order_monotonic", monotonic, True,
             "ok" if monotonic else f"observed={phase_order}",
