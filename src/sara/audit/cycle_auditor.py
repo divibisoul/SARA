@@ -30,10 +30,9 @@ class CycleAuditor:
         }
 
     def check(self, ctx, cycle: dict) -> list[dict]:
-        seen = {
-            s.phase for s in ctx.steps
-            if s.info.get("canonical_phase") is True
-        }
+        # O contexto acumula etapas de iterações anteriores; este auditor
+        # verifica somente a iteração recebida.
+        seen = set(cycle.get("phases", {}).keys())
         required = (
             "ingestion", "audit", "regeneration", "identity",
             "ethics", "strategy", "execution", "validation",
