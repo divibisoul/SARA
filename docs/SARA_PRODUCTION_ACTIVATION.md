@@ -84,3 +84,7 @@ SARA_SANDBOX_DOCKER_IMAGE pode apontar para uma imagem Python já presente no ho
 O QuantumCrawler inicializa backends HTTP reais para GitHub e HuggingFace. Tokens GITHUB_TOKEN e HF_TOKEN são opcionais para endpoints públicos e nunca são armazenados no código.
 
 A detecção é fail-closed: não há promoção para capacidade ativa sem backend detectado.
+
+## 8b. Governança
+
+A interface administrativa local está disponível em `GET /v1/governance/ui`, protegida pelo mesmo Bearer token dos endpoints `/v1/*`. Ela lê o estado real do GovernanceBackend e sua cadeia de integridade; não é uma simulação nem requer React/Vue.
