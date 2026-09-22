@@ -170,6 +170,11 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         phases=spec[1],
                         status="IMPLEMENTED",
                         requires_auth=bool(SARA_OPERATIONS.get(op.split("@", 1)[0], {}).get("requires_auth", True)),
+                        metadata={
+                            "contract_status": "IMPLEMENTED",
+                            "runtime_status": "AVAILABLE" if system.ready else "BLOCKED_RUNTIME",
+                            "pending_infrastructure": len(system.registration_report.get("pending", [])),
+                        },
                     ).as_dict()
                     for op, spec in operation_specs.items()
                 ]
