@@ -271,7 +271,42 @@ class ARA_Extended(ARA):
             elif f.kind == "COMPLEXIDADE_EXCESSIVA" and "annotate_complexity" not in seen:
                 plan.append(("COMPLEXIDADE_EXCESSIVA→anotacao", self._annotate_complexity))
                 seen.add("annotate_complexity")
+            elif f.kind == "RELACAO_ACAO_DESTRUTIVA" and "semantic_destructive_relation" not in seen:
+                plan.append(("RELACAO_ACAO_DESTRUTIVA→substituicao_semantica", self._semantic_replace))
+                seen.add("semantic_destructive_relation")
+            elif f.kind in {"RELACAO_RISCO_TAG_OPERACAO", "NEGACAO_PROXIMA_ETICA"} and "relational_guard" not in seen:
+                plan.append(("RELACAO→guardrail_contextual", self._annotate_semantic_guard))
+                seen.add("relational_guard")
+            elif f.kind == "ESCOPO_NEGACAO" and "negation_scope" not in seen:
+                plan.append(("ESCOPO_NEGACAO→anotacao_de_escopo", self._annotate_semantic_guard))
+                seen.add("negation_scope")
+            elif f.kind == "DELIMITADORES_DESBALANCEADOS" and "balance_delimiters" not in seen:
+                plan.append(("DELIMITADORES_DESBALANCEADOS→fechamento_preservador", self._balance_delimiters))
+                seen.add("balance_delimiters")
+            elif f.kind in {"REPETICAO_DEGENERADA", "ASSIMETRIA_ESTRUTURAL"} and "structural_annotation" not in seen:
+                plan.append(("FALHA_ESTRUTURAL→anotacao_preservadora", self._annotate_semantic_guard))
+                seen.add("structural_annotation")
         return plan
+
+    @staticmethod
+    def _annotate_semantic_guard(text: str) -> str:
+        return text + "\n[ARA_Extended: guardrail semântico preservou o conteúdo original]"
+
+    @staticmethod
+    def _balance_delimiters(text: str) -> str:
+        stack: list[str] = []
+        pairs = {"(": ")", "[": "]", "{": "}"}
+        closing = {")", "]", "}"}
+        for ch in text:
+            if ch in pairs:
+                stack.append(ch)
+            elif ch in closing:
+                if stack and pairs[stack[-1]] == ch:
+                    stack.pop()
+        if not stack:
+            return text
+        suffix = "".join(pairs[ch] for ch in reversed(stack))
+        return text + suffix + "\n[ARA_Extended: delimitadores fechados sem remoção de conteúdo]"
 
     def _semantic_replace(self, text: str) -> str:
         """Escolhe sinônimo baseado no contexto."""
