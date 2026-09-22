@@ -66,8 +66,28 @@ class ConnectedRuntime:
         }
 
     def validate_connection(self) -> dict:
-        report = self._validator.validate_registry(self._registry)
-        order = self._registry.dependency_order()
+        try:
+            report = self._validator.validate_registry(self._registry)
+            order = self._registry.dependency_order()
+        except Exception as exc:
+            # Falha de grafo/validação é falha de conexão e deve ser fail-closed.
+            return {
+                "ok": False,
+                "invariants": {
+                    "ok": False,
+                    "blocking_failures": ["connected_runtime_validation_error"],
+                    "warnings": [],
+                    "checks": [{
+                        "name": "connected_runtime_validation_error",
+                        "ok": False,
+                        "blocking": True,
+                        "detail": f"{type(exc).__name__}: {exc}",
+                    }],
+                },
+                "dependency_order": [],
+                "connected_count": 0,
+                "error": f"{type(exc).__name__}: {exc}",
+            }
         return {
             "ok": report.ok,
             "invariants": report.as_dict(),
