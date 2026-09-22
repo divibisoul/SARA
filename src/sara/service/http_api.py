@@ -180,6 +180,13 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
                     "soul_federation": federation_manifest(),
+                    "probabilistic": {
+                        "enabled": system.components["sistema_vivo"].describe().get("probabilistic", {}).get("enabled", False),
+                        "name": "ProbabilisticReasoningLayer",
+                        "version": "1.0",
+                        "training_in_cycle": False,
+                        "pgmpy": "optional_adapter_not_loaded",
+                    },
                 })
                 return
             if path == "/v1/state":
@@ -228,9 +235,15 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     not isinstance(cycle_id, str) or not cycle_id.strip()
                 ):
                     raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
-                result = system.sistema_vivo.process(text, cycle_id=cycle_id)
+                raw_context = body.get("context")
+                context = raw_context if isinstance(raw_context, dict) else None
+                result = system.sistema_vivo.process(
+                    text,
+                    cycle_id=cycle_id,
+                    context=context,
+                )
                 correlation_id = correlation or result.cycle_id
-                self._json(200, {
+                response_payload = {
                     "request_id": correlation_id,
                     "correlation_id": correlation_id,
                     "cycle_id": result.cycle_id,
@@ -240,7 +253,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
-                })
+                }
+                if result.probabilistic is not None:
+                    response_payload["probabilistic"] = result.probabilistic
+                self._json(200, response_payload)
                 return
 
             if path in ("/v1/audit", "/v1/regenerate"):
