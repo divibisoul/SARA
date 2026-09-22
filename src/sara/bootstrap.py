@@ -49,6 +49,7 @@ from sara.research.neural_lens import NeuralLens
 from sara.research.quantum_crawler import QuantumCrawler
 from sara.research.quantum_scanner import QuantumScanner
 from sara.audit.cycle_auditor import CycleAuditor
+from sara.omega import SoulETROmegaSystem
 from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment, transystem_adapters_from_environment
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
@@ -141,6 +142,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara_extended, etr_extended, itr_extended, eru=eru, bridge=eru_bridge
     )
     connected_runtime = ConnectedRuntime(registry)
+    omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
 
     loop = RegenerativeLoop(
         ara=ara_extended, etr=etr_extended, itr=itr_extended,
@@ -164,7 +166,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara_forge, quantum_snapshot, eru, eru_bridge, trinity_eru,
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
-        storm, governance_backend, auditor, loop, trinity, sistema,
+        storm, governance_backend, auditor, loop, trinity, sistema, omega,
     ]
 
     for module in candidates:
@@ -227,5 +229,6 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "transystem": transystem, "auditor": auditor, "provenance": prov,
             "decision_trace": trace, "activation_plan": CANONICAL_ACTIVATION_PLAN,
             "connected_runtime": connected_runtime,
+            "omega": omega,
         },
     )
