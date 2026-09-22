@@ -168,7 +168,12 @@ class RegenerativeLoop:
                 converged = (
                     post_etr.approved
                     and not post_flaws
-                    and bool(ctx.artifacts.get("execution_ok", False))
+                    and bool(
+                        ctx.flags.get(
+                            "execution_ok",
+                            ctx.artifacts.get("execution_ok", False),
+                        )
+                    )
                     and invariant_report.ok
                 )
                 cycle["converged"] = converged
@@ -393,6 +398,9 @@ class RegenerativeLoop:
         ctx.current = transformed
         ctx.register_artifact("final_output", transformed)
         ctx.flags["execution_ok"] = ok
+        # Mantém a evidência de execução também no inventário de artefatos,
+        # preservando consumidores que ainda leem o formato anterior.
+        ctx.register_artifact("execution_ok", ok)
         cycle["phases"]["execution"] = {"ok": ok, **info}
         self._record(ctx, CyclePhase.EXECUTION, "ITR", ok, **cycle["phases"]["execution"])
         if not ok:
