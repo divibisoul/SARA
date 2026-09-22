@@ -44,6 +44,7 @@ class ERURecoveryAdvisor:
     def find_lost_capabilities(self, older: str, newer: str) -> list[dict]:
         diff = self._eru.compare(older, newer)
         candidates: list[dict] = []
+
         for path in diff.lost:
             if path == "__missing_snapshot__":
                 continue
@@ -57,6 +58,48 @@ class ERURecoveryAdvisor:
                 "provenance": "ERU_STRUCTURAL_CANDIDATE",
                 "automatic_reintegration": False,
             })
+
+        # Snapshot CAP::* também informa perda/alteração de capacidade executável.
+        cap = self._eru.capability_diff(older, newer)
+        if cap.get("ok"):
+            for name in cap.get("removed_methods", []):
+                recoverable = name in cap.get("recoverable_removed_methods", [])
+                candidates.append({
+                    "path": f"method:{name}",
+                    "kind": "method",
+                    "impact": self._WEIGHTS["method"],
+                    "source_snapshot": older,
+                    "target_snapshot": newer,
+                    "provenance": "ERU_CAPABILITY_CANDIDATE",
+                    "recoverable": recoverable,
+                    "automatic_reintegration": False,
+                })
+            for name in cap.get("changed_methods", []):
+                recoverable = name in cap.get("recoverable_changed_methods", [])
+                candidates.append({
+                    "path": f"method:{name}",
+                    "kind": "method",
+                    "impact": self._WEIGHTS["method"],
+                    "source_snapshot": older,
+                    "target_snapshot": newer,
+                    "provenance": "ERU_CAPABILITY_CANDIDATE",
+                    "recoverable": recoverable,
+                    "automatic_reintegration": False,
+                    "change_type": "signature_or_source",
+                })
+            for contract in cap.get("changed_contract", []):
+                candidates.append({
+                    "path": f"contract:{contract}",
+                    "kind": "config",
+                    "impact": self._WEIGHTS["config"],
+                    "source_snapshot": older,
+                    "target_snapshot": newer,
+                    "provenance": "ERU_CAPABILITY_CANDIDATE",
+                    "recoverable": False,
+                    "automatic_reintegration": False,
+                    "change_type": "contract",
+                })
+
         return candidates
 
     def rank_by_impact(self, candidates: list[dict]) -> list[dict]:
