@@ -23,6 +23,13 @@ ACTION_VERBS = frozenset({
 })
 
 NEGATIONS = frozenset({"não", "nao", "nunca", "jamais", "sem", "nem"})
+FUNCTIONAL_WORDS = frozenset({
+    "a", "o", "as", "os", "um", "uma", "uns", "umas", "de", "da", "do",
+    "das", "dos", "e", "ou", "para", "por", "com", "em", "no", "na",
+    "nos", "nas", "ao", "aos", "à", "às", "que", "se", "é", "ser",
+    "deve", "devem", "pode", "podem", "vai", "vão", "quer", "querem",
+    "precisa", "precisam", "como", "mais", "menos",
+})
 
 WORD_RE = re.compile(r"[\wÀ-ÿ]+", re.UNICODE)
 
@@ -108,17 +115,23 @@ class SemanticEngine:
         for i, token in enumerate(tokens):
             if token not in ACTION_VERBS:
                 continue
-            before = tokens[max(0, i - 4):i]
-            after = tokens[i + 1:i + 7]
+            before = tokens[max(0, i - 5):i]
+            after = tokens[i + 1:i + 8]
             subject = next(
-                (t for t in reversed(before) if t not in NEGATIONS),
+                (
+                    t for t in reversed(before)
+                    if t not in NEGATIONS and t not in FUNCTIONAL_WORDS
+                ),
                 "implicit",
             )
             obj = next(
-                (t for t in after if t not in NEGATIONS),
+                (
+                    t for t in after
+                    if t not in NEGATIONS and t not in FUNCTIONAL_WORDS
+                ),
                 "implicit",
             )
-            negated = any(t in NEGATIONS for t in before[-3:])
+            negated = any(t in NEGATIONS for t in before[-4:])
             evidence = tuple(tokens[max(0, i - 2):min(len(tokens), i + 4)])
             relations.append(
                 SemanticRelation(
