@@ -116,6 +116,8 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     if quantum_crawler_backends:
         quantum_crawler.STATUS = ModuleStatus.IMPLEMENTED
     quantum_scanner = QuantumScanner()
+    if quantum_scanner.is_target_access_ready():
+        quantum_scanner.STATUS = ModuleStatus.IMPLEMENTED
     transystem = TransystemSARA(adapters=transystem_adapters_from_environment())
     if transystem.is_credentials_ready():
         transystem.STATUS = ModuleStatus.IMPLEMENTED
