@@ -69,7 +69,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 self._json(200, {
                     "status": "ok" if system.ready else "not_ready",
                     "ready": system.ready,
-                    "version": "1.0",
+                    "version": "3.1.0",
+                    "protocol": "sara-http/1",
                     "invariants_ok": bool(system.invariant_report.get("ok")),
                 })
                 return
@@ -90,6 +91,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
                     "activation": system.registration_report.get("pending", []),
+                    "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "invariants": system.invariant_report,
                 })
                 return
@@ -102,6 +104,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 self._json(200, {
                     "cycle_id": cycle_id,
                     "integrity": system.components["trace"].verify(),
+                    "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "entries": [e.__dict__ for e in entries],
                 })
                 return
