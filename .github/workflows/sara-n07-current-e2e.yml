@@ -22,7 +22,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: divibisoul/Orquestrador-
-          ref: 7a01af71d8ea2bc18446e596f0ee92e6bd2dca1e
+          ref: 83d32993f5ae8a24c07c20136a9c36021b84a94e
           path: n07
 
       - name: Setup Python
