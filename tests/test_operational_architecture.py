@@ -26,9 +26,9 @@ def test_cycle_has_12_canonical_phases_and_evidence():
     report = result.loop_report
     phases = [s["phase"] for s in report.context_steps]
     expected = [
-        "INGESTION", "AUDIT", "REGENERATION", "IDENTITY", "ETHICS",
-        "STRATEGY", "EXECUTION", "VALIDATION", "PERSISTENCE",
-        "SNAPSHOT", "MONITORING", "GOVERNANCE",
+        "ingestion", "audit", "regeneration", "identity", "ethics",
+        "strategy", "execution", "validation", "persistence",
+        "snapshot", "monitoring", "governance",
     ]
     assert all(p in phases for p in expected)
     assert report.execution_report["trace_integrity"] is True
