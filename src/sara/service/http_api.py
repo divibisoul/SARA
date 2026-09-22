@@ -195,6 +195,16 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 clareira = system.components["clareira"]
                 self._json(200, clareira.health_snapshot())
                 return
+            if path == "/v1/clareira/vagus/pending":
+                clareira = system.components["clareira"]
+                limit_raw = self.headers.get("X-Clareira-Limit", "32")
+                try:
+                    limit = int(limit_raw)
+                    pending = clareira.pending_vagal_commands(limit=limit)
+                except (ValueError, TypeError) as exc:
+                    raise SaraAPIError(422, "INVALID_CLAREIRA_VAGAL_LIMIT", str(exc)) from exc
+                self._json(200, {"operation": "sara.clareira.vagus.pending", "commands": pending})
+                return
             if path == "/v1/governance/ui":
                 governance = system.components["governance"]
                 self._html(200, governance.render_html())
@@ -271,6 +281,26 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "executed": True,
                     "result": result,
                 })
+                return
+
+            if path == "/v1/clareira/vagus/ack":
+                clareira = system.components["clareira"]
+                event_id = body.get("event_id")
+                executed = body.get("executed") is True
+                execution_status = body.get("execution_status")
+                if not isinstance(event_id, str) or not event_id.strip():
+                    raise SaraAPIError(422, "INVALID_EVENT_ID", "'event_id' é obrigatório.")
+                if not isinstance(execution_status, str) or not execution_status.strip():
+                    raise SaraAPIError(422, "INVALID_EXECUTION_STATUS", "'execution_status' é obrigatório.")
+                try:
+                    result = clareira.acknowledge_vagal_command(
+                        event_id.strip(),
+                        executed=executed,
+                        execution_status=execution_status.strip(),
+                    )
+                except ValueError as exc:
+                    raise SaraAPIError(422, "INVALID_CLAREIRA_VAGAL_ACK", str(exc)) from exc
+                self._json(200, {"operation": "sara.clareira.vagus.ack", "result": result})
                 return
 
             if path == "/v1/clareira/vagus":
