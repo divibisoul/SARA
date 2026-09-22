@@ -7,12 +7,14 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import json
 from dataclasses import dataclass
 from typing import Any
 
 from sara.security.safe_sandbox import IsolationBackend, SandboxResult
 from sara.research.quantum_crawler import CrawlBackend, HTTPJSONBackend
 from sara.governance.legal_ai import HTTPPatentOracle, PatentOracle
+from sara.meta.transystem_sara import HTTPSystemAdapter, SystemAdapter
 
 
 @dataclass
@@ -108,14 +110,38 @@ def patent_oracle_from_environment() -> PatentOracle | None:
         return None
 
 
+def transystem_adapters_from_environment() -> dict[str, SystemAdapter]:
+    raw = os.getenv("SARA_TRANSYSTEM_ENDPOINTS_JSON", "").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except ValueError:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    token = os.getenv("SARA_TRANSYSTEM_TOKEN", "").strip()
+    adapters: dict[str, SystemAdapter] = {}
+    for system, endpoint in parsed.items():
+        if not isinstance(system, str) or not isinstance(endpoint, str):
+            continue
+        try:
+            adapters[system] = HTTPSystemAdapter(endpoint, token=token)
+        except ValueError:
+            continue
+    return adapters
+
+
 def environment_activation_report() -> dict[str, Any]:
     docker = docker_backend_from_environment()
     crawlers = network_crawler_backends_from_environment()
     patent_oracle = patent_oracle_from_environment()
+    transystem = transystem_adapters_from_environment()
     return {
         "safe_sandbox": {"ready": docker is not None, "backend": type(docker).__name__ if docker else None},
         "quantum_crawler": {"ready": bool(crawlers), "backends": [type(b).__name__ for b in crawlers]},
         "legal_ai": {"patent_oracle_ready": patent_oracle is not None, "oracle": type(patent_oracle).__name__ if patent_oracle else None},
+        "transystem_sara": {"ready": bool(transystem), "systems": sorted(transystem)},
         "github_token_present": bool(os.getenv("GITHUB_TOKEN", "").strip()),
         "hf_token_present": bool(os.getenv("HF_TOKEN", "").strip()),
     }
