@@ -137,6 +137,14 @@ SOUL_NUCLEUS_AFFINITIES: Final[tuple[NucleusAffinity, ...]] = (
         "N05 pode usar SARA como camada de validação/regeneração dentro da coordenação; a propriedade do despacho continua N05.",
     ),
     NucleusAffinity(
+        "N07",
+        "federation / discovery / compute / storage",
+        ("sara.capabilities", "sara.state", "sara.audit", "sara.trace"),
+        ("QuantumCrawler", "TransystemSARA", "DecisionTrace", "ProvenanceTracker"),
+        "federated-governance",
+        "N07 opera na federação, descoberta, compute/storage e roteamento; SARA fornece governança, auditoria e evidência sem assumir a autoridade de execução federada.",
+    ),
+    NucleusAffinity(
         "N06",
         "cognition / synthesis / audit / governance",
         ("sara.audit", "sara.state", "sara.trace", "sara.regenerate", "sara.cycle"),
