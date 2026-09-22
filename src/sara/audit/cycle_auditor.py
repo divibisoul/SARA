@@ -30,7 +30,10 @@ class CycleAuditor:
         }
 
     def check(self, ctx, cycle: dict) -> list[dict]:
-        seen = {s.phase for s in ctx.steps}
+        seen = {
+            s.phase for s in ctx.steps
+            if s.info.get("canonical_phase") is True
+        }
         required = (
             "ingestion", "audit", "regeneration", "identity",
             "ethics", "strategy", "execution", "validation",
