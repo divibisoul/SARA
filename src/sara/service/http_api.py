@@ -33,6 +33,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
         raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        correlation = self.headers.get("X-Correlation-ID", "").strip()
+        if correlation:
+            self.send_header("X-Correlation-ID", correlation)
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
