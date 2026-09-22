@@ -10,6 +10,7 @@ from .etr_extended import ETR_Extended, MultiFrameworkResult, FrameworkAssessmen
 from .itr_extended import ITR_Extended, StrategicPlan, ComposedResult, PatternReport, RegistryOptimization
 from .trinity_synergy import TrinitySynergy, TrinityReport, TrinityIteration
 from .connected_runtime import ConnectedRuntime, ConnectedAction
+from .trinity_self_optimization import TrinitySelfOptimizer, TrinitySelfOptimizationReport, from_sara_system
 
 __all__ = [
     "Provenance", "RuleProvenance", "ProvenanceTracker",
@@ -23,4 +24,5 @@ __all__ = [
     "ITR_Extended", "StrategicPlan", "ComposedResult", "PatternReport", "RegistryOptimization",
     "TrinitySynergy", "TrinityReport", "TrinityIteration",
     "ConnectedRuntime", "ConnectedAction",
+    "TrinitySelfOptimizer", "TrinitySelfOptimizationReport", "from_sara_system",
 ]
