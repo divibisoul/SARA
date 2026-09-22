@@ -34,13 +34,26 @@ class AssimilationReviewCommittee:
         self._members[name] = evaluator
 
     def approve(self, proposal: dict) -> dict:
-        votes: dict[str, bool] = {name: bool(fn(proposal))
-                                   for name, fn in self._members.items()}
+        if not isinstance(proposal, dict):
+            raise TypeError("proposal must be a dict")
+        votes: dict[str, bool] = {}
+        failures: dict[str, str] = {}
+        for name, fn in sorted(self._members.items()):
+            try:
+                votes[name] = bool(fn(proposal))
+            except Exception as exc:
+                failures[name] = f"{type(exc).__name__}: {exc}"
+                votes[name] = False
         if not votes:
-            return {"approved": False, "votes": {}, "reason": "no_members"}
+            return {"approved": False, "votes": {}, "reason": "no_members", "failures": failures}
         ratio = sum(votes.values()) / len(votes)
-        return {"approved": ratio >= self._quorum, "votes": votes,
-                "ratio": round(ratio, 4)}
+        return {
+            "approved": ratio >= self._quorum and not failures,
+            "votes": votes,
+            "ratio": round(ratio, 4),
+            "quorum": self._quorum,
+            "failures": failures,
+        }
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
