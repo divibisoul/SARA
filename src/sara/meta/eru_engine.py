@@ -4,6 +4,8 @@ Status: IMPLEMENTED (deep).
 from __future__ import annotations
 import copy
 import re
+import inspect
+import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
@@ -103,6 +105,117 @@ class ERU_Engine:
         else:
             out[prefix or "$"] = obj
         return out
+
+    @staticmethod
+    def _callable_source_hash(member: Any) -> str | None:
+        try:
+            source = inspect.getsource(member)
+        except (OSError, TypeError):
+            return None
+        return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+    def freeze_capabilities(self, name: str, module: Any) -> str:
+        """Congela capacidades observáveis de um módulo.
+
+        Inclui contrato declarado, métodos públicos, assinaturas e, quando
+        disponível, impressão digital do código-fonte do método. Isso amplia
+        o ERU além do simples diff de dados sem afirmar equivalência funcional.
+        """
+        if not name:
+            raise ValueError("name é obrigatório")
+
+        describe = {}
+        describe_fn = getattr(module, "describe", None)
+        if callable(describe_fn):
+            described = describe_fn()
+            if isinstance(described, dict):
+                describe = copy.deepcopy(described)
+
+        methods: dict[str, dict[str, Any]] = {}
+        for attr_name, member in inspect.getmembers(module, predicate=callable):
+            if attr_name.startswith("_"):
+                continue
+            try:
+                signature = str(inspect.signature(member))
+            except (TypeError, ValueError):
+                signature = "UNAVAILABLE"
+            methods[attr_name] = {
+                "signature": signature,
+                "source_hash": self._callable_source_hash(member),
+            }
+
+        state = {
+            "kind": "capability_snapshot",
+            "module_type": f"{type(module).__module__}.{type(module).__qualname__}",
+            "describe": describe,
+            "methods": methods,
+        }
+        snapshot_name = f"CAP::{name}"
+        snapshot_hash = self.freeze(snapshot_name, state)
+        return snapshot_hash
+
+    def capability_diff(self, older: str, newer: str) -> dict[str, Any]:
+        """Compara snapshots CAP::* por capacidade nominal/assinatura/código."""
+        if older not in self._snapshots or newer not in self._snapshots:
+            return {
+                "ok": False,
+                "reason": "missing_snapshot",
+                "removed_methods": [],
+                "added_methods": [],
+                "changed_methods": [],
+                "changed_contract": [],
+            }
+
+        old = self._snapshots[older].state
+        new = self._snapshots[newer].state
+        old_methods = old.get("methods", {}) if isinstance(old, dict) else {}
+        new_methods = new.get("methods", {}) if isinstance(new, dict) else {}
+        old_names = set(old_methods)
+        new_names = set(new_methods)
+
+        added_methods = sorted(new_names - old_names)
+        removed_methods = sorted(old_names - new_names)
+        changed_methods = sorted(
+            name for name in old_names & new_names
+            if old_methods[name] != new_methods[name]
+        )
+
+        old_desc = old.get("describe", {}) if isinstance(old, dict) else {}
+        new_desc = new.get("describe", {}) if isinstance(new, dict) else {}
+        contract_keys = (
+            "status", "role", "dependencies", "phases",
+            "version", "name",
+        )
+        changed_contract = sorted(
+            key for key in contract_keys
+            if old_desc.get(key) != new_desc.get(key)
+        )
+
+        return {
+            "ok": True,
+            "older": older,
+            "newer": newer,
+            "added_methods": added_methods,
+            "removed_methods": removed_methods,
+            "changed_methods": changed_methods,
+            "changed_contract": changed_contract,
+            "functional_equivalence_proven": False,
+        }
+
+    def audit_capabilities(self, older: str, newer: str) -> dict[str, Any]:
+        diff = self.capability_diff(older, newer)
+        if not diff.get("ok"):
+            return diff
+        structural = self.compare(older, newer)
+        return {
+            **diff,
+            "structural_diff": {
+                "lost": structural.lost,
+                "added": structural.added,
+                "changed": structural.changed,
+                "kept": structural.kept,
+            },
+        }
 
     def compare(self, older: str, newer: str) -> DiffReport:
         if older not in self._snapshots or newer not in self._snapshots:
