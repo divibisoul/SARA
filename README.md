@@ -63,3 +63,27 @@ Módulos PENDING_INFRASTRUCTURE
 
 8 módulos aguardam infraestrutura externa. Mantêm interface completa +
 NotImplementedError descritivo. NUNCA mock.
+
+## Serviço HTTP e Federação
+
+O SARA também pode ser executado como serviço HTTP real sobre o mesmo runtime modular:
+
+```bash
+export SARA_API_TOKEN='<segredo>'
+python -m sara.service.main
+```
+
+Endpoints protegidos:
+`GET /v1/capabilities`, `POST /v1/cycle`, `POST /v1/audit`,
+`POST /v1/regenerate`, `GET /v1/state`, `GET /v1/trace/{cycle_id}`.
+
+Health:
+`GET /health`.
+
+Planta de federação: `docs/SARA_FEDERATION_BLUEPRINT.md`.
+
+Integração N07: `SARA_SERVICE_URL`, `SARA_SERVICE_TOKEN`,
+`SARA_REQUEST_TIMEOUT`.
+
+Integração N04/N06: `SARA_BASE_URL`, `SARA_API_TOKEN`,
+`SARA_ENABLE_CHAT=true`.
