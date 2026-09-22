@@ -24,7 +24,7 @@ jobs:
       - name: Preservation gate
         run: |
           set -euo pipefail
-          git fetch origin main --depth=1
+          git fetch --unshallow origin main 2>/dev/null || git fetch origin main
           deleted="$(git diff --name-status origin/main...HEAD | awk '$1 == "D" {print $2}')"
           if [ -n "$deleted" ]; then
             echo "Deleted repository paths are forbidden in the integrated gate:"
