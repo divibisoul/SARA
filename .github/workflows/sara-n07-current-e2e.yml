@@ -132,6 +132,7 @@ jobs:
           assert outer["correlation_id"] == "current-sara-n07-correlation-001"
           sara = json.loads(outer["metadata"]["sara_result_json"])
           assert sara["cycle_id"] == "current-sara-n07-e2e-001"
+          assert sara["correlation_id"] == "current-sara-n07-correlation-001"
           assert sara["execution_report"]["cycle_id"] == "current-sara-n07-e2e-001"
           assert sara["fusion"] is not None
           assert sara["fusion"]["integrity_ok"] is True
@@ -162,6 +163,7 @@ jobs:
           assert outer["status"] == "ok", outer
           sara = json.loads(outer["metadata"]["sara_result_json"])
           assert sara["cycle_id"] == "current-sara-n07-e2e-001"
+          assert sara["correlation_id"] == "current-sara-n07-trace-correlation-001"
           assert sara["integrity"] is True
           assert sara["provenance_integrity"] is True
           assert sara["entries"]
