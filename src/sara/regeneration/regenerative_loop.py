@@ -662,6 +662,12 @@ class RegenerativeLoop:
             except Exception as exc:
                 ctx.record(phase.value, registered.name, False, error=str(exc))
 
+    @staticmethod
+    def _record(ctx: CycleContext, phase: CyclePhase,
+                module: str, ok: bool, **info: Any) -> None:
+        """Registra evidência de uma etapa no contexto real do ciclo."""
+        ctx.record(phase.value, module, ok, **info)
+
     def history(self) -> list[LoopReport]:
         return list(self._history)
 
