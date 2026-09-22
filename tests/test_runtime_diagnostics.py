@@ -81,4 +81,9 @@ def test_runtime_diagnostic_autonomy_phase_boundary():
         "strategy", "execution", "validation", "persistence",
         "snapshot", "monitoring", "governance",
     ]
-    assert all(p in cycle["phases"] for p in expected), json.dumps(cycle, ensure_ascii=False, default=str)
+    missing = [p for p in expected if p not in cycle["phases"]]
+    assert not missing, json.dumps(
+        {"missing_phases": missing, "observed_phases": list(cycle["phases"])},
+        ensure_ascii=False,
+        default=str,
+    )
