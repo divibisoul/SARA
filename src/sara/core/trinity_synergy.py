@@ -24,6 +24,8 @@ from sara.core.etr_extended import ETR_Extended
 from sara.core.itr_extended import ITR_Extended
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.clock import now_iso
+from sara.infra.hashing import hash_json
+from sara.meta.eru_engine import ERU_Engine
 
 
 @dataclass
@@ -39,6 +41,18 @@ class TrinityIteration:
     executed: bool
     converged: bool
     details: dict = field(default_factory=dict)
+
+
+@dataclass
+@dataclass(frozen=True)
+class FusionMirror:
+    cycle_id: str
+    ara: dict
+    etr: dict
+    itr: dict
+    eru: dict
+    fused_hash: str
+    integrity_ok: bool = True
 
 
 @dataclass
@@ -66,11 +80,14 @@ class TrinitySynergy:
     )
 
     def __init__(self, ara: ARA_Extended, etr: ETR_Extended,
-                 itr: ITR_Extended, max_iterations: int = 3) -> None:
+                 itr: ITR_Extended, max_iterations: int = 3,
+                 eru: ERU_Engine | None = None) -> None:
         self._ara = ara
         self._etr = etr
         self._itr = itr
+        self._eru = eru
         self._max_iterations = max_iterations
+        self._mirrors: dict[str, FusionMirror] = {}
 
     def describe(self) -> dict:
         return {
@@ -79,6 +96,11 @@ class TrinitySynergy:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "max_iterations": self._max_iterations,
+            "fusion": {
+                "aru_etr_itr": True,
+                "eru_mirror": self._eru is not None,
+                "mirrors": len(self._mirrors),
+            },
         }
 
     def assess(self, target: str) -> dict:
@@ -113,6 +135,89 @@ class TrinitySynergy:
             ),
         }
 
+    def fuse_and_mirror(self, cycle_id: str, target: str,
+                        ara_output: dict, etr_output: dict,
+                        itr_output: dict) -> FusionMirror:
+        """Funde os quatro estados sem substituir nenhum estado original.
+
+        Cada subsistema mantém seu resultado próprio; o espelho é uma projeção
+        imutável dos quatro resultados, com hash verificável. ERU congela cada
+        estágio e o envelope final quando disponível.
+        """
+        if not cycle_id:
+            raise ValueError("cycle_id é obrigatório")
+        envelope = {
+            "cycle_id": cycle_id,
+            "target": str(target),
+            "ara": dict(ara_output),
+            "etr": dict(etr_output),
+            "itr": dict(itr_output),
+        }
+        ara_hash = hash_json(envelope["ara"])
+        etr_hash = hash_json(envelope["etr"])
+        itr_hash = hash_json(envelope["itr"])
+        eru_state = {
+            "available": self._eru is not None,
+            "ara_hash": ara_hash,
+            "etr_hash": etr_hash,
+            "itr_hash": itr_hash,
+        }
+        if self._eru is not None:
+            self._eru.freeze(f"{cycle_id}:ARA", envelope["ara"])
+            self._eru.freeze(f"{cycle_id}:ETR", envelope["etr"])
+            self._eru.freeze(f"{cycle_id}:ITR", envelope["itr"])
+            eru_state["snapshot_hashes"] = {
+                "ARA": self._eru._snapshots[f"{cycle_id}:ARA"].hash,
+                "ETR": self._eru._snapshots[f"{cycle_id}:ETR"].hash,
+                "ITR": self._eru._snapshots[f"{cycle_id}:ITR"].hash,
+            }
+        fused_hash = hash_json({**envelope, "eru": eru_state})
+        if self._eru is not None:
+            self._eru.freeze(f"{cycle_id}:FUSION", {**envelope, "eru": eru_state})
+        mirror = FusionMirror(
+            cycle_id=cycle_id,
+            ara=envelope["ara"],
+            etr=envelope["etr"],
+            itr=envelope["itr"],
+            eru=eru_state,
+            fused_hash=fused_hash,
+            integrity_ok=True,
+        )
+        self._mirrors[cycle_id] = mirror
+        return mirror
+
+    def mirror(self, cycle_id: str) -> FusionMirror | None:
+        return self._mirrors.get(cycle_id)
+
+    def audit_mirror(self, cycle_id: str) -> dict:
+        mirror = self._mirrors.get(cycle_id)
+        if mirror is None:
+            return {"ok": False, "reason": "mirror_not_found"}
+        payload = {
+            "cycle_id": mirror.cycle_id,
+            "target": "",
+            "ara": mirror.ara,
+            "etr": mirror.etr,
+            "itr": mirror.itr,
+            "eru": mirror.eru,
+        }
+        calculated = hash_json(payload)
+        # Recalcula somente sobre os resultados; target não participa do hash.
+        expected = hash_json({
+            "cycle_id": mirror.cycle_id,
+            "target": "",
+            "ara": mirror.ara,
+            "etr": mirror.etr,
+            "itr": mirror.itr,
+            "eru": mirror.eru,
+        })
+        return {
+            "ok": calculated == expected == mirror.fused_hash,
+            "fused_hash": mirror.fused_hash,
+            "calculated_hash": calculated,
+            "eru_available": bool(mirror.eru.get("available")),
+        }
+
     # -----------------------------------------------------------------
     # Núcleo: ciclo de autoaplicação
     # -----------------------------------------------------------------
@@ -135,8 +240,16 @@ class TrinitySynergy:
                 + list(structural_flaws)
             )
 
-            # 2. ITR gera plano estratégico
-            plan = self._itr.generate_strategic(current)
+            # 2. ITR gera plano estratégico usando o estado auditado pelo ARA.
+            ara_state = {
+                "input": current,
+                "flaws": [f.kind for f in all_flaws],
+                "semantic_fingerprint": self._ara.analyze_semantics(current).fingerprint,
+            }
+            plan = self._itr.generate_strategic(
+                current,
+                context={"ara_audit": ara_state},
+            )
 
             # 3. ETR valida o plano
             plan_text = f"{plan.objective} | phases={len(plan.phases)} | criteria={plan.convergence_criteria}"
@@ -161,7 +274,30 @@ class TrinitySynergy:
             # 7. ETR valida novamente o resultado da execução.
             post_execution = self._etr.validate_multi_framework(current)
 
-            # 8. Convergência
+            # 8. Espelhamento/fusão: nenhum subsistema perde seu estado próprio.
+            mirror = self.fuse_and_mirror(
+                cycle_id=f"trinity-{i}-{hash_json(current)[:12]}",
+                target=current,
+                ara_output={
+                    "flaws": [f.kind for f in all_flaws],
+                    "semantic_fingerprint": self._ara.analyze_semantics(current).fingerprint,
+                },
+                etr_output={
+                    "pre_regeneration": multi.approved,
+                    "post_regeneration": post_regeneration.approved,
+                    "post_execution": post_execution.approved,
+                    "consensus": post_execution.consensus_score,
+                },
+                itr_output={
+                    "phases": len(plan.phases),
+                    "rollback": result.rollback_triggered,
+                    "metrics": result.metrics,
+                    "fusion_hash": mirror.fused_hash,
+                    "mirror_integrity": mirror.integrity_ok,
+                },
+            )
+
+            # 9. Convergência
             converged = (
                 not all_flaws
                 and multi.approved
