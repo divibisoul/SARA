@@ -171,6 +171,11 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "modules": modules,
                     "capability_descriptors": descriptors,
                     "activation": system.registration_report.get("pending", []),
+                    "memory_layers": {
+                        "working": system.components["working_memory"].describe(),
+                        "episodic": system.components["memory"].describe(),
+                        "semantic_vector": system.components["temporal"].describe(),
+                    },
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
