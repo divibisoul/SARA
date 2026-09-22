@@ -417,7 +417,97 @@ class ERU_Engine:
                 cur[key] = [] if next_is_list else {}
             cur = cur[key]
 
+    def checkpoint(
+        self,
+        name: str,
+        state: Any,
+        *,
+        cycle_id: str,
+        phase: str,
+        source: str = "ERU_Engine.checkpoint",
+    ) -> dict[str, Any]:
+        """Creates a named reversible checkpoint with explicit provenance."""
+        if not cycle_id or not phase:
+            raise ValueError("cycle_id e phase são obrigatórios")
+        snapshot_name = f"{cycle_id}:{phase}:{name}"
+        snapshot_hash = self.freeze(snapshot_name, state)
+        return {
+            "name": snapshot_name,
+            "cycle_id": cycle_id,
+            "phase": phase,
+            "source": source,
+            "hash": snapshot_hash,
+            "verified": self.verify_snapshot(snapshot_name),
+            "status": "REAL",
+        }
+
+    def detect_information_loss(self, older: str, newer: str) -> dict[str, Any]:
+        """Detects lost fields and separates recoverable from non-recoverable loss."""
+        if older not in self._snapshots or newer not in self._snapshots:
+            missing = [n for n in (older, newer) if n not in self._snapshots]
+            return {
+                "status": "UNMEASURABLE",
+                "older": older,
+                "newer": newer,
+                "reason": "missing_snapshot",
+                "missing_snapshots": missing,
+                "lost": [],
+                "recoverable": [],
+                "non_recoverable": [],
+            }
+        diff = self.compare(older, newer)
+        recoverable = []
+        non_recoverable = []
+        old_state = self._snapshots[older].state
+        for path in diff.lost:
+            value = self._get_path(old_state, path)
+            if value is self._MISSING:
+                non_recoverable.append(path)
+            else:
+                recoverable.append(path)
+        return {
+            "status": "REAL",
+            "older": older,
+            "newer": newer,
+            "lost": diff.lost,
+            "recoverable": recoverable,
+            "non_recoverable": non_recoverable,
+            "loss_detected": bool(diff.lost),
+        }
+
+    def reconstructability(self, older: str, newer: str) -> dict[str, Any]:
+        """Reports whether the newer state can be reconstructed from the older state."""
+        if older not in self._snapshots or newer not in self._snapshots:
+            return {
+                "status": "UNMEASURABLE",
+                "reconstructable": False,
+                "reason": "missing_snapshot",
+            }
+        integrity = {
+            "older": self.verify_snapshot(older),
+            "newer": self.verify_snapshot(newer),
+        }
+        if not all(integrity.values()):
+            return {
+                "status": "BLOCKED",
+                "reconstructable": False,
+                "reason": "snapshot_integrity_failed",
+                "integrity": integrity,
+            }
+        loss = self.detect_information_loss(older, newer)
+        reconstructable = not loss["non_recoverable"]
+        return {
+            "status": "REAL" if reconstructable else "BLOCKED",
+            "reconstructable": reconstructable,
+            "integrity": integrity,
+            "lost": loss["lost"],
+            "recoverable": loss["recoverable"],
+            "non_recoverable": loss["non_recoverable"],
+        }
+
     def audit(self, reference: str, target: str) -> AuditReport:
+        if not self.verify_snapshot(reference) or not self.verify_snapshot(target):
+            raise ValueError("ERU_SNAPSHOT_INTEGRITY_FAILED")
         diff = self.compare(reference, target)
         rec = self.recover(reference, target)
         return AuditReport(
