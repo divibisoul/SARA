@@ -42,7 +42,7 @@ jobs:
 
       - name: Build N07
         working-directory: n07
-        run: go build ./cmd/nexus -o nexus
+        run: go build -o nexus ./cmd/nexus
 
       - name: Start real SARA
         env:
