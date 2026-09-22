@@ -229,7 +229,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 ):
                     raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
                 result = system.sistema_vivo.process(text, cycle_id=cycle_id)
+                correlation_id = correlation or result.cycle_id
                 self._json(200, {
+                    "request_id": correlation_id,
+                    "correlation_id": correlation_id,
                     "cycle_id": result.cycle_id,
                     "input": result.input,
                     "final_state": result.loop_report.final_state,
