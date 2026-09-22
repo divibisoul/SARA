@@ -3,6 +3,7 @@ Status: IMPLEMENTED (análise local) | PENDING_INFRASTRUCTURE (repositórios rem
 """
 from __future__ import annotations
 import ast
+import base64
 import json
 import os
 import urllib.error
@@ -19,6 +20,8 @@ class CodeStructure:
     classes: list[str]
     imports: list[str]
     lines: int
+    revision: str | None = None
+    source_sha: str | None = None
 
 
 class NeuralLens:
@@ -59,7 +62,7 @@ class NeuralLens:
     def is_repo_client_ready(self) -> bool:
         return bool(os.getenv("GITHUB_TOKEN", "").strip())
 
-    def extract_from_repo(self, repo_url: str, path: str) -> CodeStructure:
+    def extract_from_repo(self, repo_url: str, path: str, ref: str | None = None) -> CodeStructure:
         parsed = urllib.parse.urlparse(str(repo_url).strip())
         if parsed.scheme not in {"http", "https"}:
             raise ValueError("repo_url deve ser http/https")
@@ -75,12 +78,17 @@ class NeuralLens:
         clean_path = "/".join(p for p in str(path).split("/") if p)
         if not clean_path:
             raise ValueError("path é obrigatório")
+        query_ref = str(ref or "").strip()
+        if not query_ref:
+            query_ref = urllib.parse.parse_qs(parsed.query).get("ref", [""])[0].strip()
         api = f"https://api.github.com/repos/{owner}/{repo}/contents/{urllib.parse.quote(clean_path, safe='/')}"
+        if query_ref:
+            api += "?" + urllib.parse.urlencode({"ref": query_ref})
         request = urllib.request.Request(
             api,
             headers={
-                "Accept": "application/vnd.github.raw+json",
-                "User-Agent": "SARA-NeuralLens/2.0",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "SARA-NeuralLens/2.1",
             },
         )
         token = os.getenv("GITHUB_TOKEN", "").strip()
@@ -88,12 +96,39 @@ class NeuralLens:
             request.add_header("Authorization", f"Bearer {token}")
         try:
             with urllib.request.urlopen(request, timeout=20) as response:
-                source = response.read().decode("utf-8")
+                payload = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", "replace")[:500]
             raise RuntimeError(f"GitHub contents HTTP {exc.code}: {detail}") from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"GitHub transport error: {exc}") from exc
+        except (urllib.error.URLError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"GitHub contents transport/JSON error: {exc}") from exc
+
+        if not isinstance(payload, dict):
+            raise RuntimeError("GitHub contents invalid response")
+        source_sha = str(payload.get("sha") or "").strip() or None
+        encoded = payload.get("content")
+        encoding = str(payload.get("encoding") or "").lower()
+        source = ""
+        if isinstance(encoded, str) and encoding == "base64":
+            try:
+                source = base64.b64decode(encoded, validate=False).decode("utf-8")
+            except (ValueError, UnicodeDecodeError) as exc:
+                raise RuntimeError(f"GitHub contents base64 decode error: {exc}") from exc
+        elif isinstance(payload.get("download_url"), str) and payload["download_url"].strip():
+            raw_request = urllib.request.Request(
+                payload["download_url"],
+                headers={"Accept": "application/octet-stream", "User-Agent": "SARA-NeuralLens/2.1"},
+            )
+            if token:
+                raw_request.add_header("Authorization", f"Bearer {token}")
+            try:
+                with urllib.request.urlopen(raw_request, timeout=20) as response:
+                    source = response.read().decode("utf-8")
+            except (urllib.error.HTTPError, urllib.error.URLError, UnicodeDecodeError) as exc:
+                raise RuntimeError(f"GitHub raw contents error: {exc}") from exc
+        else:
+            raise RuntimeError("GitHub contents did not provide decodable source")
+
         structure = self.extract(source, "python")
         return CodeStructure(
             module=f"{owner}/{repo}/{clean_path}",
@@ -101,6 +136,8 @@ class NeuralLens:
             classes=structure.classes,
             imports=structure.imports,
             lines=structure.lines,
+            revision=query_ref or None,
+            source_sha=source_sha,
         )
 
     def compare(self, a: CodeStructure, b: CodeStructure) -> dict:
