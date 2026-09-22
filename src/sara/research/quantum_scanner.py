@@ -6,6 +6,8 @@ from typing import Literal
 import ast
 import hashlib
 import pathlib
+import shutil
+import subprocess
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 
@@ -27,7 +29,7 @@ class QuantumScanner:
         }
 
     def is_target_access_ready(self) -> bool:
-        return False
+        return shutil.which("file") is not None
 
     def scan_source_file(self, target: str) -> dict:
         path = pathlib.Path(target)
@@ -80,22 +82,49 @@ class QuantumScanner:
         if depth not in {"shallow", "deep", "atomic"}:
             raise ValueError("depth inválido")
         path = pathlib.Path(str(target))
-        if path.is_file() and path.suffix.lower() in {".py"}:
+        if path.is_file() and path.suffix.lower() == ".py":
             result = self.scan_source_file(str(path))
             result["depth"] = depth
             result["backend"] = "local_source_parser"
-            if depth in {"deep", "atomic"}:
+            return result
+        if path.is_file() and self.is_target_access_ready():
+            result = {
+                "target": str(path),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "bytes": path.stat().st_size,
+                "lines": len(path.read_text(encoding="utf-8", errors="replace").splitlines()),
+                "language": path.suffix.lower(),
+                "functions": [],
+                "classes": [],
+                "imports": [],
+                "syntax_valid": True,
+                "findings": [],
+                "depth": depth,
+                "backend": "file"
+            }
+            file_probe = subprocess.run(
+                ["file", "-b", str(path)],
+                check=False, capture_output=True, text=True, timeout=5,
+            )
+            result["file_type"] = file_probe.stdout.strip()
+            if file_probe.returncode != 0:
+                result["findings"].append({"kind": "file_probe_failed", "message": file_probe.stderr.strip()})
+            objdump = shutil.which("objdump")
+            if depth in {"deep", "atomic"} and objdump:
+                header_probe = subprocess.run(
+                    [objdump, "-f", str(path)],
+                    check=False, capture_output=True, text=True, timeout=10,
+                )
+                result["objdump"] = header_probe.stdout.strip()
+                if header_probe.returncode != 0:
+                    result["findings"].append({"kind": "objdump_failed", "message": header_probe.stderr.strip()})
+            elif depth in {"deep", "atomic"}:
                 result["findings"].append({
-                    "kind": "deep_binary_analysis_unavailable",
-                    "message": "análise profunda de binário requer toolchain externo real",
+                    "kind": "deep_disassembler_unavailable",
+                    "message": "objdump não encontrado; análise de formato permanece disponível via file",
                 })
             return result
-        raise NotImplementedError(
-            "QuantumScanner.scan requer acesso local/remoto ao alvo com parser ou "
-            "disassembler apropriado. A análise Python local está disponível em "
-            "scan_source_file(). Ativação externa: ver "
-            "CANONICAL_ACTIVATION_PLAN.for_module('QuantumScanner')."
-        )
+        raise FileNotFoundError(f"target não encontrado ou toolchain indisponível: {target}")
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
