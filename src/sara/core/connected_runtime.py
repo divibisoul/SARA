@@ -92,6 +92,24 @@ class ConnectedRuntime:
 
             module = entry.instance
             if entry.status == ModuleStatus.PENDING_INFRASTRUCTURE:
+                local_operation = getattr(module, "execute_local", None)
+                if local_operation is not None:
+                    try:
+                        result = local_operation(ctx)
+                        action = ConnectedAction(
+                            phase.value, name, entry.status.value, True, True,
+                            "local_operation",
+                            result if isinstance(result, dict) else {"result": result},
+                        )
+                    except Exception as exc:
+                        action = ConnectedAction(
+                            phase.value, name, entry.status.value, False, False,
+                            "local_operation_error",
+                            {"error": f"{type(exc).__name__}: {exc}"},
+                        )
+                    actions.append(action)
+                    self._record(ctx, action)
+                    continue
                 action = ConnectedAction(
                     phase.value, name, entry.status.value, False, True,
                     "pending_infrastructure",
