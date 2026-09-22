@@ -11,3 +11,13 @@ services:
       SARA_PORT: "8090"
     ports:
       - "${SARA_PORT_EXTERNAL:-8090}:8090"
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=3).read()"
+      interval: 15s
+      timeout: 5s
+      retries: 5
