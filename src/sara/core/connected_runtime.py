@@ -150,7 +150,7 @@ class ConnectedRuntime:
                     phase.value, name, entry.status.value, False, False,
                     "error", {"error": f"{type(exc).__name__}: {exc}"},
                 )
-            if not action.ok and operation not in {"none", "emit_trace"}:
+            if not action.ok and action.operation not in {"none", "emit_trace"}:
                 action = ConnectedAction(
                     action.phase, action.module, action.status,
                     action.executed, action.ok, action.operation,
