@@ -51,13 +51,16 @@ class CycleContext:
             step.info.setdefault("temporal_id", temporal_id)
 
         if self.sink.decision_trace is not None:
+            # O payload enviado ao trace precisa ser independente do dicionário
+            # que continuará sendo enriquecido com temporal_id/decision_hash.
+            trace_info = dict(info)
             entry = self.sink.decision_trace.log({
                 "event": "cycle_step",
                 "cycle_id": self.cycle_id,
                 "phase": phase,
                 "module": module,
                 "ok": ok,
-                "info": info,
+                "info": trace_info,
                 "ts": ts,
             })
             step.info.setdefault("decision_hash", entry.hash)
