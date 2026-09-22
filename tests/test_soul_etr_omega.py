@@ -48,3 +48,31 @@ def test_omega_cycle_produces_real_evidence():
     assert report.cycle_id.startswith("omega-")
     assert report.evidence["scanner"] == "SystemMetricsScanner"
     assert isinstance(report.evidence["metrics"], list)
+
+def test_omega_context_services_use_explicit_inputs_only():
+    system = SoulETROmegaSystem()
+    report = system.run_cycle(
+        cycle_id="omega-context-test",
+        facts={
+            "habit_key": "open_documents",
+            "habit_candidates": ["open_documents", "other"],
+            "habit_context": {"source": "test"},
+            "network": "offline",
+            "hour": 2,
+            "completed_cycles": 10,
+            "observed_reward": 0.8,
+        },
+    )
+    assert report.cycle_id == "omega-context-test"
+    assert report.evidence["habit"]["observation"]["count"] == 1
+    assert "reduce_optional_work" in report.evidence["anticipation"]["recommendations"]
+    assert "defer_network_work" in report.evidence["anticipation"]["recommendations"]
+    assert report.evidence["micro_macro"]["completion_source"] == "explicit_fact"
+    assert report.adaptation["updated"] is True
+    assert report.adaptation["reward_source"] == "external_observation"
+
+
+def test_omega_does_not_fabricate_adaptive_reward():
+    report = SoulETROmegaSystem().run_cycle()
+    assert report.adaptation["updated"] is False
+    assert report.adaptation["reason"] == "no_observed_reward"
