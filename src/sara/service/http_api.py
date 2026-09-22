@@ -9,6 +9,8 @@ import json
 import os
 import hmac
 import uuid
+import time
+import threading
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, cast
@@ -20,6 +22,7 @@ from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
 _rate_state: dict[str, tuple[int, float]] = {}
+_rate_lock = threading.Lock()
 
 
 class SaraAPIError(Exception):
@@ -49,13 +52,14 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
         self._json(exc.status, {"error": {"code": exc.code, "message": exc.message, "details": exc.details}})
 
     def _rate_limit(self) -> None:
-        now = __import__('time').time()
+        now = time.monotonic()
         key = self.client_address[0] if self.client_address else 'unknown'
-        count, started = _rate_state.get(key, (0, now))
-        if now - started >= _RATE_WINDOW_S:
-            count, started = 0, now
-        count += 1
-        _rate_state[key] = (count, started)
+        with _rate_lock:
+            count, started = _rate_state.get(key, (0, now))
+            if now - started >= _RATE_WINDOW_S:
+                count, started = 0, now
+            count += 1
+            _rate_state[key] = (count, started)
         if count > _RATE_MAX:
             raise SaraAPIError(429, 'RATE_LIMITED', 'Limite temporário de requisições excedido.', {'window_seconds': _RATE_WINDOW_S, 'max_requests': _RATE_MAX})
 
