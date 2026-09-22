@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import json
 import os
+import hmac
+import uuid
+
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import urlparse
@@ -44,7 +47,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
         if not expected:
             raise SaraAPIError(503, "AUTH_NOT_CONFIGURED", "SARA_API_TOKEN não configurado; API protegida por fail-closed.")
         supplied = self.headers.get("Authorization", "")
-        if supplied != f"Bearer {expected}":
+        if not hmac.compare_digest(supplied, f"Bearer {expected}"):
             raise SaraAPIError(401, "UNAUTHORIZED", "Bearer token inválido ou ausente.")
 
     def _body(self) -> dict:
@@ -74,8 +77,17 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 modules = system.registry.snapshot()["modules"]
                 self._json(200, {
                     "service": "SARA",
+                    "protocol": "sara-http/1",
                     "contract_version": "1.0",
                     "ready": system.ready,
+                    "operations": [
+                        "sara.cycle@1.0.0",
+                        "sara.audit@1.0.0",
+                        "sara.regenerate@1.0.0",
+                        "sara.state@1.0.0",
+                        "sara.trace@1.0.0",
+                    ],
+                    "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
                     "activation": system.registration_report.get("pending", []),
                     "invariants": system.invariant_report,
@@ -130,24 +142,34 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
                 ara = system.components["ara_extended"]
+                etr = system.components["etr_extended"]
                 flaws = ara.detect(text)
                 structural = ara.detect_structural(text)
                 relational = ara.detect_relational(text)
+                all_flaws = [*flaws, *structural, *relational]
                 if path == "/v1/audit":
+                    ethical = etr.validate_multi_framework(text)
                     self._json(200, {
+                        "request_id": str(uuid.uuid4()),
                         "operation": "audit",
-                        "flaws": [getattr(f, "__dict__", str(f)) for f in [*flaws, *structural, *relational]],
-                        "count": len(flaws) + len(structural) + len(relational),
+                        "flaws": [getattr(f, "__dict__", str(f)) for f in all_flaws],
+                        "count": len(all_flaws),
+                        "ethical": getattr(ethical, "__dict__", str(ethical)),
+                        "provenance": ara.meta_audit_complete(),
                     })
                     return
-                regenerated = ara.regenerate_semantic(text, [*flaws, *structural, *relational])
+                regenerated = ara.regenerate_semantic(text, all_flaws)
+                ethical = etr.validate_multi_framework(regenerated.transformed)
                 self._json(200, {
+                    "request_id": str(uuid.uuid4()),
                     "operation": "regenerate",
                     "original": regenerated.original,
                     "transformed": regenerated.transformed,
                     "applied_rules": list(regenerated.applied_rules),
+                    "plan_steps": list(regenerated.plan_steps),
                     "integrity_hash": regenerated.integrity_hash,
                     "preserved_length": regenerated.preserved_length,
+                    "ethical": getattr(ethical, "__dict__", str(ethical)),
                 })
                 return
 
