@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 import logging
 
 from sara.contracts import ModuleRegistry, ModuleStatus
-from sara.contracts.base import ModuleStatus
 from sara.contracts.activation import CANONICAL_ACTIVATION_PLAN
 from sara.contracts.invariants import InvariantValidator
 from sara.core.ara import ARA
@@ -104,7 +103,11 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     committee = AssimilationReviewCommittee(quorum=0.75)
     committee.register_member("etr", lambda p: etr.validate(str(p.get("description", ""))).approved)
     committee.register_member("identity", lambda p: identity.validate(str(p.get("description", ""))).approved)
-    committee.register_member("itr", lambda p: True)
+    def _itr_member(proposal: dict) -> bool:
+        strategy = itr.generate(str(proposal.get("description", "")), context=proposal)
+        return bool(strategy.objective.strip() and strategy.plan and strategy.analysis)
+
+    committee.register_member("itr", _itr_member)
 
     radar = InnovationRadar(etr, itr, identity)
     governed = GovernedSARA(committee, legal_compliance, radar=radar)
