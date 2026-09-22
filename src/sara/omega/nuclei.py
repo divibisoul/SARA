@@ -103,7 +103,8 @@ class SymbiosisHostNucleus:
             return {"action": "python_gc", "rollback": "not_applicable"}
         return ETRAction(
             "omega-gc", "python_gc", "Coletar lixo do processo SARA",
-            impact=0.3, urgency=0.7, cost=0.05, reversible=True,
+            # Python garbage collection is not reversible: collected objects cannot be restored by a rollback hook.
+            impact=0.3, urgency=0.7, cost=0.05, reversible=False,
             execute=execute, rollback=rollback,
         )
 
