@@ -21,11 +21,20 @@ def test_runtime_diagnostics_for_clean_cycle_and_complexity_detector():
         f"score={score!r}; threshold={ara.COMPLEXITY_SCORE_THRESHOLD!r}; flaws={flaws!r}"
     )
 
-    itr = system.components["itr"]
+    itr = system.components["itr_extended"]
+    assert type(system.components["loop"]._itr).__name__ == "ITR_Extended"
     try:
-        itr.generate_strategic("promover autonomia comunitária", {"cycle": 1, "ara_audit": {"flaws": [], "semantic_fingerprint": "x"}})
+        plan = itr.generate_strategic(
+            "promover autonomia comunitária",
+            {"cycle": 1, "ara_audit": {"flaws": [], "semantic_fingerprint": "x"}},
+        )
     except Exception as exc:
         raise AssertionError(f"STRATEGY direct failure: {type(exc).__name__}: {exc}") from exc
+    assert len(plan.phases) == 4
+
+    etr = system.components["etr_extended"]
+    ethical = etr.validate_multi_framework("promover autonomia comunitária")
+    assert ethical.approved is True, ethical
 
     result = system.sistema_vivo.process("promover autonomia comunitária", cycle_id="diagnostic-clean-001")
     assert result.loop_report.converged is True, result.loop_report.cycles
