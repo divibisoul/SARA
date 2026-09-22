@@ -210,6 +210,7 @@ class ClareiraSubsystem:
             "reported_homeostasis": copy.deepcopy(copied["homeostasis"]),
             "derived_homeostasis": derived,
             "vagus": copy.deepcopy(copied["vagus"]),
+            "device_state": copy.deepcopy(copied.get("deviceState")),
         }
         digest = hashlib.sha256(
             json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -228,6 +229,7 @@ class ClareiraSubsystem:
             "observed_channel_count": len(copied["channels"]),
             "homeostasis": derived,
             "received_at": payload["timestamp"],
+            "device_state": copy.deepcopy(payload["device_state"]),
         }
         self._latest_snapshot = record
         self._latest_hash = digest
