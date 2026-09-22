@@ -131,7 +131,7 @@ class ERUTrinityBridge:
         """Anexa observação comportamental à capacidade observada nesta fase."""
         audit = self._cycles.setdefault(cycle_id, BridgeAudit(cycle_id))
         snapshot_name = f"CAP::{cycle_id}:{phase}:{role}"
-        if snapshot_name not in self._eru._snapshots:
+        if not self._eru.has_snapshot(snapshot_name):
             raise ValueError("ERU_BEHAVIOR_CAPABILITY_SNAPSHOT_MISSING")
         evidence = self._eru.record_behavior_observation(
             snapshot_name,
