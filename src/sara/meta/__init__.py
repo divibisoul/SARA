@@ -7,6 +7,7 @@ from .eru_trinity_bridge import ERUTrinityBridge
 from .eru_drift_detector import ERUDriftDetector
 from .eru_recovery_advisor import ERURecoveryAdvisor
 from .clareira import ClareiraSubsystem, CLAREIRA_SCHEMA_VERSION, CLAREIRA_BLUEPRINT_VERSION, BLUEPRINT_ROLES
+from .eru_mmd_rgo_clareira_bridge import ERUMMDRGOClareiraBridge, FrontierAssessment, RGO_FORMULA
 from .soul_federation import (
     SARA_FEDERATION_CONTRACT_VERSION,
     SARA_OPERATIONS,
@@ -24,6 +25,7 @@ __all__ = [
     "TransystemSARA",
     "ERUTrinityBridge", "ERUDriftDetector", "ERURecoveryAdvisor",
     "ClareiraSubsystem", "CLAREIRA_SCHEMA_VERSION", "CLAREIRA_BLUEPRINT_VERSION", "BLUEPRINT_ROLES",
+    "ERUMMDRGOClareiraBridge", "FrontierAssessment", "RGO_FORMULA",
     "SARA_FEDERATION_CONTRACT_VERSION", "SARA_OPERATIONS",
     "SOUL_NUCLEUS_AFFINITIES", "NucleusAffinity", "affinity_for", "federation_manifest",
 ]
