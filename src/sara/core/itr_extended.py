@@ -187,9 +187,10 @@ class ITR_Extended(ITR):
     # 2. EXECUÇÃO COMPOSTA
     # -----------------------------------------------------------------
 
-    def execute_composed(self, plan: StrategicPlan) -> ComposedResult:
-        """Executa plano com pontos de rollback e métricas por fase."""
-        text = plan.objective
+    def execute_composed(self, plan: StrategicPlan,
+                         initial_text: str | None = None) -> ComposedResult:
+        """Executa plano com rollback transacional e métricas semânticas por fase."""
+        text = plan.objective if initial_text is None else str(initial_text)
         phase_results: list[dict] = []
         rollback_triggered = False
         snapshot = text
@@ -222,14 +223,12 @@ class ITR_Extended(ITR):
             except Exception as exc:
                 phase_metrics["ok"] = False
                 phase_metrics["error"] = str(exc)
-                if semantic_violation or f"after_phase_{phase['phase']}" in plan.rollback_points:
-                    text = snapshot
-                    phase_metrics["rolled_back"] = True
-                    rollback_triggered = True
-                if semantic_violation:
-                    phase_metrics["blocking"] = True
-                    phase_results.append(phase_metrics)
-                    break
+                text = snapshot
+                phase_metrics["rolled_back"] = True
+                phase_metrics["blocking"] = True
+                rollback_triggered = True
+                phase_results.append(phase_metrics)
+                break
             phase_results.append(phase_metrics)
             snapshot = text
 
