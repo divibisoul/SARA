@@ -59,9 +59,9 @@ CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
 ))
 CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
     module="QuantumScanner",
-    required_infrastructure="Acesso a binário/código-fonte + toolchain de análise",
-    activation_method="inject_target_access",
-    fallback_behavior="scan() levanta NotImplementedError",
+    required_infrastructure="Acesso local ao alvo + ferramenta file; objdump opcional para análise profunda",
+    activation_method="local_toolchain_detection",
+    fallback_behavior="Python é analisado localmente; outros arquivos usam file quando disponível",
     activates_phases=(),
     verification_hook="is_target_access_ready",
 ))
@@ -83,9 +83,9 @@ CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
 ))
 CANONICAL_ACTIVATION_PLAN.add(ActivationRequirement(
     module="TransystemSARA",
-    required_infrastructure="Credenciais + contratos de uso de bigtechs",
-    activation_method="inject_credentials",
-    fallback_behavior="assimilate_from() levanta NotImplementedError; list_sources() permanece",
+    required_infrastructure="Endpoints externos explicitamente autorizados + credenciais quando exigidas",
+    activation_method="inject_http_adapters",
+    fallback_behavior="sistemas sem adapter retornam BLOCKED_INFRASTRUCTURE; list_sources() permanece",
     activates_phases=(),
     verification_hook="is_credentials_ready",
 ))
