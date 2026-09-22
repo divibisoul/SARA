@@ -71,10 +71,7 @@ class NeuralLens:
         if len(parts) < 2:
             raise ValueError("repo_url deve apontar para owner/repo")
         if "github.com" not in parsed.netloc.lower():
-            raise NotImplementedError(
-                "NeuralLens.extract_from_repo possui cliente HTTP real para GitHub; "
-                "outros hosts exigem backend específico."
-            )
+            raise ValueError("NEURAL_LENS_UNSUPPORTED_HOST")
         owner, repo = parts[0], parts[1].removesuffix(".git")
         clean_path = "/".join(p for p in str(path).split("/") if p)
         if not clean_path:
