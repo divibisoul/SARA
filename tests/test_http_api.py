@@ -51,7 +51,7 @@ def test_v1_capabilities_requires_bearer_and_exposes_operations():
     server, _ = _start_server()
     try:
         status, _ = _request(server, "/v1/capabilities")
-        assert status == 503
+        assert status == 401
         status, payload = _request(
             server, "/v1/capabilities", token="test-token-123456789"
         )
