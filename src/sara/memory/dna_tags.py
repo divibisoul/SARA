@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.clock import now_iso
+from sara.infra.hashing import chain_hash
 
 
 PROTECTED_TAGS = ["🔒IDENTITY", "🔒ETHICS", "🔒MEMORY", "🔒CORE"]
@@ -23,6 +24,7 @@ class ViolationRecord:
     operation: str
     tags: tuple[str, ...]
     timestamp: str
+    hash: str = ""
 
 
 class DNA_Tags:
@@ -37,6 +39,7 @@ class DNA_Tags:
 
     def __init__(self) -> None:
         self._violations: list[ViolationRecord] = []
+        self._chain: list[str] = []
 
     def describe(self) -> dict:
         return {
@@ -53,11 +56,45 @@ class DNA_Tags:
     def guard(self, operation: str, payload: Any) -> GuardResult:
         tags = tuple(self.scan(str(payload)))
         if tags:
+            timestamp = now_iso()
+            prev = self._chain[-1] if self._chain else "GENESIS"
+            current = chain_hash(prev, {
+                "operation": operation,
+                "tags": tags,
+                "timestamp": timestamp,
+            })
             self._violations.append(
-                ViolationRecord(operation, tags, now_iso())
+                ViolationRecord(operation, tags, timestamp, current)
             )
+            self._chain.append(current)
             return GuardResult(blocked=True, reason="tag_protegida", tags=tags)
         return GuardResult(blocked=False)
+
+    def explain_guard(self, operation: str, payload: Any) -> dict:
+        result = self.guard(operation, payload)
+        return {
+            "blocked": result.blocked,
+            "reason": result.reason,
+            "tags": list(result.tags),
+            "operation": operation,
+            "violations_count": len(self._violations),
+            "integrity": self.verify_integrity(),
+        }
+
+    def verify_integrity(self) -> bool:
+        if len(self._violations) != len(self._chain):
+            return False
+        previous = "GENESIS"
+        for record, chain_value in zip(self._violations, self._chain):
+            expected = chain_hash(previous, {
+                "operation": record.operation,
+                "tags": record.tags,
+                "timestamp": record.timestamp,
+            })
+            if expected != chain_value or record.hash != chain_value:
+                return False
+            previous = chain_value
+        return True
 
     def require_approval(self, tag: str, operation: str) -> dict:
         if tag not in self.PROTECTED:
@@ -70,4 +107,5 @@ class DNA_Tags:
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
             ctx.record("ingestion", self.NAME, True,
-                       violations_count=len(self._violations))
+                       violations_count=len(self._violations),
+                       chain_integrity=self.verify_integrity())
