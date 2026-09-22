@@ -187,15 +187,20 @@ class ETR_Extended(ETR):
         pos = sum(1 for p in positive if p in lower)
         neg = sum(1 for n in negative if n in lower)
         score = max(0.0, min(1.0, (pos - neg + 3) / 6))
+        evidence = tuple(
+            [f"positive_term:{p}" for p in positive if p in lower]
+            + [f"negative_term:{n}" for n in negative if n in lower]
+            + [f"positive_terms_evaluated:{len(positive)}",
+               f"negative_terms_evaluated:{len(negative)}",
+               f"positive_hits:{pos}",
+               f"negative_hits:{neg}"]
+        )
         return FrameworkAssessment(
             framework="utilitarista",
             approved=score >= 0.5 and neg == 0,
             score=round(score, 3),
             reasoning=f"beneficios={pos} danos={neg}",
-            evidence=tuple(
-                [f"positive_term:{p}" for p in positive if p in lower]
-                + [f"negative_term:{n}" for n in negative if n in lower]
-            ),
+            evidence=evidence,
             basis="LEXICAL_HEURISTIC_WITH_HARM_GUARD",
         )
 
@@ -212,7 +217,11 @@ class ETR_Extended(ETR):
                     f"{e.layer}:{e.kind}:{','.join(e.matched)}"
                     for e in r.evidence
                 )
-                or (f"base_validation:{r.reason}",)
+                or (
+                    f"base_validation:{r.reason}",
+                    "prohibited_terms_absent" if r.approved else "base_rule_rejected",
+                    f"identity_checked:{r.approved}",
+                )
             ),
             basis="BASE_ETR_RULES",
         )
@@ -224,12 +233,16 @@ class ETR_Extended(ETR):
                    "solidariedade", "autonomia", "transparência", "transparencia")
         hits = sum(1 for v in virtues if v in lower)
         score = min(hits / 3.0, 1.0)
+        evidence = tuple(
+            [f"virtue_term:{v}" for v in virtues if v in lower]
+            + [f"virtue_terms_evaluated:{len(virtues)}", f"virtue_hits:{hits}"]
+        )
         return FrameworkAssessment(
             framework="virtude",
             approved=score >= 0.33,
             score=round(score, 3),
             reasoning=f"virtudes_encontradas={hits}",
-            evidence=tuple(f"virtue_term:{v}" for v in virtues if v in lower),
+            evidence=evidence,
             basis="LEXICAL_HEURISTIC",
         )
 
@@ -248,6 +261,18 @@ class ETR_Extended(ETR):
         semantic_evidence = len(ubuntu.get("semantic_evidence", ())) + len(buen.get("semantic_evidence", ()))
         score = min((hits + (1 if ubuntu_aligned else 0) +
                      (1 if buen_aligned else 0) + semantic_evidence) / 6.0, 1.0)
+        evidence = (
+            tuple(f"care_term:{c}" for c in care_terms if c in lower)
+            + tuple(f"ubuntu:{x}" for x in ubuntu.get("semantic_evidence", ()))
+            + tuple(f"buen_vivir:{x}" for x in buen.get("semantic_evidence", ()))
+            + (
+                f"care_terms_evaluated:{len(care_terms)}",
+                f"care_hits:{hits}",
+                f"ubuntu_aligned:{ubuntu_aligned}",
+                f"buen_vivir_aligned:{buen_aligned}",
+                f"semantic_evidence_count:{semantic_evidence}",
+            )
+        )
         return FrameworkAssessment(
             framework="cuidado",
             approved=score >= 0.25,
@@ -256,11 +281,7 @@ class ETR_Extended(ETR):
                 f"termos_cuidado={hits} ubuntu={ubuntu_aligned} "
                 f"buen={buen_aligned} semantic_evidence={semantic_evidence}"
             ),
-            evidence=(
-                tuple(f"care_term:{c}" for c in care_terms if c in lower)
-                + tuple(f"ubuntu:{x}" for x in ubuntu.get("semantic_evidence", ()))
-                + tuple(f"buen_vivir:{x}" for x in buen.get("semantic_evidence", ()))
-            ),
+            evidence=evidence,
             basis="LEXICAL_PLUS_CULTURAL_STRUCTURED",
         )
 
