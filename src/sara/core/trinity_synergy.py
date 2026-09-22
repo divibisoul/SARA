@@ -81,6 +81,38 @@ class TrinitySynergy:
             "max_iterations": self._max_iterations,
         }
 
+    def assess(self, target: str) -> dict:
+        """Avalia a Tríade sobre um estado sem mutá-lo."""
+        current = str(target)
+        lexical = self._ara.detect(current)
+        semantic = self._ara.detect_semantic(current)
+        structural = self._ara.detect_structural(current)
+        relational = self._ara.detect_relational(current)
+        plan = self._itr.generate_strategic(current)
+        ethical = self._etr.validate_multi_framework(current)
+        return {
+            "target_length": len(current),
+            "flaws": {
+                "lexical": [f.kind for f in lexical],
+                "semantic": [f.kind for f in semantic],
+                "structural": [f.kind for f in structural],
+                "relational": [f.kind for f in relational],
+            },
+            "strategy": {
+                "phases": len(plan.phases),
+                "criteria": list(plan.convergence_criteria),
+                "semantic_profile": self._itr.semantic_strategy_profile(current),
+            },
+            "ethics": {
+                "approved": ethical.approved,
+                "consensus": ethical.consensus_score,
+                "dissenting": list(ethical.dissenting_frameworks),
+            },
+            "ready_for_regeneration": bool(
+                lexical or semantic or structural or relational
+            ),
+        }
+
     # -----------------------------------------------------------------
     # Núcleo: ciclo de autoaplicação
     # -----------------------------------------------------------------
