@@ -205,6 +205,12 @@ class ITR_Extended(ITR):
                     fn = _STEP_REGISTRY.get(step_name)
                     if fn is None:
                         raise KeyError(f"passo '{step_name}' não registrado")
+                    # extract_keywords é uma operação analítica: produz evidência
+                    # sobre a entrada e não substitui o conteúdo operacional.
+                    if step_name == "extract_keywords":
+                        extracted = fn(text)
+                        phase_metrics["extracted_keywords"] = extracted
+                        continue
                     text = fn(text)
 
                 semantic_delta = self._semantic.compare(plan.objective, text)
