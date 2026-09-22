@@ -144,9 +144,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 ara = system.components["ara_extended"]
                 etr = system.components["etr_extended"]
                 flaws = ara.detect(text)
+                semantic = ara.detect_semantic(text)
                 structural = ara.detect_structural(text)
                 relational = ara.detect_relational(text)
-                all_flaws = [*flaws, *structural, *relational]
+                all_flaws = [*flaws, *semantic, *structural, *relational]
                 if path == "/v1/audit":
                     ethical = etr.validate_multi_framework(text)
                     self._json(200, {
@@ -154,6 +155,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "operation": "audit",
                         "flaws": [getattr(f, "__dict__", str(f)) for f in all_flaws],
                         "count": len(all_flaws),
+                        "semantic": [getattr(f, "__dict__", str(f)) for f in semantic],
                         "ethical": getattr(ethical, "__dict__", str(ethical)),
                         "provenance": ara.meta_audit_complete(),
                     })
