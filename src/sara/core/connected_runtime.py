@@ -285,16 +285,23 @@ class ConnectedRuntime:
 
     @staticmethod
     def _record(ctx: Any, action: ConnectedAction) -> None:
-        if hasattr(ctx, "record"):
-            ctx.record(
-                action.phase,
-                action.module,
-                action.ok,
-                connected=True,
-                executed=action.executed,
-                operation=action.operation,
-                **action.detail,
-            )
+        if not hasattr(ctx, "record"):
+            return
+        detail = dict(action.detail)
+        # Campos estruturais do trace têm precedência. Dados com o mesmo nome
+        # continuam preservados sob o namespace "detail_*".
+        for reserved in ("phase", "module", "ok", "connected", "executed", "operation"):
+            if reserved in detail:
+                detail[f"detail_{reserved}"] = detail.pop(reserved)
+        ctx.record(
+            action.phase,
+            action.module,
+            action.ok,
+            connected=True,
+            executed=action.executed,
+            operation=action.operation,
+            **detail,
+        )
 
     def last_actions(self) -> list[ConnectedAction]:
         return list(self._last_actions)
