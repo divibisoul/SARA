@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 from sara.meta.soul_federation import federation_manifest, SARA_OPERATIONS
+from sara.probabilistic import ProbabilisticReasoningError
 
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
@@ -308,6 +309,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             raise SaraAPIError(404, "NOT_FOUND", f"Endpointo não existe: {path}")
         except SaraAPIError as exc:
             self._error(exc)
+        except ProbabilisticReasoningError as exc:
+            self._error(SaraAPIError(422, "INVALID_PROBABILISTIC_CONTEXT", str(exc)))
         except Exception as exc:
             self._error(SaraAPIError(500, "INTERNAL_ERROR", str(exc)))
 
