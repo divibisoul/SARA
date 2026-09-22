@@ -192,5 +192,6 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "quantum_scanner": quantum_scanner, "safe_sandbox": safe_sandbox,
             "transystem": transystem, "auditor": auditor, "provenance": prov,
             "decision_trace": trace, "activation_plan": CANONICAL_ACTIVATION_PLAN,
+            "connected_runtime": connected_runtime,
         },
     )
