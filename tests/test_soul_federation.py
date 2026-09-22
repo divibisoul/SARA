@@ -15,9 +15,9 @@ def test_federation_manifest_has_all_current_sara_operations():
     assert manifest["proof_rule"]["connected"].startswith("real request")
 
 
-def test_all_six_soul_nuclei_have_explicit_affinity():
+def test_all_declared_soul_nuclei_have_explicit_affinity():
     nuclei = {item.nucleus for item in SOUL_NUCLEUS_AFFINITIES}
-    assert nuclei == {"N01", "N02", "N03", "N04", "N05", "N06"}
+    assert nuclei == {"N01", "N02", "N03", "N04", "N05", "N06", "N07"}
     for nucleus in nuclei:
         affinity = affinity_for(nucleus)
         assert affinity is not None
