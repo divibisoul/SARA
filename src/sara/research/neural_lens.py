@@ -3,6 +3,11 @@ Status: IMPLEMENTED (análise local) | PENDING_INFRASTRUCTURE (repositórios rem
 """
 from __future__ import annotations
 import ast
+import json
+import os
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
@@ -52,13 +57,50 @@ class NeuralLens:
                              len(source_code.splitlines()))
 
     def is_repo_client_ready(self) -> bool:
-        return False
+        return bool(os.getenv("GITHUB_TOKEN", "").strip())
 
     def extract_from_repo(self, repo_url: str, path: str) -> CodeStructure:
-        raise NotImplementedError(
-            "NeuralLens.extract_from_repo requer acesso a repositórios remotos "
-            "(GitHub, GitLab) com token. "
-            "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('NeuralLens')."
+        parsed = urllib.parse.urlparse(str(repo_url).strip())
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("repo_url deve ser http/https")
+        parts = [part for part in parsed.path.split("/") if part]
+        if len(parts) < 2:
+            raise ValueError("repo_url deve apontar para owner/repo")
+        if "github.com" not in parsed.netloc.lower():
+            raise NotImplementedError(
+                "NeuralLens.extract_from_repo possui cliente HTTP real para GitHub; "
+                "outros hosts exigem backend específico."
+            )
+        owner, repo = parts[0], parts[1].removesuffix(".git")
+        clean_path = "/".join(p for p in str(path).split("/") if p)
+        if not clean_path:
+            raise ValueError("path é obrigatório")
+        api = f"https://api.github.com/repos/{owner}/{repo}/contents/{urllib.parse.quote(clean_path, safe='/')}"
+        request = urllib.request.Request(
+            api,
+            headers={
+                "Accept": "application/vnd.github.raw+json",
+                "User-Agent": "SARA-NeuralLens/2.0",
+            },
+        )
+        token = os.getenv("GITHUB_TOKEN", "").strip()
+        if token:
+            request.add_header("Authorization", f"Bearer {token}")
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                source = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:500]
+            raise RuntimeError(f"GitHub contents HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"GitHub transport error: {exc}") from exc
+        structure = self.extract(source, "python")
+        return CodeStructure(
+            module=f"{owner}/{repo}/{clean_path}",
+            functions=structure.functions,
+            classes=structure.classes,
+            imports=structure.imports,
+            lines=structure.lines,
         )
 
     def compare(self, a: CodeStructure, b: CodeStructure) -> dict:
