@@ -73,6 +73,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             system = self._runtime()
             if path == "/health":
                 self._json(200, {
+                    "service": "SARA",
                     "status": "ok" if system.ready else "not_ready",
                     "ready": system.ready,
                     "version": "3.1.0",
