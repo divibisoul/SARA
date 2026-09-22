@@ -139,9 +139,19 @@ class ERU_Engine:
                 signature = str(inspect.signature(member))
             except (TypeError, ValueError):
                 signature = "UNAVAILABLE"
+            source_text = None
+            try:
+                source_text = inspect.getsource(member)
+            except (OSError, TypeError):
+                pass
             methods[attr_name] = {
                 "signature": signature,
-                "source_hash": self._callable_source_hash(member),
+                "source_hash": (
+                    hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+                    if source_text is not None else None
+                ),
+                "source_text": source_text,
+                "source_available": source_text is not None,
             }
 
         state = {
