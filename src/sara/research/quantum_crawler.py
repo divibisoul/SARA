@@ -4,7 +4,10 @@ Status: PENDING_INFRASTRUCTURE
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
+import copy
 import json
+import threading
+import time
 import urllib.error
 import urllib.request
 import urllib.parse
@@ -31,15 +34,29 @@ class HTTPJSONBackend:
     def __init__(self, endpoint_template: str, *,
                  token_env: str | None = None,
                  timeout_s: float = 20.0,
-                 source: str = "HTTP") -> None:
+                 source: str = "HTTP",
+                 cache_ttl_s: float = 30.0,
+                 max_retries: int = 2,
+                 backoff_s: float = 0.5) -> None:
         if "{query}" not in endpoint_template:
             raise ValueError("endpoint_template deve conter {query}")
         if timeout_s <= 0:
             raise ValueError("timeout_s deve ser positivo")
+        if cache_ttl_s < 0:
+            raise ValueError("cache_ttl_s não pode ser negativo")
+        if max_retries < 0:
+            raise ValueError("max_retries não pode ser negativo")
+        if backoff_s < 0:
+            raise ValueError("backoff_s não pode ser negativo")
         self.endpoint_template = endpoint_template
         self.token_env = token_env
         self.timeout_s = timeout_s
         self.source = source
+        self.cache_ttl_s = cache_ttl_s
+        self.max_retries = max_retries
+        self.backoff_s = backoff_s
+        self._cache: dict[str, tuple[float, list[dict]]] = {}
+        self._cache_lock = threading.RLock()
 
     def fetch(self, query: str) -> list[dict]:
         encoded_query = urllib.parse.quote(str(query), safe="")
@@ -56,23 +73,55 @@ class HTTPJSONBackend:
             token = os.getenv(self.token_env, "").strip()
             if token:
                 request.add_header("Authorization", f"Bearer {token}")
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", "replace")[:500]
-            raise RuntimeError(f"{self.source} HTTP {exc.code}: {detail}") from exc
-        except (urllib.error.URLError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"{self.source} backend failure: {exc}") from exc
+        now = time.monotonic()
+        if self.cache_ttl_s > 0:
+            with self._cache_lock:
+                cached = self._cache.get(url)
+                if cached and now - cached[0] < self.cache_ttl_s:
+                    return copy.deepcopy(cached[1])
+
+        last_error = None
+        payload = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                break
+            except urllib.error.HTTPError as exc:
+                last_error = exc
+                if exc.code not in {429, 502, 503, 504} or attempt >= self.max_retries:
+                    detail = exc.read().decode("utf-8", "replace")[:500]
+                    raise RuntimeError(f"{self.source} HTTP {exc.code}: {detail}") from exc
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                try:
+                    delay = max(0.0, float(retry_after)) if retry_after else self.backoff_s * (2 ** attempt)
+                except ValueError:
+                    delay = self.backoff_s * (2 ** attempt)
+                time.sleep(delay)
+            except (urllib.error.URLError, json.JSONDecodeError) as exc:
+                last_error = exc
+                if isinstance(exc, json.JSONDecodeError) or attempt >= self.max_retries:
+                    raise RuntimeError(f"{self.source} backend failure: {exc}") from exc
+                time.sleep(self.backoff_s * (2 ** attempt))
+        if payload is None:
+            raise RuntimeError(f"{self.source} backend failure: {last_error}")
+
         if isinstance(payload, list):
-            return [item for item in payload if isinstance(item, dict)]
-        if isinstance(payload, dict):
+            items = [item for item in payload if isinstance(item, dict)]
+        elif isinstance(payload, dict):
             if isinstance(payload.get("items"), list):
-                return [item for item in payload["items"] if isinstance(item, dict)]
-            if isinstance(payload.get("models"), list):
-                return [item for item in payload["models"] if isinstance(item, dict)]
-            return [payload]
-        raise RuntimeError(f"{self.source} returned unsupported JSON shape")
+                items = [item for item in payload["items"] if isinstance(item, dict)]
+            elif isinstance(payload.get("models"), list):
+                items = [item for item in payload["models"] if isinstance(item, dict)]
+            else:
+                items = [payload]
+        else:
+            raise RuntimeError(f"{self.source} returned unsupported JSON shape")
+
+        if self.cache_ttl_s > 0:
+            with self._cache_lock:
+                self._cache[url] = (time.monotonic(), copy.deepcopy(items))
+        return items
 
 class QuantumCrawler:
     NAME = "QuantumCrawler"
