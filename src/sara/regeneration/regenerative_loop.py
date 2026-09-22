@@ -302,13 +302,24 @@ class RegenerativeLoop:
 
     def _phase_identity(self, ctx, cycle, idx):
         ident = self._identity.participate(f"cycle_{idx}", ctx.current)
+        structured = (
+            self._identity.validate_structured(ctx.current)
+            if hasattr(self._identity, "validate_structured")
+            else {"approved": ident.identity_approved, "violations": ident.violations}
+        )
+        approved = ident.identity_approved and bool(structured.get("approved", True))
         cycle["phases"]["identity"] = {
-            "approved": ident.identity_approved,
+            "approved": approved,
             "violations": list(ident.violations),
+            "structured_approved": bool(structured.get("approved", True)),
+            "structured_violations": list(structured.get("violations", ())),
+            "semantic_fingerprint": structured.get("fingerprint"),
+            "semantic_relations": structured.get("relations"),
         }
-        self._record(ctx, CyclePhase.IDENTITY, "IdentityCore", ident.identity_approved,
+        ctx.register_artifact("identity_semantic_fingerprint", structured.get("fingerprint"))
+        self._record(ctx, CyclePhase.IDENTITY, "IdentityCore", approved,
                      **cycle["phases"]["identity"])
-        if not ident.identity_approved:
+        if not approved:
             raise _Aborted("IDENTITY", "identity_block")
 
     def _phase_ethics(self, ctx, cycle):
@@ -364,15 +375,27 @@ class RegenerativeLoop:
 
     def _phase_validation(self, ctx, cycle, etr_result):
         result = self._etr.validate(ctx.current, mode="default")
+        semantic_validation = (
+            self._etr.validate_semantic_frame(ctx.current)
+            if hasattr(self._etr, "validate_semantic_frame")
+            else {"ok": result.approved, "fingerprint": None}
+        )
+        approved = result.approved and bool(semantic_validation.get("ok", True))
         cycle["phases"]["validation"] = {
-            "approved": result.approved,
+            "approved": approved,
             "reason": result.reason,
             "previous_ethics_approved": etr_result.approved,
+            "semantic_approved": bool(semantic_validation.get("ok", True)),
+            "semantic_fingerprint": semantic_validation.get("fingerprint"),
+            "semantic_findings": semantic_validation.get("findings", []),
         }
-        self._record(ctx, CyclePhase.VALIDATION, "ETR", result.approved,
+        self._record(ctx, CyclePhase.VALIDATION, "ETR", approved,
                      **cycle["phases"]["validation"])
-        if not result.approved:
-            raise _Aborted("VALIDATION", result.reason)
+        if not approved:
+            raise _Aborted(
+                "VALIDATION",
+                result.reason if not result.approved else "semantic_validation_rejected",
+            )
 
     def _phase_persistence(self, ctx, cycle, idx, result):
         rid = self._temporal.insert({
