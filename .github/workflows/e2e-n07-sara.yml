@@ -135,7 +135,8 @@ jobs:
           assert sara["fusion"] is not None
           assert sara["fusion"]["integrity_ok"] is True
           assert sara["execution_report"]["artifacts"]["fusion_mirror"]["fused_hash"]
-          assert outer["traceId"] == sara["trace_hash"] or outer["traceId"]
+          assert outer["traceId"]
+          assert outer["correlationId"]
           print("E2E cycle:", sara["cycle_id"])
           print("Fusion hash:", sara["fusion"]["fused_hash"])
           print("Correlation:", outer["correlationId"])
