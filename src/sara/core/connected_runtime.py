@@ -27,6 +27,7 @@ class ConnectedAction:
     ok: bool
     operation: str
     detail: dict[str, Any]
+    blocking: bool = False
 
 
 class ConnectedRuntime:
@@ -100,12 +101,14 @@ class ConnectedRuntime:
                             phase.value, name, entry.status.value, True, True,
                             "local_operation",
                             result if isinstance(result, dict) else {"result": result},
+                            blocking=True,
                         )
                     except Exception as exc:
                         action = ConnectedAction(
                             phase.value, name, entry.status.value, False, False,
                             "local_operation_error",
                             {"error": f"{type(exc).__name__}: {exc}"},
+                            blocking=True,
                         )
                     actions.append(action)
                     self._record(ctx, action)
@@ -146,6 +149,12 @@ class ConnectedRuntime:
                 action = ConnectedAction(
                     phase.value, name, entry.status.value, False, False,
                     "error", {"error": f"{type(exc).__name__}: {exc}"},
+                )
+            if not action.ok and operation not in {"none", "emit_trace"}:
+                action = ConnectedAction(
+                    action.phase, action.module, action.status,
+                    action.executed, action.ok, action.operation,
+                    action.detail, blocking=True,
                 )
             actions.append(action)
             self._record(ctx, action)
