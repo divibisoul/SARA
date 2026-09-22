@@ -197,6 +197,23 @@ class RegenerativeLoop:
                 report.rollback_performed = restored.restored
                 if restored.restored:
                     ctx.current = restored.state.get("input", ctx.input)
+
+                # Divergência do espelho é tratada como evento regenerativo RGO:
+                # rollback do estado inválido, registro do evento e nova iteração.
+                if exc.reason == "fusion_integrity_failed" and idx < self._max_cycles:
+                    ctx.flags.setdefault("rgo_regeneration_inputs", []).append({
+                        "type": "FUSION_DIVERGENCE",
+                        "cycle_id": ctx.cycle_id,
+                        "version": idx,
+                        "phase": exc.phase,
+                    })
+                    ctx.aborted = False
+                    ctx.abort_reason = ""
+                    state.transition(CycleState.REGENERATING,
+                                     "rgo_fusion_divergence_retry", now_iso())
+                    report.cycles.append(cycle)
+                    continue
+
                 state.transition(CycleState.ROLLED_BACK if restored.restored else CycleState.ABORTED,
                                  exc.reason, now_iso())
                 report.cycles.append(cycle)
