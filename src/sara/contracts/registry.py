@@ -46,11 +46,23 @@ class ModuleRegistry:
         self._modules[name] = entry
         return entry
 
+    EXTERNAL_RUNTIME_DEPENDENCIES = {
+        "ProvenanceTracker", "CycleContext", "TraceSink", "ModuleRegistry",
+    }
+
     def validate_dependencies(self) -> list[str]:
+        """Valida apenas dependências que devem existir no registry.
+
+        Alguns contratos representam infraestrutura/contexto de runtime e não
+        são módulos registráveis; eles permanecem explicitamente permitidos.
+        """
         missing: list[str] = []
         for name, entry in self._modules.items():
             for dep in entry.dependencies:
-                if dep not in self._modules:
+                if (
+                    dep not in self._modules
+                    and dep not in self.EXTERNAL_RUNTIME_DEPENDENCIES
+                ):
                     missing.append(f"{name} → {dep}")
         return missing
 
