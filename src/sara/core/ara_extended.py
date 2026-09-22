@@ -49,7 +49,7 @@ class ARA_Extended(ARA):
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.NUCLEAR
-    DEPENDENCIES = ARA.DEPENDENCIES + ("ARA",)
+    DEPENDENCIES = ARA.DEPENDENCIES
     CYCLE_PHASES = ARA.CYCLE_PHASES
 
     # Sinônimos para transformação semântica (não apenas literal)
@@ -156,13 +156,16 @@ class ARA_Extended(ARA):
                     suggestion="quebrar repetição com conteúdo novo",
                 ))
 
-        # 1c. Assimetria estrutural (frases longas sem pontuação)
-        if len(s) > 500 and s.count(".") + s.count("!") + s.count("?") < len(s) // 500:
+        # 1c. Assimetria estrutural. Quebras de linha e blocos estruturados
+        # contam como limites reais; isso evita falso positivo sobre outputs
+        # já estruturados pelo ITR/Trinity.
+        boundaries = s.count(".") + s.count("!") + s.count("?") + s.count("\n")
+        if len(s) > 500 and boundaries < max(1, len(s) // 500):
             flaws.append(StructuralFlaw(
                 kind="ASSIMETRIA_ESTRUTURAL",
                 severity=0.4,
-                evidence=(f"len={len(s)}", f"pontuacoes={s.count('.') + s.count('!') + s.count('?')}"),
-                suggestion="introduzir pontuação para legibilidade",
+                evidence=(f"len={len(s)}", f"boundaries={boundaries}"),
+                suggestion="introduzir limites estruturais preservadores",
             ))
 
         return flaws
@@ -294,10 +297,14 @@ class ARA_Extended(ARA):
 
     @staticmethod
     def _annotate_semantic_guard(text: str) -> str:
-        return text + "\n[ARA_Extended: guardrail semântico preservou o conteúdo original]"
+        marker = "[ARA_Extended: guardrail semântico preservou o conteúdo original]"
+        return text if marker in text else text + "\n" + marker
 
     @staticmethod
     def _balance_delimiters(text: str) -> str:
+        marker = "[ARA_Extended: delimitadores fechados sem remoção de conteúdo]"
+        if marker in text:
+            return text
         stack: list[str] = []
         pairs = {"(": ")", "[": "]", "{": "}"}
         closing = {")", "]", "}"}
@@ -313,14 +320,15 @@ class ARA_Extended(ARA):
         return text + suffix + "\n[ARA_Extended: delimitadores fechados sem remoção de conteúdo]"
 
     def _semantic_replace(self, text: str) -> str:
-        """Escolhe sinônimo baseado no contexto."""
+        """Escolhe sinônimo baseado no contexto e de forma idempotente."""
+        marker = "[ARA_Extended: substituição semântica aplicada]"
         out = text
         for bad, alternatives in self.SEMANTIC_MAP.items():
             if re.search(rf"\b{re.escape(bad)}\b", out, flags=re.IGNORECASE):
                 # Escolhe a alternativa mais curta que preserva o tom
                 best = alternatives[0]
                 out = re.sub(rf"\b{re.escape(bad)}\b", best, out, flags=re.IGNORECASE)
-        return out + "\n[ARA_Extended: substituição semântica aplicada]"
+        return out if marker in out else out + "\n" + marker
 
     # -----------------------------------------------------------------
     # 4. META-AUDITORIA DAS PRÓPRIAS REGRAS
@@ -401,10 +409,20 @@ class ARA_Extended(ARA):
     # -----------------------------------------------------------------
 
     def applied_to_self(self) -> dict:
-        """Aplica ARA ao próprio ARA: audita, regenera, propõe."""
-        # Cria um snapshot textual do próprio código (representação)
-        self_repr = f"ARA v{self.VERSION} | regras={len(self._prov.all())} | "                     f"detectores=5 | regeneradores=2 | meta=meta_audit_complete"
+        """Audita a implementação real do próprio ARA, além da configuração."""
+        import inspect
 
+        try:
+            self_source = inspect.getsource(type(self))
+            source_status = "REAL"
+        except (OSError, TypeError):
+            self_source = (
+                f"ARA v{self.VERSION} | regras={len(self._prov.all())} | "
+                "source_unavailable"
+            )
+            source_status = "UNMEASURABLE"
+
+        self_repr = self_source
         flaws = self.detect(self_repr)
         structural = self.detect_structural(self_repr)
         relational = self.detect_relational(self_repr)
@@ -412,6 +430,8 @@ class ARA_Extended(ARA):
         proposals = self.propose_rule_upgrade()
 
         return {
+            "source_status": source_status,
+            "source_hash": self._hash(self_repr),
             "flaws": [f.kind for f in flaws],
             "structural_flaws": [f.kind for f in structural],
             "relational_flaws": [f.kind for f in relational],
