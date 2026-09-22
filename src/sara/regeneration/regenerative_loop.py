@@ -484,9 +484,17 @@ class RegenerativeLoop:
             "cycle_id": ctx.cycle_id, "iteration": idx,
             "state": ctx.current, "temporal_id": rid,
         }, label=f"{ctx.cycle_id}::iteration::{idx}")
-        cycle["phases"]["persistence"] = {"temporal_id": rid}
+        memory_persisted = self._memory.persist_if_configured()
+        temporal_persisted = self._temporal.persist_if_configured()
+        cycle["phases"]["persistence"] = {
+            "temporal_id": rid,
+            "memory_persisted": memory_persisted,
+            "temporal_persisted": temporal_persisted,
+        }
         self._record(ctx, CyclePhase.PERSISTENCE, "RegenerativeMemory", True,
-                     temporal_id=rid)
+                     temporal_id=rid,
+                     memory_persisted=memory_persisted,
+                     temporal_persisted=temporal_persisted)
 
     def _phase_snapshot(self, ctx, cycle, idx):
         snap = self._rollback.capture(
