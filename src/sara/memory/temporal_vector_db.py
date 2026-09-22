@@ -4,6 +4,9 @@ Status: IMPLEMENTED
 from __future__ import annotations
 import math
 import json
+import os
+import threading
+from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Any, Optional
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
@@ -40,8 +43,10 @@ class TemporalVectorDB:
     DEPENDENCIES = ()
     CYCLE_PHASES = (CyclePhase.PERSISTENCE,)
 
-    def __init__(self) -> None:
+    def __init__(self, persist_path: str | None = None) -> None:
         self._records: list[Record] = []
+        self._persist_path = (persist_path or os.getenv("SARA_TEMPORAL_PERSIST_PATH", "")).strip() or None
+        self._lock = threading.RLock()
 
     def describe(self) -> dict:
         return {
@@ -49,6 +54,8 @@ class TemporalVectorDB:
             "status": self.STATUS.value, "role": self.ROLE.value,
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
+            "persistence_enabled": self._persist_path is not None,
+            "persistence_path": self._persist_path,
         }
 
     def insert(self, data: dict, ts: Optional[str] = None,
@@ -56,10 +63,11 @@ class TemporalVectorDB:
         ts_val = ts or now_iso()
         rid = short_hash({"data": data, "ts": ts_val})
         integrity = short_hash({"id": rid, "data": data, "ts": ts_val, "vector": vector})
-        self._records.append(
-            Record(id=rid, data=dict(data), ts=ts_val,
-                   inserted_at=now_iso(), vector=vector, integrity=integrity)
-        )
+        with self._lock:
+            self._records.append(
+                Record(id=rid, data=dict(data), ts=ts_val,
+                       inserted_at=now_iso(), vector=vector, integrity=integrity)
+            )
         return rid
 
     def by_id(self, record_id: str) -> Optional[Record]:
@@ -105,19 +113,51 @@ class TemporalVectorDB:
         return sorted(self._records, key=lambda r: r.ts)
 
     def persist(self, path: str) -> None:
-        payload = [asdict(r) for r in self._records]
-        with open(path, "w", encoding="utf-8") as f:
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            payload = [asdict(r) for r in self._records]
+        tmp = target.with_name(target.name + ".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, target)
+
+    def persist_if_configured(self) -> bool:
+        if not self._persist_path:
+            return False
+        self.persist(self._persist_path)
+        return True
 
     def load(self, path: str) -> None:
         with open(path, "r", encoding="utf-8") as f:
             payload = json.load(f)
-        self._records = [
-            Record(**{**p, "integrity": p.get("integrity") or short_hash({
-                "id": p["id"], "data": p["data"], "ts": p["ts"], "vector": p.get("vector")
-            })})
-            for p in payload
-        ]
+        if not isinstance(payload, list):
+            raise ValueError("TEMPORAL_VECTOR_PAYLOAD_INVALID")
+        loaded: list[Record] = []
+        for item in payload:
+            if not isinstance(item, dict) or not item.get("integrity"):
+                raise ValueError("TEMPORAL_VECTOR_INTEGRITY_MISSING")
+            record = Record(**item)
+            if not self.verify_record_payload(record):
+                raise ValueError("TEMPORAL_VECTOR_INTEGRITY_FAILED")
+            loaded.append(record)
+        with self._lock:
+            self._records = loaded
+
+    def verify_record_payload(self, record: Record) -> bool:
+        expected = short_hash({
+            "id": record.id,
+            "data": record.data,
+            "ts": record.ts,
+            "vector": record.vector,
+        })
+        return record.integrity == expected
+
+    def load_if_configured(self) -> bool:
+        if not self._persist_path or not Path(self._persist_path).exists():
+            return False
+        self.load(self._persist_path)
+        return True
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
