@@ -138,14 +138,12 @@ class InvariantValidator:
 
     def validate_cycle(self, ctx: Any, cycle: dict[str, Any]) -> InvariantReport:
         checks: list[InvariantCheck] = []
-        phase_order = []
-        canonical_values = {p.value for p in CyclePhase}
-        for step in ctx.steps:
-            if (
-                step.phase in canonical_values
-                and step.info.get("canonical_phase") is True
-            ):
-                phase_order.append(step.phase)
+        # ctx.steps acumula todas as iterações do ciclo. A validação
+        # de ordenação precisa considerar apenas a iteração atual.
+        phase_order = [
+            phase for phase in cycle.get("phases", {}).keys()
+            if phase in {p.value for p in CyclePhase}
+        ]
 
         canonical = [p.value for p in CANONICAL_ORDER]
         positions = [canonical.index(p) for p in phase_order if p in canonical]
