@@ -47,6 +47,7 @@ class TrinityIteration:
 @dataclass(frozen=True)
 class FusionMirror:
     cycle_id: str
+    target: str
     ara: dict
     etr: dict
     itr: dict
@@ -163,19 +164,17 @@ class TrinitySynergy:
             "itr_hash": itr_hash,
         }
         if self._eru is not None:
-            self._eru.freeze(f"{cycle_id}:ARA", envelope["ara"])
-            self._eru.freeze(f"{cycle_id}:ETR", envelope["etr"])
-            self._eru.freeze(f"{cycle_id}:ITR", envelope["itr"])
             eru_state["snapshot_hashes"] = {
-                "ARA": self._eru._snapshots[f"{cycle_id}:ARA"].hash,
-                "ETR": self._eru._snapshots[f"{cycle_id}:ETR"].hash,
-                "ITR": self._eru._snapshots[f"{cycle_id}:ITR"].hash,
+                "ARA": self._eru.freeze(f"{cycle_id}:ARA", envelope["ara"]),
+                "ETR": self._eru.freeze(f"{cycle_id}:ETR", envelope["etr"]),
+                "ITR": self._eru.freeze(f"{cycle_id}:ITR", envelope["itr"]),
             }
         fused_hash = hash_json({**envelope, "eru": eru_state})
         if self._eru is not None:
             self._eru.freeze(f"{cycle_id}:FUSION", {**envelope, "eru": eru_state})
         mirror = FusionMirror(
             cycle_id=cycle_id,
+            target=str(target),
             ara=envelope["ara"],
             etr=envelope["etr"],
             itr=envelope["itr"],
@@ -195,22 +194,14 @@ class TrinitySynergy:
             return {"ok": False, "reason": "mirror_not_found"}
         payload = {
             "cycle_id": mirror.cycle_id,
-            "target": "",
+            "target": mirror.target,
             "ara": mirror.ara,
             "etr": mirror.etr,
             "itr": mirror.itr,
             "eru": mirror.eru,
         }
         calculated = hash_json(payload)
-        # Recalcula somente sobre os resultados; target não participa do hash.
-        expected = hash_json({
-            "cycle_id": mirror.cycle_id,
-            "target": "",
-            "ara": mirror.ara,
-            "etr": mirror.etr,
-            "itr": mirror.itr,
-            "eru": mirror.eru,
-        })
+        expected = hash_json(payload)
         return {
             "ok": calculated == expected == mirror.fused_hash,
             "fused_hash": mirror.fused_hash,
