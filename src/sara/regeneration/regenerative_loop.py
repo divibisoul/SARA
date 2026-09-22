@@ -19,6 +19,7 @@ from sara.memory.dna_tags import DNA_Tags
 from sara.infra.clock import now_iso
 from sara.monitoring.execution_report import ExecutionReport, PhaseEvidence
 from sara.regeneration.regenerative_state import CycleState, RegenerativeState
+from sara.core.connected_runtime import ConnectedRuntime
 
 
 @dataclass
@@ -78,6 +79,7 @@ class RegenerativeLoop:
         decision_trace: Any = None, provenance: Any = None,
         registry: ModuleRegistry | None = None, governance_backend: Any = None,
         cycle_auditor: Any = None, max_cycles: int = 3,
+        connected_runtime: ConnectedRuntime | None = None,
     ) -> None:
         self._ara, self._etr, self._itr = ara, etr, itr
         self._identity, self._memory = identity, memory
@@ -86,6 +88,7 @@ class RegenerativeLoop:
         self._trace, self._prov = decision_trace, provenance
         self._registry, self._gov_backend = registry, governance_backend
         self._auditor, self._max_cycles = cycle_auditor, max(1, max_cycles)
+        self._connected_runtime = connected_runtime
         self._history: list[LoopReport] = []
         self._invariants = InvariantValidator()
 
@@ -407,7 +410,18 @@ class RegenerativeLoop:
     def _dispatch_emit_trace(self, ctx: CycleContext, phase: CyclePhase) -> None:
         if self._registry is None:
             return
+
+        # Primeiro executa a camada de conexão operacional. Ela trata módulos
+        # não-nucleares e não duplica as operações do núcleo do loop.
+        if self._connected_runtime is not None:
+            self._connected_runtime.dispatch_phase(ctx, phase)
+
         for registered in self._registry.modules_for_phase(phase):
+            if (
+                self._connected_runtime is not None
+                and registered.name not in self._connected_runtime.CORE_HANDLED
+            ):
+                continue
             status = getattr(registered.instance, "STATUS", None)
             if status is not None and status.value == "PENDING_INFRASTRUCTURE":
                 ctx.record(phase.value, registered.name, True,
