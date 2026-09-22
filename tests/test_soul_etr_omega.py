@@ -57,6 +57,7 @@ def test_omega_context_services_use_explicit_inputs_only():
             "habit_key": "open_documents",
             "habit_candidates": ["open_documents", "other"],
             "habit_context": {"source": "test"},
+            "battery_percent": 15,
             "network": "offline",
             "hour": 2,
             "completed_cycles": 10,
