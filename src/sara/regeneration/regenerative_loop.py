@@ -366,7 +366,14 @@ class RegenerativeLoop:
                 "criteria": list(strategy.convergence_criteria),
             }
         else:
-            strategy = self._itr.generate(ctx.current, context={"cycle": idx})
+            strategy = self._itr.generate(
+                ctx.current,
+                context={
+                    "cycle": idx,
+                    "force_variant": "conservadora"
+                    if not cycle.get("_flaws", []) else None,
+                },
+            )
             cycle["phases"]["strategy"] = {"type": "Strategy", "variant": strategy.variant}
         self._record(ctx, CyclePhase.STRATEGY, "ITR", True, **cycle["phases"]["strategy"])
         return strategy
