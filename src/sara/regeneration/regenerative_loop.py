@@ -417,10 +417,13 @@ class RegenerativeLoop:
         self._record(ctx, CyclePhase.VALIDATION, "ETR", approved,
                      **cycle["phases"]["validation"])
         if not approved:
-            raise _Aborted(
-                "VALIDATION",
-                result.reason if not result.approved else "semantic_validation_rejected",
-            )
+            if not result.approved:
+                reason = result.reason
+            elif not semantic_validation.get("ok", True):
+                reason = "semantic_validation_rejected"
+            else:
+                reason = "ethical_filter_chain_failure"
+            raise _Aborted("VALIDATION", reason)
 
     def _phase_persistence(self, ctx, cycle, idx, result):
         rid = self._temporal.insert({
