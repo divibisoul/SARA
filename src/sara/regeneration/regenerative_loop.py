@@ -639,14 +639,19 @@ class RegenerativeLoop:
                      snapshot_hash=snap)
 
     def _phase_monitoring(self, ctx, cycle):
+        trace_valid = self._trace.verify() if self._trace is not None else False
+        cycle["phases"]["monitoring"] = {
+            "ok": trace_valid,
+            "trace_valid": trace_valid,
+        }
         if self._gov_backend is not None and hasattr(self._gov_backend, "register_decision"):
             self._gov_backend.register_decision({
                 "event": "cycle_monitoring",
                 "cycle_id": ctx.cycle_id,
                 "phases": list(cycle["phases"].keys()),
             })
-        self._record(ctx, CyclePhase.MONITORING, "RegenerativeLoop", True,
-                     trace_valid=self._trace.verify() if self._trace is not None else False)
+        self._record(ctx, CyclePhase.MONITORING, "RegenerativeLoop", trace_valid,
+                     trace_valid=trace_valid)
 
     def _phase_governance(self, ctx, cycle):
         meta = None
