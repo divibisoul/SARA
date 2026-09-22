@@ -37,10 +37,15 @@ def _snapshot(correlation_id: str = "clareira-test-001") -> dict:
         )
 
     channels = []
-    for index in range(120):
-        source = f"NODE-{index:03d}"
-        target = f"NODE-{(index + 1) % 120:03d}"
-        channels.append({"id": f"ch_{source}_{target}", "active": True})
+    primary_ids = [f"NP-{i:03d}" for i in range(1, 13)]
+    secondary_ids = [f"MS-{i:03d}" for i in range(1, 49)]
+    for primary in primary_ids:
+        channels.append({"id": f"ch_{primary}_NC-001", "active": True})
+        channels.append({"id": f"ch_NC-001_{primary}", "active": True})
+    for index, secondary in enumerate(secondary_ids):
+        primary = primary_ids[index // 4]
+        channels.append({"id": f"ch_{secondary}_{primary}", "active": True})
+        channels.append({"id": f"ch_{primary}_{secondary}", "active": True})
 
     return {
         "schemaVersion": "1.1.0",
