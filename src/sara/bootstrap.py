@@ -16,6 +16,7 @@ from sara.core.itr import ITR
 from sara.core.itr_extended import ITR_Extended
 from sara.core.trinity_synergy import TrinitySynergy
 from sara.core.sistema_vivo import SistemaVivo
+from sara.core.connected_runtime import ConnectedRuntime
 from sara.core.provenance import ProvenanceTracker
 from sara.memory.dna_tags import DNA_Tags
 from sara.memory.temporal_vector_db import TemporalVectorDB
@@ -108,6 +109,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     storm = StormMonitor(interval_s=0.1)
     governance_backend = GovernanceBackend(module_status={})
     auditor = CycleAuditor()
+    connected_runtime = ConnectedRuntime(registry)
 
     loop = RegenerativeLoop(
         ara=ara_extended, etr=etr_extended, itr=itr_extended,
@@ -115,6 +117,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         filters=filters, rollback=rollback, decision_trace=trace,
         provenance=prov, registry=registry, governance_backend=governance_backend,
         cycle_auditor=auditor, max_cycles=3,
+        connected_runtime=connected_runtime,
     )
     sistema = SistemaVivo(loop, storm, trace, registry=registry, provenance=prov)
     trinity = TrinitySynergy(ara_extended, etr_extended, itr_extended)
@@ -126,7 +129,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         legal_compliance, legal_ai, committee, radar, governed,
         ara_forge, quantum_snapshot, eru, neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
-        storm, governance_backend, auditor, loop, trinity, sistema,
+        storm, governance_backend, auditor, connected_runtime, loop, trinity, sistema,
     ]
 
     for module in candidates:
@@ -139,6 +142,21 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         except Exception as exc:
             logger.error("[bootstrap] registro falhou: %s: %s", name, exc)
             report["failed"].append({"module": name, "reason": str(exc)})
+
+    # A camada conectiva entra por último: assim seu contrato pode depender
+    # de todo o inventário já registrado, sem criar ciclo de dependências.
+    try:
+        connected_runtime.DEPENDENCIES = tuple(
+            n for n in registry.snapshot()["modules"] if n != connected_runtime.NAME
+        )
+        registry.register(connected_runtime)
+        report["registered"].append(connected_runtime.NAME)
+    except Exception as exc:
+        logger.error("[bootstrap] registro do ConnectedRuntime falhou: %s", exc)
+        report["failed"].append({
+            "module": connected_runtime.NAME,
+            "reason": str(exc),
+        })
 
     invariant_report = InvariantValidator().validate_registry(registry).as_dict()
     if fail_closed and (report["failed"] or not invariant_report["ok"]):
