@@ -124,6 +124,21 @@ class ERUMMDRGOClareiraBridge:
         return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     @staticmethod
+    def _stable_diff(diff: dict[str, Any]) -> dict[str, Any]:
+        """Remove somente metadados de transporte, não estado operacional."""
+        volatile_roots = {"correlationId", "source", "timestamp"}
+        result: dict[str, Any] = {}
+        for key in ("lost", "added", "changed", "kept"):
+            values = diff.get(key, [])
+            result[key] = [
+                path for path in values
+                if str(path).split(".", 1)[0] not in volatile_roots
+            ]
+        if "baseline" in diff:
+            result["baseline"] = diff["baseline"]
+        return result
+
+    @staticmethod
     def _rgo_proposals(lost: list[str], changed: list[str]) -> list[dict[str, Any]]:
         findings = [
             ("MISSING", path, "RESTORE_OR_RETAIN")
@@ -160,7 +175,7 @@ class ERUMMDRGOClareiraBridge:
         if len(history) >= 2:
             older_name = str(history[-2].get("eru_snapshot_name", ""))
 
-        diff = (
+        raw_diff = (
             self._eru.compare(older_name, current_name)
             if older_name and current_name
             else {
@@ -171,6 +186,7 @@ class ERUMMDRGOClareiraBridge:
                 "baseline": "NO_PREVIOUS_SNAPSHOT",
             }
         )
+        diff = self._stable_diff(raw_diff)
 
         trinity = self._trinity.assess(self._trinity_input(latest, diff))
         lost = list(diff.get("lost", []))
