@@ -37,6 +37,14 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
     def _runtime(self) -> SaraSystem:
         return cast(SaraHTTPServer, self.server).sara_system
 
+    def _html(self, status: int, payload: str) -> None:
+        raw = payload.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
     def _json(self, status: int, payload: dict) -> None:
         raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(status)
@@ -167,6 +175,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/state":
                 self._json(200, system.sistema_vivo.state())
+                return
+            if path == "/v1/governance/ui":
+                governance = system.components["governance"]
+                self._html(200, governance.render_html())
                 return
             if path.startswith("/v1/trace/"):
                 cycle_id = path.rsplit("/", 1)[-1]
