@@ -20,6 +20,7 @@ from sara.security.identity_core import IdentityCore
 from sara.governance.ubuntu_ethics import UbuntuEthics, FilterResult
 from sara.governance.buen_vivir import BuenVivir
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
+from sara.core.semantic_engine import SemanticEngine, SemanticFrame
 
 
 @dataclass(frozen=True)
@@ -62,6 +63,7 @@ class ETR_Extended(ETR):
     def __init__(self, identity: IdentityCore, ubuntu: UbuntuEthics,
                  buen: BuenVivir, provenance: ProvenanceTracker) -> None:
         super().__init__(identity, ubuntu, buen, provenance)
+        self._semantic = SemanticEngine()
         self._prov.register(
             "ETR_Extended.multi_framework",
             Provenance.RECONSTRUCTED,
@@ -70,11 +72,60 @@ class ETR_Extended(ETR):
         )
 
     # -----------------------------------------------------------------
+    # 1. ANÁLISE SEMÂNTICA COMPARTILHADA
+    # -----------------------------------------------------------------
+
+    def analyze_semantics(self, text: str) -> SemanticFrame:
+        return self._semantic.analyze(text)
+
+    def validate_semantic_frame(self, text: str) -> dict:
+        """Valida relações, negação e preservação semântica antes dos frameworks."""
+        frame = self.analyze_semantics(text)
+        relation_findings: list[dict] = []
+        for relation in frame.relations:
+            if relation.negated:
+                relation_findings.append({
+                    "kind": "NEGATED_ACTION",
+                    "subject": relation.subject,
+                    "action": relation.action,
+                    "object": relation.object,
+                    "clause": relation.clause_index,
+                    "evidence": list(relation.evidence),
+                })
+            if relation.action in {"alterar", "apagar", "deletar", "remover", "violar"}:
+                relation_findings.append({
+                    "kind": "DESTRUCTIVE_ACTION",
+                    "subject": relation.subject,
+                    "action": relation.action,
+                    "object": relation.object,
+                    "clause": relation.clause_index,
+                    "evidence": list(relation.evidence),
+                })
+        return {
+            "fingerprint": frame.fingerprint,
+            "relations": len(frame.relations),
+            "entities": list(frame.entities),
+            "negations": list(frame.negations),
+            "findings": relation_findings,
+            "ok": not any(f["kind"] == "DESTRUCTIVE_ACTION" and not (
+                any(n in frame.negations for n in ("não", "nao", "nunca", "jamais"))
+            ) for f in relation_findings),
+        }
+
+    def validate_transformation(self, original: str, transformed: str) -> dict:
+        diff = self._semantic.compare(original, transformed)
+        return {
+            **diff,
+            "ok": not bool(diff["relations_lost"]),
+        }
+
+    # -----------------------------------------------------------------
     # 1. VALIDAÇÃO MULTI-FRAMEWORK
     # -----------------------------------------------------------------
 
     def validate_multi_framework(self, text: str) -> MultiFrameworkResult:
-        """Valida sob 4 frameworks éticos independentes."""
+        """Valida sob semântica estruturada + 4 frameworks éticos independentes."""
+        semantic = self.validate_semantic_frame(text)
         assessments: list[FrameworkAssessment] = []
 
         # Framework 1 — Utilitarista: benefício líquido
@@ -91,6 +142,8 @@ class ETR_Extended(ETR):
 
         votes_for = sum(1 for a in assessments if a.approved)
         consensus = votes_for / len(assessments)
+        if not semantic["ok"]:
+            consensus = min(consensus, 0.5)
         dissenting = tuple(a.framework for a in assessments if not a.approved)
 
         return MultiFrameworkResult(
