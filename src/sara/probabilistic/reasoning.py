@@ -345,7 +345,7 @@ class ProbabilisticReasoningLayer:
             }
             posterior = self._normalize(fused)
             source = "fused"
-            entropy = self.neural.entropy(list(posterior))
+            entropy = self.neural.entropy(list(posterior.values()))
 
         max_probability = max(posterior.values())
         if len(states) <= 1:
