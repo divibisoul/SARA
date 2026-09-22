@@ -87,23 +87,39 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/capabilities":
                 modules = system.registry.snapshot()["modules"]
+                operation_specs = {
+                    "sara.cycle@1.0.0": (
+                        "/v1/cycle",
+                        tuple(p.value for p in system.components["loop"].CYCLE_PHASES),
+                    ),
+                    "sara.audit@1.0.0": (
+                        "/v1/audit",
+                        ("audit", "ethics", "validation"),
+                    ),
+                    "sara.regenerate@1.0.0": (
+                        "/v1/regenerate",
+                        ("audit", "regeneration", "ethics", "validation"),
+                    ),
+                    "sara.state@1.0.0": (
+                        "/v1/state",
+                        (),
+                    ),
+                    "sara.trace@1.0.0": (
+                        "/v1/trace/{cycle_id}",
+                        ("persistence", "monitoring"),
+                    ),
+                }
                 descriptors = [
                     CapabilityDescriptor(
                         name=op.split("@", 1)[0],
                         version=op.split("@", 1)[1],
                         operation=op,
-                        endpoint="/v1/" + op.split(".", 1)[1].split("@", 1)[0],
-                        phases=tuple(p.value for p in system.components["loop"].CYCLE_PHASES),
+                        endpoint=spec[0],
+                        phases=spec[1],
                         status="IMPLEMENTED",
                         requires_auth=True,
                     ).as_dict()
-                    for op in (
-                        "sara.cycle@1.0.0",
-                        "sara.audit@1.0.0",
-                        "sara.regenerate@1.0.0",
-                        "sara.state@1.0.0",
-                        "sara.trace@1.0.0",
-                    )
+                    for op, spec in operation_specs.items()
                 ]
                 identity = FederationIdentity(node_id="SARA", node_name="SARA")
                 self._json(200, {
