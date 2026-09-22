@@ -87,6 +87,20 @@ jobs:
           print("CYCLE_LAST:", result.loop_report.cycles[-1] if result.loop_report.cycles else None)
           PY
 
+      - name: Executable integrated engineering matrix
+        run: |
+          python -m sara.audit.engineering_matrix | tee /tmp/engineering-matrix.json
+          python - <<'PY'
+          import json
+          data = json.load(open("/tmp/engineering-matrix.json", encoding="utf-8"))
+          assert data["totals"]["REAL"] > 0, data
+          assert len(data["items"]) >= 100, data["totals"]
+          assert data["integrity_hash"], data
+          print("ENGINEERING_MATRIX_STATUS=", data["status"])
+          print("ENGINEERING_MATRIX_TOTALS=", data["totals"])
+          print("ENGINEERING_MATRIX_BLOCKERS=", len(data["blockers"]))
+          PY
+
       - name: Integrated regression tests
         run: |
           python -m pytest -q             tests/test_engineering_gate.py             tests/test_trinity_extended.py             tests/test_trinity_self_optimization.py             tests/test_eru_behavior_evidence.py             tests/test_eru_trinity_symbiosis.py             tests/test_http_api.py
