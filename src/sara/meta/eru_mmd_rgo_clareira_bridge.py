@@ -124,18 +124,24 @@ class ERUMMDRGOClareiraBridge:
         return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
     @staticmethod
-    def _stable_diff(diff: dict[str, Any]) -> dict[str, Any]:
-        """Remove somente metadados de transporte, não estado operacional."""
+    def _stable_diff(diff: Any) -> dict[str, Any]:
+        """Normaliza DiffReport/dict e remove somente metadados de transporte."""
         volatile_roots = {"correlationId", "source", "timestamp"}
+        if hasattr(diff, "__dict__"):
+            raw = diff.__dict__
+        elif isinstance(diff, dict):
+            raw = diff
+        else:
+            raw = {}
         result: dict[str, Any] = {}
         for key in ("lost", "added", "changed", "kept"):
-            values = diff.get(key, [])
+            values = raw.get(key, [])
             result[key] = [
                 path for path in values
                 if str(path).split(".", 1)[0] not in volatile_roots
             ]
-        if "baseline" in diff:
-            result["baseline"] = diff["baseline"]
+        if "baseline" in raw:
+            result["baseline"] = raw["baseline"]
         return result
 
     @staticmethod
