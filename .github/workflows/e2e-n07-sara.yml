@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: divibisoul/Orquestrador-
+          ref: fix/sara-e2e-build
           path: n07
 
       - name: Setup Python
