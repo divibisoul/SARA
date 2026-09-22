@@ -21,6 +21,7 @@ from sara.core.provenance import ProvenanceTracker
 from sara.memory.dna_tags import DNA_Tags
 from sara.memory.temporal_vector_db import TemporalVectorDB
 from sara.memory.regenerative_memory import RegenerativeMemory
+from sara.memory.working_memory import WorkingMemory
 from sara.security.identity_core import IdentityCore
 from sara.security.emergency_rollback import EmergencyRollback
 from sara.security.ethical_filter_chain import EthicalFilterChain
@@ -71,6 +72,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     dna = DNA_Tags()
     temporal = TemporalVectorDB()
     memory = RegenerativeMemory()
+    working_memory = WorkingMemory()
     loaded_memory = memory.load_if_configured()
     loaded_temporal = temporal.load_if_configured()
     rollback = EmergencyRollback()
@@ -148,13 +150,14 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         cycle_auditor=auditor, max_cycles=3,
         connected_runtime=connected_runtime,
         trinity=trinity_eru,
+        working_memory=working_memory,
     )
     sistema = SistemaVivo(
         loop, storm, trace, registry=registry, provenance=prov,
         connected_runtime=connected_runtime,
     )
     candidates = [
-        prov, dna, temporal, memory, rollback, trace,
+        prov, dna, temporal, memory, working_memory, rollback, trace,
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
         safe_sandbox, itr, itr_extended, filters,
         legal_compliance, legal_ai, committee, radar, governed,
@@ -210,7 +213,8 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "itr": itr, "itr_extended": itr_extended,
             "trinity": trinity, "trinity_eru": trinity_eru,
             "eru_bridge": eru_bridge, "identity": identity,
-            "memory": memory, "temporal": temporal, "dna": dna,
+            "memory": memory, "working_memory": working_memory,
+            "temporal": temporal, "dna": dna,
             "filters": filters, "rollback": rollback, "trace": trace,
             "loop": loop, "sistema_vivo": sistema, "governed": governed,
             "radar": radar, "eru": eru, "neuro": neuro,
