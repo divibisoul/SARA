@@ -177,6 +177,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.trace@1.0.0",
                         "sara.clareira.state@1.1.0",
                         "sara.clareira.vagus@1.1.0",
+                        "sara.clareira.vagus.pending@1.1.0",
+                        "sara.clareira.vagus.ack@1.1.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -194,6 +196,18 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if path == "/v1/clareira/state":
                 clareira = system.components["clareira"]
                 self._json(200, clareira.health_snapshot())
+                return
+            if path == "/v1/clareira/vagus/pending":
+                clareira = system.components["clareira"]
+                limit_raw = self.headers.get("X-Clareira-Limit", "32")
+                try:
+                    pending = clareira.pending_vagal_commands(limit=int(limit_raw))
+                except (ValueError, TypeError) as exc:
+                    raise SaraAPIError(422, "INVALID_CLAREIRA_VAGAL_LIMIT", str(exc)) from exc
+                self._json(200, {
+                    "operation": "sara.clareira.vagus.pending",
+                    "commands": pending,
+                })
                 return
             if path == "/v1/clareira/vagus/pending":
                 clareira = system.components["clareira"]
