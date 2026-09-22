@@ -16,7 +16,7 @@ Startup sequence:
 9. persist temporal evidence, decision hashes, provenance and rollback snapshots;
 10. emit a deterministic execution report.
 
-PENDING_INFRASTRUCTURE modules are registered and visible but are never silently executed.
+All módulos são registrados e expostos no runtime. Backends externos são detectados e ativados quando disponíveis; ausência de infraestrutura produz estados de execução explícitos, nunca simulação.
 
 ## Bounded contexts for future microservices
 
@@ -66,18 +66,11 @@ Stage B — container: build the Python package into one image and run the modul
 Stage C — orchestrated monolith: run one SARA deployment with persistent storage for TemporalVectorDB, RegenerativeMemory and DecisionTrace.
 Stage D — microservices: extract bounded contexts one at a time, keeping sara-core as contract authority. Start with observability/memory, then security/governance, then research/meta. The regeneration coordinator remains one authoritative state machine until distributed invariants are proven.
 
-## External infrastructure gates
+## Real backend activation
 
-The following remain honestly pending because their real external backends are absent:
-- SafeSandbox execution: Docker/Firecracker/nsjail backend;
-- QuantumCrawler: real network APIs, credentials and rate limiting;
-- QuantumScanner: real target/toolchain access;
-- LegalAI patent checks: INPI/USPTO/EPO or equivalent oracle;
-- DecisionTrace IPFS publication;
-- TransystemSARA external-system credentials/contracts;
-- GovernanceBackend UI/HTTP frontend.
+SafeSandbox detects Docker; QuantumCrawler uses real HTTP backends; QuantumScanner uses local file/toolchain inspection; LegalAI accepts a real HTTP patent oracle; DecisionTrace accepts a real IPFS HTTP API or local `ipfs` CLI; TransystemSARA accepts explicit HTTP adapters; GovernanceBackend exposes an authenticated local HTML UI.
 
-These are not simulated. Their interfaces remain explicit and raise NotImplementedError until the required infrastructure is injected.
+No backend is fabricated when infrastructure is absent.
 
 ## Persistência local opcional de memória regenerativa
 
