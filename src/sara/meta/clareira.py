@@ -299,6 +299,7 @@ class ClareiraSubsystem:
             "directional_channel_count": 120,
             "correlation_id": correlation_id,
             "source": source,
+            "eru_snapshot_name": snapshot_name,
             "hash": digest,
             "eru_hash": eru_hash,
             "observed_node_count": len(nodes),
@@ -425,6 +426,16 @@ class ClareiraSubsystem:
 
     def latest_snapshot(self) -> dict[str, Any] | None:
         return copy.deepcopy(self._latest_snapshot)
+
+    def validate_snapshot(self, snapshot: dict[str, Any]) -> None:
+        """Valida publicamente um snapshot sem registrar ou mutar estado."""
+        self._validate_snapshot(snapshot)
+
+    def snapshot_history(self, *, limit: int = 128) -> list[dict[str, Any]]:
+        if limit < 1:
+            raise ValueError("CLAREIRA_SNAPSHOT_HISTORY_LIMIT_INVALID")
+        with self._lock:
+            return copy.deepcopy(self._snapshots[-min(limit, 128):])
 
     def health_snapshot(self) -> dict[str, Any]:
         snapshot = self._latest_snapshot or {}
