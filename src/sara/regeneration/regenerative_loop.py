@@ -111,6 +111,9 @@ class RegenerativeLoop:
                 raise _Aborted("PREFLIGHT", ";".join(registry_report.blocking_failures))
         if self._trace is not None and not self._trace.verify():
             raise _Aborted("PREFLIGHT", "decision_trace_integrity_failed")
+        if self._prov is not None and hasattr(self._prov, "verify_integrity"):
+            if not self._prov.verify_integrity():
+                raise _Aborted("PREFLIGHT", "provenance_integrity_failed")
 
     def run(self, input_text: str, cycle_id: str | None = None) -> LoopReport:
         cid = cycle_id or f"cycle-{now_iso()}"
