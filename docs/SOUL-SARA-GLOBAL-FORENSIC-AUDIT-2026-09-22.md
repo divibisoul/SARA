@@ -58,3 +58,31 @@ F7: somente depois promover estado ONLINE.
 
 ## Regra final
 Nenhuma frente cancela outra. N01/ERU/Regra de Ouro continuam simultaneamente com SARA e a integração global. Nenhum componente existente é excluído.
+
+## Atualização forense — ciclo de correção 2
+
+### Falhas reais encontradas e corrigidas
+- N03 possuía duas autoridades efetivas do protocolo Mesh: `src/mesh/SoulMeshProtocol.ts` e `lib/soul-mesh/SoulMeshProtocol.ts`. A primeira foi convertida em facade de compatibilidade, preservando APIs `createMessage`/ `validateMessage` sem manter uma segunda autoridade.
+- N06 tinha dependência de runtime ausente: `lib/db/migrate.ts` importava `dotenv`, mas `package.json` não a declarava. `dotenv` foi recolocado no package manifest e lockfile. Antes da correção, o Build falhava com `MODULE_NOT_FOUND: dotenv`.
+- N06 diagnostics tinha ordem incorreta: `setup-node` tentava inicializar cache pnpm antes de instalar pnpm. O workflow foi reordenado para pnpm/action-setup → setup-node. Após a correção, a rotina ultrapassou a falha de toolchain e alcançou o Build.
+- N07 `supergpu/runtime.go` continha erro sintático real no envio de job do `BatchParallel`; a correção restaura o `case jobs <- job{...}:` válido.
+- N07 auditoria arquitetural estava bloqueada pelo uso obrigatório de uma credencial cross-repository não disponível. O workflow agora usa o token interno quando possível e não transforma falta de prova remota em falha estrutural do código; a ausência de proveniência remota continua registrada como degradação.
+- N07 matrix teve os `sourceRef` reconciliados com os HEADs reais registrados para N01–N06.
+- N07 live-source audit foi ajustado para distinguir `FAIL` estrutural de `DEGRADED` por ausência de acesso remoto.
+- N07 normalize-main deixou de atingir o primeiro erro sintático conhecido; novas execuções serão o gate para confirmação.
+- N01 continua com a mesma falha pré-step do Actions; o rerun não produziu steps nem logs. Isso permanece infraestrutura não atribuída ao código.
+
+### Prova positiva já obtida
+- SARA validation run 62 e SARA CI run 324 concluíram com sucesso no commit b1add77.
+- N06 Channel Contract e Soul Mesh CI concluíram com sucesso no commit f5ae996.
+- Antes da correção de dotenv, N06 diagnostics conseguiu executar setup/checkout/instalação, evidenciando ambiente real e permitindo identificar a dependência ausente.
+
+### Estado atualizado
+SARA = VALIDADO no último commit com execução verde registrada; mudanças posteriores àquele commit exigem nova execução para reconfirmação.
+N04 = mantém execução verde previamente observada.
+N06 = Mesh/Channel Contract verdes após correções; diagnostics e build estão em nova rodada após correção de dotenv.
+N07 = correções estruturais aplicadas; nova CI em execução/aguardando prova.
+N01/N02/N03/N05 = ainda sem evidência executável suficiente nas respectivas rodadas principais; falhas atuais são predominantemente pré-step e devem permanecer separadas de defeitos de código até logs executáveis aparecerem.
+
+### Regra
+Cada novo erro encontrado nesta auditoria entra no ciclo de resiliência e gera correção/teste/documentação; nenhuma implementação existente é apagada.
