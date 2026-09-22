@@ -22,6 +22,7 @@ from sara.contracts.context import CycleFusionState
 from sara.infra.hashing import hash_json
 from sara.regeneration.regenerative_state import CycleState, RegenerativeState
 from sara.core.connected_runtime import ConnectedRuntime
+from sara.meta.eru_engine import ERU_Engine
 
 
 @dataclass
@@ -84,6 +85,7 @@ class RegenerativeLoop:
         cycle_auditor: Any = None, max_cycles: int = 3,
         connected_runtime: ConnectedRuntime | None = None,
         trinity: Any = None,
+        eru: ERU_Engine | None = None,
     ) -> None:
         self._ara, self._etr, self._itr = ara, etr, itr
         self._identity, self._memory = identity, memory
@@ -94,6 +96,7 @@ class RegenerativeLoop:
         self._auditor, self._max_cycles = cycle_auditor, max(1, max_cycles)
         self._connected_runtime = connected_runtime
         self._trinity = trinity
+        self._eru = eru
         self._history: list[LoopReport] = []
         self._invariants = InvariantValidator()
 
@@ -104,6 +107,7 @@ class RegenerativeLoop:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "max_cycles": self._max_cycles,
+            "eru_checkpointing": self._eru is not None,
         }
 
     def _preflight(self, ctx: CycleContext) -> None:
@@ -142,6 +146,12 @@ class RegenerativeLoop:
             pre_state = {"cycle": idx, "input": ctx.current, "ts": now_iso()}
             pre_hash = self._rollback.capture(f"{cid}::{idx}::pre", pre_state, scope="cycle")
             cycle["pre_hash"] = pre_hash
+            if self._eru is not None:
+                checkpoint = self._eru.checkpoint(
+                    cid, idx, {"input": ctx.input, "current": ctx.current, "cycle": idx}
+                )
+                cycle["eru_checkpoint"] = checkpoint
+                ctx.register_artifact(f"eru_checkpoint_{idx}", checkpoint)
             try:
                 self._run_phases_canonical(ctx, cycle, idx)
                 if self._auditor is not None and hasattr(self._auditor, "check"):
@@ -178,6 +188,10 @@ class RegenerativeLoop:
                 report.cycles.append(cycle)
 
                 if converged:
+                    if self._eru is not None and "eru_checkpoint" in cycle:
+                        cycle["eru_checkpoint"]["final_verified"] = self._eru.verify_snapshot(
+                            cycle["eru_checkpoint"]["name"]
+                        )
                     state.transition(CycleState.CONVERGED, "all_criteria_satisfied", now_iso())
                     report.converged = True
                     report.final_state = ctx.current
@@ -245,6 +259,17 @@ class RegenerativeLoop:
             {"phase": s.phase, "module": s.module, "ok": s.ok, "info": s.info, "ts": s.ts}
             for s in ctx.steps
         ]
+        report_context_eru = [
+            c.get("eru_checkpoint") for c in report.cycles if c.get("eru_checkpoint")
+        ]
+        if report_context_eru:
+            report.context_steps.append({
+                "phase": "persistence",
+                "module": "ERU_Engine",
+                "ok": all(x.get("verified", False) for x in report_context_eru),
+                "info": {"checkpoints": report_context_eru},
+                "ts": now_iso(),
+            })
 
         er = ExecutionReport(
             cycle_id=cid,
