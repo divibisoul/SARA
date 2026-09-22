@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Optional
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
+from sara.infra.hashing import chain_hash
 
 
 class Provenance(str, Enum):
@@ -22,6 +23,7 @@ class RuleProvenance:
     provenance: Provenance
     evidence: str
     source: Optional[str] = None
+    hash: str = ""
 
 
 class ProvenanceTracker:
@@ -34,6 +36,7 @@ class ProvenanceTracker:
 
     def __init__(self) -> None:
         self._rules: list[RuleProvenance] = []
+        self._chain: list[str] = []
 
     def describe(self) -> dict:
         return {
@@ -42,12 +45,23 @@ class ProvenanceTracker:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "records": len(self._rules),
+            "integrity": self.verify_integrity(),
+            "integrity_head": self.integrity_head(),
         }
 
     def register(self, entity: str, provenance: Provenance,
                  evidence: str, source: Optional[str] = None) -> RuleProvenance:
-        rp = RuleProvenance(entity, provenance, evidence, source)
+        previous = self._chain[-1] if self._chain else "GENESIS"
+        payload = {
+            "entity": entity,
+            "provenance": provenance.value,
+            "evidence": evidence,
+            "source": source,
+        }
+        current = chain_hash(previous, payload)
+        rp = RuleProvenance(entity, provenance, evidence, source, current)
         self._rules.append(rp)
+        self._chain.append(current)
         return rp
 
     def query(self, entity: str) -> list[RuleProvenance]:
@@ -55,6 +69,26 @@ class ProvenanceTracker:
 
     def all(self) -> list[RuleProvenance]:
         return list(self._rules)
+
+    def verify_integrity(self) -> bool:
+        if len(self._rules) != len(self._chain):
+            return False
+        previous = "GENESIS"
+        for rule, chain_value in zip(self._rules, self._chain):
+            payload = {
+                "entity": rule.entity,
+                "provenance": rule.provenance.value,
+                "evidence": rule.evidence,
+                "source": rule.source,
+            }
+            expected = chain_hash(previous, payload)
+            if expected != chain_value or rule.hash != chain_value:
+                return False
+            previous = chain_value
+        return True
+
+    def integrity_head(self) -> str:
+        return self._chain[-1] if self._chain else "GENESIS"
 
     def report(self) -> dict[str, int]:
         out: dict[str, int] = {}
@@ -64,4 +98,4 @@ class ProvenanceTracker:
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
-            ctx.record("persistence", self.NAME, True, records=len(self._rules))
+            ctx.record("persistence", self.NAME, True, records=len(self._rules), integrity=self.verify_integrity())
