@@ -77,10 +77,24 @@ class QuantumScanner:
 
     def scan(self, target: str,
              depth: Literal["shallow", "deep", "atomic"] = "shallow") -> dict:
+        if depth not in {"shallow", "deep", "atomic"}:
+            raise ValueError("depth inválido")
+        path = pathlib.Path(str(target))
+        if path.is_file() and path.suffix.lower() in {".py"}:
+            result = self.scan_source_file(str(path))
+            result["depth"] = depth
+            result["backend"] = "local_source_parser"
+            if depth in {"deep", "atomic"}:
+                result["findings"].append({
+                    "kind": "deep_binary_analysis_unavailable",
+                    "message": "análise profunda de binário requer toolchain externo real",
+                })
+            return result
         raise NotImplementedError(
-            "QuantumScanner.scan requer acesso a binário/código-fonte do alvo e "
-            "ferramentas de análise profunda (parsers, disassemblers). "
-            "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('QuantumScanner')."
+            "QuantumScanner.scan requer acesso local/remoto ao alvo com parser ou "
+            "disassembler apropriado. A análise Python local está disponível em "
+            "scan_source_file(). Ativação externa: ver "
+            "CANONICAL_ACTIVATION_PLAN.for_module('QuantumScanner')."
         )
 
     def emit_trace(self, ctx) -> None:
