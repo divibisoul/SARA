@@ -148,6 +148,14 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/clareira/vagus",
                         ("strategy", "execution", "monitoring"),
                     ),
+                    "sara.clareira.vagus.pending@1.1.0": (
+                        "/v1/clareira/vagus/pending",
+                        ("execution", "monitoring"),
+                    ),
+                    "sara.clareira.vagus.ack@1.1.0": (
+                        "/v1/clareira/vagus/ack",
+                        ("execution", "monitoring"),
+                    ),
                 }
                 descriptors = [
                     CapabilityDescriptor(
