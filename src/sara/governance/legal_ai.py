@@ -52,6 +52,24 @@ class LegalAI:
         self._chain.append(d)
         return d
 
+    def execute_local(self, ctx=None) -> dict:
+        """Executa a parte local disponível sem fingir consulta de patentes."""
+        decision = self.validate_license("SARA-cycle", "MIT")
+        result = {
+            "operation": "local_license_validation",
+            "approved": decision.approved,
+            "hash": decision.hash,
+            "patent_oracle_ready": self.is_patent_oracle_ready(),
+        }
+        if ctx is not None and hasattr(ctx, "record"):
+            ctx.record(
+                "governance",
+                self.NAME,
+                decision.approved,
+                **result,
+            )
+        return result
+
     def check_patent(self, tech_name: str, jurisdiction: str) -> dict:
         raise NotImplementedError(
             "LegalAI.check_patent requer integração com bases de patentes reais "
