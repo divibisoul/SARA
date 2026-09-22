@@ -48,6 +48,12 @@ class IdentityCore:
         for rule in self.HISTORICAL_RULES["ethical_boundaries"]:
             self._prov.register(f"IdentityCore.{rule}", Provenance.HISTORICAL,
                                 "Pseudo-código v6 (IdentityCore)")
+        self._prov.register(
+            "IdentityCore.intent_aware_validation",
+            Provenance.INFERRED,
+            "Operacionalização semântica das fronteiras históricas sem bloqueio por mera coincidência lexical",
+            source="identity_core_v2_compatibility",
+        )
 
     def describe(self) -> dict:
         return {
@@ -58,15 +64,47 @@ class IdentityCore:
         }
 
     def validate(self, candidate: str) -> IdentityResult:
+        """Valida violações de identidade por intenção, não por mera coincidência lexical.
+
+        As regras históricas são preservadas. A interpretação operacional abaixo
+        é marcada como inferida para não confundir a regra histórica com sua
+        implementação contemporânea.
+        """
+        import re
+
         t = str(candidate).lower()
         violations: list[str] = []
-        for boundary in self.HISTORICAL_RULES["ethical_boundaries"]:
-            terms = [w for w in boundary.lower().split() if len(w) > 4]
-            hits = sum(1 for term in terms if term in t)
-            if hits >= 2:
-                violations.append(boundary)
-        return IdentityResult(approved=len(violations) == 0,
-                              violations=tuple(violations))
+
+        # Regra histórica: não desenvolver armas.
+        prohibited_weapon = re.compile(
+            r"\bdesenvolver\b.{0,80}\barmas?\b"
+        )
+        if prohibited_weapon.search(t) and not re.search(
+            r"\b(?:não|nao|nunca|jamais)\b.{0,20}\bdesenvolver\b.{0,80}\barmas?\b",
+            t,
+        ):
+            violations.append("Não desenvolver armas")
+
+        # Regra histórica: preservar autonomia humana.
+        if re.search(
+            r"\b(?:remover|apagar|deletar|violar|limitar|reduzir|substituir|destruir|negar)\b"
+            r".{0,80}\bautonomia\b",
+            t,
+        ):
+            violations.append("Preservar autonomia humana")
+
+        # Regra histórica: transparência radical.
+        if re.search(
+            r"\b(?:ocultar|esconder|omitir|falsificar|enganar|distorcer)\b"
+            r".{0,80}\btranspar(?:ência|encia)\b",
+            t,
+        ):
+            violations.append("Transparência radical")
+
+        return IdentityResult(
+            approved=len(violations) == 0,
+            violations=tuple(violations),
+        )
 
     def validate_structured(self, candidate: str) -> dict:
         """Validação adicional baseada em relações semânticas observáveis."""
