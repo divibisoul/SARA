@@ -8,7 +8,7 @@ SARA permanece operacional como monólito modular. A fronteira HTTP é uma camad
 
 - `GET /health`: público para health-check.
 - Demais endpoints: `Authorization: Bearer $SARA_API_TOKEN`.
-- Se o token não estiver configurado, endpoints protegidos retornam `503 AUTH_NOT_CONFIGURED`.
+- Se o token não estiver configurado ou for inválido, endpoints protegidos permanecem fechados e retornam `401 UNAUTHORIZED`.
 - O token nunca deve ser enviado ao frontend/browser.
 
 ## Endpoints
@@ -18,12 +18,20 @@ SARA permanece operacional como monólito modular. A fronteira HTTP é uma camad
 Resposta 200:
 
 ```json
-{"status":"ok","ready":true,"version":"1.0","invariants_ok":true}
+{"status":"ok","ready":true,"version":"3.1.0","protocol":"sara-http/1","invariants_ok":true,"trace_integrity":true,"provenance_integrity":true,"rollback_chain_integrity":true}
 ```
 
 ### GET /v1/capabilities
 
-Retorna inventário, status, dependências/capacidades registradas e módulos que ainda dependem de infraestrutura externa.
+Retorna identidade federativa, operações versionadas, capability descriptors,
+inventário, status, dependências e módulos que ainda dependem de infraestrutura externa.
+
+Operações:
+- `sara.cycle@1.0.0`
+- `sara.audit@1.0.0`
+- `sara.regenerate@1.0.0`
+- `sara.state@1.0.0`
+- `sara.trace@1.0.0`
 
 ### POST /v1/cycle
 
@@ -61,7 +69,7 @@ Retorna estado observável do SistemaVivo, histórico, trace, registry e proveni
 
 ### GET /v1/trace/{cycle_id}
 
-Retorna entradas encadeadas do DecisionTrace daquele ciclo e informa a integridade da cadeia.
+Retorna entradas encadeadas do DecisionTrace daquele ciclo, registros temporais relacionados e integridade de trace/proveniência.
 
 ## Erros
 
@@ -75,7 +83,7 @@ Códigos: `400 INVALID_JSON`, `401 UNAUTHORIZED`, `404 NOT_FOUND`, `422 INVALID_
 
 ## Federação
 
-O N07 não controla a lógica interna do ciclo. Ele envia intent/execute pela fronteira de serviço e consome capabilities, health e resultados. SARA mantém autoridade sobre identidade, auditoria, regeneração, ética, estratégia, execução, validação, memória, rollback, proveniência e governança interna.
+O N07 não controla a lógica interna do ciclo. Ele envia intent/execute pela fronteira de serviço e consome capabilities, health e resultados. `correlationId` / `X-Correlation-ID` é preservado quando fornecido. SARA mantém autoridade sobre identidade, auditoria, regeneração, ética, estratégia, execução, validação, memória, rollback, proveniência e governança interna.
 
 ## N04/N06
 
