@@ -183,12 +183,25 @@ class SemanticEngine:
             for r in frame.relations
         )
 
+    @staticmethod
+    def preservation_signature(frame: SemanticFrame) -> tuple[tuple[str, str, bool], ...]:
+        """Assinatura mínima para verificar preservação de intenção.
+
+        Sujeitos podem mudar quando um transformador introduz wrappers/labels
+        (por exemplo, "OBJETIVO:"). A ação, o objeto e a negação permanecem a
+        unidade mais estável para este motor determinístico.
+        """
+        return tuple(
+            (r.action, r.object, r.negated)
+            for r in frame.relations
+        )
+
     @classmethod
     def compare(cls, before: str, after: str) -> dict:
         a = cls.analyze(before)
         b = cls.analyze(after)
-        rel_a = set(cls.relation_signature(a))
-        rel_b = set(cls.relation_signature(b))
+        rel_a = set(cls.preservation_signature(a))
+        rel_b = set(cls.preservation_signature(b))
         return {
             "before_fingerprint": a.fingerprint,
             "after_fingerprint": b.fingerprint,
