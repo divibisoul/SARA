@@ -185,6 +185,14 @@ class ConnectedRuntime:
             "phase": phase.value,
         }
 
+        if phase == CyclePhase.PERSISTENCE and name == "ClareiraSubsystem":
+            snapshot = module.latest_snapshot()
+            return {
+                "_operation": "clareira_persistence_observation",
+                "snapshot_available": snapshot is not None,
+                "snapshot_hash": snapshot.get("hash") if snapshot else None,
+            }
+
         if phase == CyclePhase.PERSISTENCE and name == "ERU_Engine":
             h = module.freeze(
                 f"cycle:{state['cycle_id']}:phase:{phase.value}",
@@ -195,6 +203,15 @@ class ConnectedRuntime:
         if phase == CyclePhase.SNAPSHOT and name == "QuantumSnapshotSystem":
             sid = module.snapshot(state)
             return {"_operation": "quantum_snapshot", "snapshot_id": sid}
+
+        if phase == CyclePhase.MONITORING and name == "ClareiraSubsystem":
+            snapshot = module.health_snapshot()
+            return {
+                "_operation": "clareira_health_snapshot",
+                "ready": snapshot["ready"],
+                "latest_snapshot_hash": snapshot["latest_snapshot_hash"],
+                "vagal_command_count": snapshot["vagal_command_count"],
+            }
 
         if phase == CyclePhase.MONITORING and name == "GovernanceBackend":
             snap = module.snapshot()
