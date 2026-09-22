@@ -171,7 +171,7 @@ class RegenerativeLoop:
                 converged = (
                     post_etr.approved
                     and not post_flaws
-                    and bool(ctx.artifacts.get("execution_ok", False))
+                    and bool(ctx.flags.get("execution_ok", False))
                     and invariant_report.ok
                 )
                 cycle["converged"] = converged
