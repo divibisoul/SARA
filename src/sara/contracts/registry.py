@@ -24,6 +24,10 @@ class RegisteredModule:
 
 
 class ModuleRegistry:
+    INJECTED_DEPENDENCIES = frozenset({
+        "ProvenanceTracker", "CycleContext", "TraceSink", "ModuleRegistry",
+    })
+
     def __init__(self) -> None:
         self._modules: dict[str, RegisteredModule] = {}
 
@@ -50,7 +54,7 @@ class ModuleRegistry:
         missing: list[str] = []
         for name, entry in self._modules.items():
             for dep in entry.dependencies:
-                if dep not in self._modules:
+                if dep not in self._modules and dep not in self.INJECTED_DEPENDENCIES:
                     missing.append(f"{name} → {dep}")
         return missing
 
