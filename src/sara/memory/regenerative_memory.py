@@ -38,6 +38,9 @@ class RegenerativeMemory:
             "status": self.STATUS.value, "role": self.ROLE.value,
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
+            "versions": len(self._versions),
+            "latest_integrity": self._versions[-1].integrity if self._versions else None,
+            "integrity_valid": self.verify_integrity(),
         }
 
     def store(self, state: dict, label: str = "") -> VersionRecord:
@@ -67,11 +70,46 @@ class RegenerativeMemory:
         v2 = self.get(v2_id)
         if not v1 or not v2:
             return {"error": "version_not_found"}
+        paths1 = self._flatten(v1.state)
+        paths2 = self._flatten(v2.state)
+        keys1, keys2 = set(paths1), set(paths2)
+        changed = sorted(k for k in keys1 & keys2 if paths1[k] != paths2[k])
         return {
             "same_integrity": v1.integrity == v2.integrity,
             "v1_len": len(str(v1.state)),
             "v2_len": len(str(v2.state)),
+            "lost": sorted(keys1 - keys2),
+            "added": sorted(keys2 - keys1),
+            "changed": changed,
+            "kept": sorted((keys1 & keys2) - set(changed)),
         }
+
+    @staticmethod
+    def _flatten(obj: Any, prefix: str = "") -> dict[str, Any]:
+        out: dict[str, Any] = {}
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                path = f"{prefix}.{key}" if prefix else str(key)
+                if isinstance(value, (dict, list)):
+                    out.update(RegenerativeMemory._flatten(value, path))
+                else:
+                    out[path] = value
+        elif isinstance(obj, list):
+            for idx, value in enumerate(obj):
+                path = f"{prefix}[{idx}]"
+                if isinstance(value, (dict, list)):
+                    out.update(RegenerativeMemory._flatten(value, path))
+                else:
+                    out[path] = value
+        else:
+            out[prefix or "$"] = obj
+        return out
+
+    def verify_integrity(self, version_id: int | None = None) -> bool:
+        target = self.get(version_id) if version_id is not None else self.latest()
+        if target is None:
+            return False
+        return short_hash(target.state) == target.integrity
 
     def trail(self) -> list[VersionRecord]:
         return list(self._versions)
