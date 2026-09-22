@@ -12,6 +12,22 @@ class TraceSink:
     provenance: Any
 
 
+@dataclass(frozen=True)
+class CycleFusionState:
+    """Estado verificado da fusão ARA/ETR/ITR/ERU em uma versão do ciclo."""
+    cycle_id: str
+    version: int
+    target_hash: str
+    ara_hash: str
+    etr_hash: str
+    itr_hash: str
+    eru_snapshot_hashes: tuple[tuple[str, str], ...]
+    fusion_snapshot_hash: str | None
+    fused_hash: str
+    integrity_ok: bool
+    created_at: str = field(default_factory=now_iso)
+
+
 @dataclass
 class CycleStep:
     phase: str
@@ -27,9 +43,11 @@ class CycleContext:
     input: str
     current: str
     sink: TraceSink
+    fusion: CycleFusionState | None
     steps: list[CycleStep] = field(default_factory=list)
     artifacts: dict[str, Any] = field(default_factory=dict)
     flags: dict[str, Any] = field(default_factory=dict)
+    fusion: CycleFusionState | None = None
     aborted: bool = False
     abort_reason: str = ""
 
