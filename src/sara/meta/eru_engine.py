@@ -239,7 +239,7 @@ class ERU_Engine:
         recovered: list[str] = []
         for path in diff.lost:
             value = self._get_path(old_state, path)
-            if value is not None:
+            if value is not self._MISSING:
                 self._set_path(new_state, path, value)
                 recovered.append(path)
         return {
@@ -250,21 +250,23 @@ class ERU_Engine:
             "changed": diff.changed,
         }
 
-    @staticmethod
-    def _get_path(obj: Any, path: str) -> Any:
+    _MISSING = object()
+
+    @classmethod
+    def _get_path(cls, obj: Any, path: str) -> Any:
         tokens = re.findall(r"([^.\[\]]+)|\[(\d+)\]", path)
         cur = obj
         for key, index in tokens:
             if index:
                 if not isinstance(cur, list):
-                    return None
+                    return cls._MISSING
                 idx = int(index)
                 if idx >= len(cur):
-                    return None
+                    return cls._MISSING
                 cur = cur[idx]
             else:
                 if not isinstance(cur, dict) or key not in cur:
-                    return None
+                    return cls._MISSING
                 cur = cur[key]
         return cur
 
