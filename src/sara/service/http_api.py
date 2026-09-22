@@ -5,6 +5,7 @@ quando a capacidade requerida está bloqueada por infraestrutura externa.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import hmac
@@ -139,6 +140,14 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
                     ),
+                    "sara.clareira.state@1.1.0": (
+                        "/v1/clareira/state",
+                        ("audit", "validation", "persistence", "monitoring"),
+                    ),
+                    "sara.clareira.vagus@1.1.0": (
+                        "/v1/clareira/vagus",
+                        ("strategy", "execution", "monitoring"),
+                    ),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -166,6 +175,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "sara.clareira.state@1.1.0",
+                        "sara.clareira.vagus@1.1.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -179,6 +190,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/state":
                 self._json(200, system.sistema_vivo.state())
+                return
+            if path == "/v1/clareira/state":
+                clareira = system.components["clareira"]
+                self._json(200, clareira.health_snapshot())
                 return
             if path == "/v1/governance/ui":
                 governance = system.components["governance"]
@@ -232,6 +247,63 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
+                })
+                return
+
+            if path == "/v1/clareira/state":
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or body.get("correlation_id")
+                if not isinstance(correlation, str) or not correlation.strip():
+                    raise SaraAPIError(422, "INVALID_CORRELATION_ID", "X-Correlation-ID ou 'correlation_id' é obrigatório.")
+                snapshot = body.get("snapshot", body)
+                clareira = system.components["clareira"]
+                try:
+                    result = clareira.ingest_snapshot(
+                        snapshot,
+                        correlation_id=correlation.strip(),
+                        source=str(body.get("source", "SOUL_N01")),
+                    )
+                except ValueError as exc:
+                    raise SaraAPIError(422, "INVALID_CLAREIRA_SNAPSHOT", str(exc)) from exc
+                self._json(200, {
+                    "operation": "sara.clareira.state",
+                    "correlation_id": correlation.strip(),
+                    "accepted": True,
+                    "executed": True,
+                    "result": result,
+                })
+                return
+
+            if path == "/v1/clareira/vagus":
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or body.get("correlation_id")
+                node_id = body.get("node_id")
+                command = body.get("command")
+                if not isinstance(correlation, str) or not correlation.strip():
+                    raise SaraAPIError(422, "INVALID_CORRELATION_ID", "X-Correlation-ID ou 'correlation_id' é obrigatório.")
+                if not isinstance(node_id, str) or not node_id.strip():
+                    raise SaraAPIError(422, "INVALID_NODE_ID", "'node_id' é obrigatório.")
+                if not isinstance(command, str) or not command.strip():
+                    raise SaraAPIError(422, "INVALID_COMMAND", "'command' é obrigatório.")
+                clareira = system.components["clareira"]
+                try:
+                    result = asyncio.run(
+                        clareira.issue_vagal_command(
+                            node_id.strip(),
+                            command.strip(),
+                            payload=body.get("payload") if isinstance(body.get("payload"), dict) else {},
+                            priority=float(body.get("priority", 0.5)),
+                            correlation_id=correlation.strip(),
+                            target=str(body.get("target", "SOUL_N01")),
+                        )
+                    )
+                except (ValueError, TypeError) as exc:
+                    raise SaraAPIError(422, "INVALID_CLAREIRA_VAGAL_COMMAND", str(exc)) from exc
+                self._json(202, {
+                    "operation": "sara.clareira.vagus",
+                    "correlation_id": correlation.strip(),
+                    "accepted": result["accepted"],
+                    "executed": result["executed"],
+                    "execution_status": result["execution_status"],
+                    "result": result,
                 })
                 return
 
