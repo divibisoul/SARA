@@ -229,3 +229,23 @@ def test_clareira_vagal_delivery_moves_pending_to_acknowledged():
     assert acknowledged["delivery_status"] == "EXECUTED"
     assert acknowledged["execution_status"] == "APPLIED_IN_SOUL_RUNTIME"
     assert all(item["event_id"] != event_id for item in clareira.pending_vagal_commands())
+
+
+def test_clareira_rejects_unauthorized_vagal_target():
+    import asyncio
+
+    system = build_default_system(fail_closed=True)
+    clareira = system.components["clareira"]
+    try:
+        asyncio.run(
+            clareira.issue_vagal_command(
+                "NP-001",
+                "calm",
+                correlation_id="clareira-target-001",
+                target="N02",
+            )
+        )
+    except ValueError as exc:
+        assert str(exc) == "CLAREIRA_VAGAL_TARGET_UNAUTHORIZED"
+        return
+    raise AssertionError("unauthorized vagal target was accepted")
