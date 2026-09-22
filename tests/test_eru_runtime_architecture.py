@@ -48,3 +48,14 @@ def test_working_memory_is_bounded():
     memory.put("c", 3)
     assert memory.get("a") is None
     assert memory.get("c") == 3
+
+
+def test_working_memory_is_first_class_in_sara_bootstrap():
+    from sara.bootstrap import build_default_system
+
+    system = build_default_system(fail_closed=False)
+    working = system.components["working_memory"]
+    assert system.registry.get("WorkingMemory") is not None
+    assert working.describe()["layer"] == "working_memory"
+    assert working.describe()["storage_scope"] == "process_ram_bounded"
+
