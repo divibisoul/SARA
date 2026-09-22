@@ -129,7 +129,7 @@ jobs:
           import json
           outer = json.load(open("/tmp/n07-cycle.json", encoding="utf-8"))
           assert outer["status"] == "ok", outer
-          assert outer["correlationId"] == "current-sara-n07-correlation-001"
+          assert outer["correlation_id"] == "current-sara-n07-correlation-001"
           sara = json.loads(outer["metadata"]["sara_result_json"])
           assert sara["cycle_id"] == "current-sara-n07-e2e-001"
           assert sara["execution_report"]["cycle_id"] == "current-sara-n07-e2e-001"
