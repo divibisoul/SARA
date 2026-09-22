@@ -144,6 +144,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/clareira/state",
                         ("audit", "validation", "persistence", "monitoring"),
                     ),
+                    "sara.clareira.audit@1.0.0": (
+                        "/v1/clareira/audit",
+                        ("audit", "strategy", "validation", "persistence"),
+                    ),
                     "sara.clareira.vagus@1.1.0": (
                         "/v1/clareira/vagus",
                         ("strategy", "execution", "monitoring"),
@@ -184,6 +188,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
                         "sara.clareira.state@1.1.0",
+                        "sara.clareira.audit@1.0.0",
                         "sara.clareira.vagus@1.1.0",
                         "sara.clareira.vagus.pending@1.1.0",
                         "sara.clareira.vagus.ack@1.1.0",
@@ -204,6 +209,14 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if path == "/v1/clareira/state":
                 clareira = system.components["clareira"]
                 self._json(200, clareira.health_snapshot())
+                return
+            if path == "/v1/clareira/audit":
+                audit = system.components["clareira_frontier"].latest_assessment()
+                self._json(200, {
+                    "operation": "sara.clareira.audit",
+                    "status": "OBSERVED" if audit is not None else "EXECUTION_REQUIRED",
+                    "audit": audit,
+                })
                 return
             if path == "/v1/clareira/vagus/pending":
                 clareira = system.components["clareira"]
@@ -296,12 +309,16 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     )
                 except ValueError as exc:
                     raise SaraAPIError(422, "INVALID_CLAREIRA_SNAPSHOT", str(exc)) from exc
+                audit = system.components["clareira_frontier"].assess_latest(
+                    correlation_id=f"{correlation.strip()}:frontier"
+                )
                 self._json(200, {
                     "operation": "sara.clareira.state",
                     "correlation_id": correlation.strip(),
                     "accepted": True,
                     "executed": True,
                     "result": result,
+                    "frontier_audit": audit,
                 })
                 return
 
