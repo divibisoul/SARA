@@ -104,6 +104,19 @@ def test_clareira_is_registered_and_implements_real_ingestion():
     assert second["device_state"]["batteryPercent"] == 38
 
 
+def test_clareira_requires_canonical_topology():
+    system = build_default_system(fail_closed=True)
+    clareira = system.components["clareira"]
+    invalid = _snapshot()
+    invalid["nodes"] = invalid["nodes"][:1]
+    try:
+        clareira.ingest_snapshot(invalid, correlation_id="clareira-topology-invalid")
+    except ValueError as exc:
+        assert str(exc) == "CLAREIRA_TOPOLOGY_NODE_COUNT_INVALID"
+        return
+    raise AssertionError("non-canonical Clareira topology was accepted")
+
+
 def test_clareira_rejects_invalid_snapshot_without_mutating_last_state():
     system = build_default_system(fail_closed=True)
     clareira = system.components["clareira"]
