@@ -277,6 +277,13 @@ class TrinitySynergy:
         iterations: list[TrinityIteration] = []
 
         for i in range(1, self._max_iterations + 1):
+            checkpoint = None
+            if self._eru is not None:
+                checkpoint = self._eru.checkpoint(
+                    f"trinity-{hash_json(target)[:16]}",
+                    i,
+                    {"target": current, "iteration": i},
+                )
             # 1. ARA detecta (3 camadas)
             lexical_flaws = self._ara.detect(current)
             structural_flaws = self._ara.detect_structural(current)
@@ -344,13 +351,23 @@ class TrinitySynergy:
                 },
             )
 
-            # 9. Convergência
+            # 9. Reauditoria do estado final antes de declarar convergência.
+            final_flaws = (
+                list(self._ara.detect(current))
+                + list(self._ara.detect_semantic(current))
+                + list(self._ara.detect_structural(current))
+                + list(self._ara.detect_relational(current))
+            )
+            final_semantic = self._etr.validate_transformation(
+                str(target), current
+            )
             converged = (
-                not all_flaws
+                not final_flaws
                 and multi.approved
                 and post_regeneration.approved
                 and post_execution.approved
                 and executed
+                and bool(final_semantic.get("ok", False))
             )
 
             iteration = TrinityIteration(
@@ -375,6 +392,10 @@ class TrinitySynergy:
                     "fusion_hash": mirror.fused_hash,
                     "mirror_integrity": mirror.integrity_ok,
                     "mirror_version": mirror.version,
+                    "final_flaws": [f.kind for f in final_flaws],
+                    "final_semantic_ok": final_semantic.get("ok", False),
+                    "checkpoint": checkpoint,
+                    "convergence_status": "CONVERGED" if converged else "REQUIRES_REGENERATION",
                 },
             )
             iterations.append(iteration)
