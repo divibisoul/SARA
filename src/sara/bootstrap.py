@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import logging
 
 from sara.contracts import ModuleRegistry
+from sara.contracts.base import ModuleStatus
 from sara.contracts.activation import CANONICAL_ACTIVATION_PLAN
 from sara.contracts.invariants import InvariantValidator
 from sara.core.ara import ARA
