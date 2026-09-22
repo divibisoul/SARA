@@ -2,8 +2,12 @@ services:
   sara:
     build:
       context: ..
-      dockerfile: deploy/Dockerfile
+      dockerfile: deploy/Dockerfile.service
     restart: unless-stopped
     environment:
       PYTHONUNBUFFERED: "1"
-    command: ["python", "scripts/run_regenerative_loop.py"]
+      SARA_API_TOKEN: ${SARA_API_TOKEN:?SARA_API_TOKEN is required}
+      SARA_HOST: "0.0.0.0"
+      SARA_PORT: "8090"
+    ports:
+      - "${SARA_PORT_EXTERNAL:-8090}:8090"
