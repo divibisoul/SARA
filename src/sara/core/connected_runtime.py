@@ -30,6 +30,32 @@ class ConnectedAction:
     blocking: bool = False
 
 
+class _PhaseContextProxy:
+    """Contexto somente de fase para hooks de módulos conectados.
+
+    Impede que um emit_trace legado grave uma fase diferente daquela em
+    que foi despachado, preservando ainda os demais atributos do contexto.
+    """
+
+    def __init__(self, ctx: Any, phase: CyclePhase) -> None:
+        self._ctx = ctx
+        self.phase = phase
+        self.cycle_id = getattr(ctx, "cycle_id", "")
+        self.current = getattr(ctx, "current", "")
+        self.input = getattr(ctx, "input", "")
+        self.sink = getattr(ctx, "sink", None)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._ctx, name)
+
+    def record(self, _phase: str, module: str, ok: bool, **info: Any) -> None:
+        self._ctx.record(self.phase.value, module, ok, **info)
+
+    def emit_decision(self, decision: dict) -> None:
+        if hasattr(self._ctx, "emit_decision"):
+            self._ctx.emit_decision(decision)
+
+
 class ConnectedRuntime:
     """Executa a integração transversal sem duplicar o núcleo do ciclo."""
 
@@ -147,12 +173,12 @@ class ConnectedRuntime:
                 if result is None:
                     hook = getattr(module, "process_phase", None)
                     if hook is not None:
-                        result = hook(phase, ctx)
+                        result = hook(phase, _PhaseContextProxy(ctx, phase))
                         operation = "process_phase"
                     else:
                         emitter = getattr(module, "emit_trace", None)
                         if emitter is not None:
-                            emitter(ctx)
+                            emitter(_PhaseContextProxy(ctx, phase))
                             result = {"observability_only": True}
                             operation = "emit_trace"
                         else:
