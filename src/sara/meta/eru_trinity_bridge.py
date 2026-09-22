@@ -29,6 +29,8 @@ class BridgeAudit:
     capability_drifts: list[dict] = field(default_factory=list)
     recovery_candidates: list[dict] = field(default_factory=list)
     capability_recovery_candidates: list[dict] = field(default_factory=list)
+    behavioral_evidence: list[dict] = field(default_factory=list)
+    behavioral_drifts: list[dict] = field(default_factory=list)
 
 
 class ERUTrinityBridge:
@@ -113,6 +115,57 @@ class ERUTrinityBridge:
             by_role.setdefault(item["role"], []).append(item)
         return by_role
 
+    def record_behavior(
+        self,
+        cycle_id: str,
+        phase: str,
+        role: str,
+        method: str,
+        probe_id: str,
+        input_digest: str,
+        output_digest: str,
+        *,
+        success: bool,
+        evidence_source: str = "external_execution",
+    ) -> dict:
+        """Anexa observação comportamental à capacidade observada nesta fase."""
+        audit = self._cycles.setdefault(cycle_id, BridgeAudit(cycle_id))
+        snapshot_name = f"CAP::{cycle_id}:{phase}:{role}"
+        if snapshot_name not in self._eru._snapshots:
+            raise ValueError("ERU_BEHAVIOR_CAPABILITY_SNAPSHOT_MISSING")
+        evidence = self._eru.record_behavior_observation(
+            snapshot_name,
+            method,
+            probe_id,
+            input_digest,
+            output_digest,
+            success=success,
+            evidence_source=evidence_source,
+        )
+        audit.behavioral_evidence.append(evidence)
+        return evidence
+
+    def detect_behavioral_drift(self, cycle_id: str) -> list[dict]:
+        audit = self._cycles.get(cycle_id)
+        if audit is None:
+            return []
+        by_role: dict[str, list[dict]] = {}
+        for item in audit.capability_observations:
+            by_role.setdefault(item["role"], []).append(item)
+        drifts: list[dict] = []
+        for role, observations in by_role.items():
+            for older, newer in zip(observations, observations[1:]):
+                result = self._eru.behavior_diff(
+                    older["snapshot_name"],
+                    newer["snapshot_name"],
+                )
+                result["role"] = role
+                result["from_phase"] = older["phase"]
+                result["to_phase"] = newer["phase"]
+                drifts.append(result)
+        audit.behavioral_drifts = drifts
+        return list(drifts)
+
     def detect_capability_drift(self, cycle_id: str) -> list[dict]:
         audit = self._cycles.get(cycle_id)
         if audit is None:
@@ -185,6 +238,7 @@ class ERUTrinityBridge:
             return {"ok": False, "reason": "cycle_not_observed"}
         drifts = self.detect_drift(cycle_id)
         capability_drifts = self.detect_capability_drift(cycle_id)
+        behavioral_drifts = self.detect_behavioral_drift(cycle_id)
         candidates = self.advise_recovery(cycle_id=cycle_id)
         audit.recovery_candidates = candidates
 
@@ -209,6 +263,8 @@ class ERUTrinityBridge:
             "capability_drifts": capability_drifts,
             "capability_observations": list(audit.capability_observations),
             "capability_recovery_candidates": list(audit.capability_recovery_candidates),
+            "behavioral_evidence": list(audit.behavioral_evidence),
+            "behavioral_drifts": behavioral_drifts,
             "recovery_candidates": candidates,
             "alignment": self.align_trinity(),
         }
