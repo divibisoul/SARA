@@ -3,6 +3,10 @@ Status: IMPLEMENTED (cadeia local thread-safe) | PENDING (IPFS).
 """
 from __future__ import annotations
 import threading
+import json
+import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from typing import Optional
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
@@ -72,14 +76,57 @@ class DecisionTrace:
                     if all(e.decision.get(k) == v for k, v in filters.items())]
 
     def is_ipfs_ready(self) -> bool:
-        return False
+        return bool(os.getenv("SARA_IPFS_API_URL", "").strip())
 
     def publish_to_ipfs(self, entry: TraceEntry) -> str:
-        raise NotImplementedError(
-            "DecisionTrace.publish_to_ipfs requer nó IPFS ou gateway configurado. "
-            "Nenhum backend IPFS está disponível. "
-            "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('DecisionTrace')."
+        endpoint = os.getenv("SARA_IPFS_API_URL", "").strip()
+        if not endpoint:
+            raise NotImplementedError(
+                "DecisionTrace.publish_to_ipfs requer SARA_IPFS_API_URL "
+                "apontando para a API RPC HTTP de um nó/gateway IPFS real. "
+                "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('DecisionTrace')."
+            )
+
+        boundary = "----SARAIPFSBOUNDARY"
+        payload = json.dumps({
+            "index": entry.index,
+            "ts": entry.ts,
+            "decision": entry.decision,
+            "prev_hash": entry.prev_hash,
+            "hash": entry.hash,
+        }, ensure_ascii=False).encode("utf-8")
+        body = (
+            f"--{boundary}\r\n"
+            "Content-Disposition: form-data; name=\"file\"; filename=\"decision-trace.json\"\r\n"
+            "Content-Type: application/json\r\n\r\n"
+        ).encode() + payload + f"\r\n--{boundary}--\r\n".encode()
+        req = urllib.request.Request(
+            endpoint.rstrip("/") + "/api/v0/add",
+            data=body,
+            method="POST",
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+                "User-Agent": "SARA-DecisionTrace/2.0",
+            },
         )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as response:
+                raw = response.read().decode("utf-8")
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", "replace")[:500]
+            raise RuntimeError(f"IPFS HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"IPFS transport error: {exc}") from exc
+
+        try:
+            response = json.loads(raw)
+        except json.JSONDecodeError:
+            # Kubo RPC normally returns newline-delimited JSON; parse the last object.
+            response = json.loads(raw.strip().splitlines()[-1])
+        cid = response.get("Hash") or response.get("cid")
+        if not cid:
+            raise RuntimeError("IPFS response sem Hash/cid")
+        return str(cid)
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
