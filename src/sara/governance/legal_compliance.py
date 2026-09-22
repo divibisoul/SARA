@@ -43,9 +43,25 @@ class LegalCompliance:
             self._allowed.add(license_id)
 
     def validate(self, tech_license: str, context: dict | None = None) -> ComplianceResult:
-        if tech_license in self._allowed:
-            return ComplianceResult(True, tech_license, "permitida")
-        return ComplianceResult(False, tech_license, "não permitida")
+        license_id = str(tech_license).strip()
+        if not license_id:
+            return ComplianceResult(False, license_id, "licença ausente")
+        terms = self._registry.get(license_id, {})
+        if license_id in self._allowed:
+            if context and context.get("commercial_use") and terms.get("non_commercial"):
+                return ComplianceResult(False, license_id, "restrição non_commercial incompatível")
+            return ComplianceResult(True, license_id, "permitida")
+        return ComplianceResult(False, license_id, "não permitida")
+
+    def explain(self, tech_license: str, context: dict | None = None) -> dict:
+        result = self.validate(tech_license, context=context)
+        return {
+            "approved": result.approved,
+            "license": result.license,
+            "reason": result.reason,
+            "registered_terms": dict(self._registry.get(result.license, {})),
+            "context": dict(context or {}),
+        }
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
