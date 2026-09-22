@@ -137,8 +137,8 @@ class ERU_Engine:
         new_state = copy.deepcopy(self._snapshots[newer].state)
         recovered: list[str] = []
         for path in diff.lost:
-            value = self._get_path(old_state, path)
-            if value is not None:
+            found, value = self._lookup_path(old_state, path)
+            if found:
                 self._set_path(new_state, path, value)
                 recovered.append(path)
         return {
@@ -148,6 +148,24 @@ class ERU_Engine:
             "added": diff.added,
             "changed": diff.changed,
         }
+
+    @staticmethod
+    def _lookup_path(obj: Any, path: str) -> tuple[bool, Any]:
+        tokens = re.findall(r"([^.\\[\\]]+)|\\[(\\d+)\\]", path)
+        cur = obj
+        for key, index in tokens:
+            if index:
+                if not isinstance(cur, list):
+                    return False, None
+                idx = int(index)
+                if idx >= len(cur):
+                    return False, None
+                cur = cur[idx]
+            else:
+                if not isinstance(cur, dict) or key not in cur:
+                    return False, None
+                cur = cur[key]
+        return True, cur
 
     @staticmethod
     def _get_path(obj: Any, path: str) -> Any:
@@ -197,6 +215,14 @@ class ERU_Engine:
             cur = cur[key]
 
     def audit(self, reference: str, target: str) -> AuditReport:
+        if reference not in self._snapshots or target not in self._snapshots:
+            return AuditReport(
+                before_hash=self._snapshots[reference].hash if reference in self._snapshots else "",
+                after_hash=self._snapshots[target].hash if target in self._snapshots else "",
+                diff=DiffReport(lost=["__missing_snapshot__"]),
+                recovered_paths=[],
+                final_state=None,
+            )
         diff = self.compare(reference, target)
         rec = self.recover(reference, target)
         return AuditReport(
@@ -238,11 +264,11 @@ class ERU_Engine:
         irrecoverable: list[str] = []
         old_state = self._snapshots[older].state
         for path in diff.lost:
-            value = self._get_path(old_state, path)
-            if value is None and self._get_path(old_state, path) is None:
-                irrecoverable.append(path)
-            else:
+            found, _ = self._lookup_path(old_state, path)
+            if found:
                 recoverable.append(path)
+            else:
+                irrecoverable.append(path)
         return {
             "reconstructable": not irrecoverable,
             "reason": "ok" if not irrecoverable else "missing_evidence_for_lost_paths",
