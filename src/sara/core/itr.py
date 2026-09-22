@@ -204,8 +204,10 @@ class ITR:
             steps_applied.append(step_name)
         metrics["output_len"] = len(text)
         metrics["steps_count"] = len(steps_applied)
+        metrics["execution_scope"] = "local_registered_transformations"
+        metrics["sandbox_static_checked"] = self._safe_sandbox is not None
         return ExecutionResult(
-            transformed=text, status="executed", capability_level="PARCIAL",
+            transformed=text, status="executed", capability_level="LOCAL_TRANSFORMATION",
             steps_applied=tuple(steps_applied), metrics=metrics,
         )
 
