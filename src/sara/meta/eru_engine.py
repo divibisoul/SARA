@@ -166,6 +166,13 @@ class ERU_Engine:
         snapshot_hash = self.freeze(snapshot_name, state)
         return snapshot_hash
 
+    def verify_snapshot(self, name: str) -> bool:
+        """Verifica a integridade do estado congelado pelo seu hash."""
+        frozen = self._snapshots.get(name)
+        if frozen is None:
+            return False
+        return hash_json(frozen.state) == frozen.hash
+
     def has_snapshot(self, name: str) -> bool:
         return name in self._snapshots
 
