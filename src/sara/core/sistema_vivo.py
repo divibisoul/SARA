@@ -9,6 +9,7 @@ from sara.monitoring.storm_monitor import StormMonitor
 from sara.monitoring.decision_trace import DecisionTrace
 from sara.contracts import ModuleRegistry
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
+from sara.core.connected_runtime import ConnectedRuntime
 
 
 @dataclass
@@ -32,12 +33,14 @@ class SistemaVivo:
 
     def __init__(self, loop: RegenerativeLoop, monitor: StormMonitor,
                  trace: DecisionTrace, registry: ModuleRegistry | None = None,
-                 provenance: Any = None) -> None:
+                 provenance: Any = None,
+                 connected_runtime: ConnectedRuntime | None = None) -> None:
         self._loop = loop
         self._monitor = monitor
         self._trace = trace
         self._registry = registry
         self._provenance = provenance
+        self._connected_runtime = connected_runtime
         self._active_monitor: Optional[str] = None
         self._cycle_count = 0
 
@@ -47,10 +50,18 @@ class SistemaVivo:
             "status": self.STATUS.value, "role": self.ROLE.value,
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
+            "connected_runtime": self._connected_runtime is not None,
         }
 
     def process(self, input_text, cycle_id=None, monitor_hours=0.0) -> CycleResult:
         self._cycle_count += 1
+        if self._connected_runtime is not None:
+            connection = self._connected_runtime.validate_connection()
+            if not connection["ok"]:
+                raise RuntimeError({
+                    "message": "SistemaVivo bloqueado por invariantes de conexão",
+                    "invariants": connection["invariants"],
+                })
         cid = cycle_id or f"sv-cycle-{self._cycle_count}"
         start = self._trace.log({
             "event": "cycle_start", "cycle_id": cid,
@@ -81,6 +92,10 @@ class SistemaVivo:
             "trace_valid": self._trace.verify(),
             "registry_snapshot": self._registry.snapshot() if self._registry else None,
             "provenance": self._provenance.report() if self._provenance else None,
+            "connected_runtime": (
+                self._connected_runtime.validate_connection()
+                if self._connected_runtime is not None else None
+            ),
         }
 
     def reset(self) -> None:
