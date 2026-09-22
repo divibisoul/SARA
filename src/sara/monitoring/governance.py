@@ -49,7 +49,19 @@ class GovernanceBackend:
     def override(self, decision_id: int, action: str) -> dict:
         if decision_id < 0 or decision_id >= len(self._decisions):
             return {"ok": False, "reason": "decision_id_out_of_range"}
-        return {"ok": True, "decision_id": decision_id, "action": action}
+        action = str(action).strip()
+        if not action:
+            return {"ok": False, "reason": "action_required"}
+        decision = self._decisions[decision_id]
+        decision["override"] = {
+            "action": action,
+            "ts": now_iso(),
+        }
+        return {
+            "ok": True,
+            "decision_id": decision_id,
+            "override": dict(decision["override"]),
+        }
 
     def is_ui_ready(self) -> bool:
         return False
