@@ -52,3 +52,30 @@ def test_system_vivo_blocks_when_connection_invariants_fail():
             assert "invariantes" in str(exc)
     finally:
         runtime._registry.dependency_order = original
+
+
+def test_connected_runtime_executes_omega_once_in_monitoring():
+    system = build_default_system(fail_closed=True)
+    runtime = system.components["connected_runtime"]
+    trace = system.components["trace"]
+    temporal = system.components["temporal"]
+
+    from sara.contracts.context import CycleContext, TraceSink
+    ctx = CycleContext(
+        "test-omega-monitoring",
+        "texto de monitoramento SARA",
+        "texto de monitoramento SARA",
+        TraceSink(trace, temporal, system.components["provenance"]),
+    )
+
+    actions = runtime.dispatch_phase(ctx, CyclePhase.MONITORING)
+    omega_actions = [
+        action for action in actions
+        if action.module == "SoulETROmegaSystem"
+    ]
+    assert len(omega_actions) == 1
+    action = omega_actions[0]
+    assert action.operation == "omega_cycle"
+    assert action.ok is True
+    assert action.executed is True
+    assert action.detail["cycle_id"] == "omega::test-omega-monitoring"
