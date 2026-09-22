@@ -68,3 +68,17 @@ def test_runtime_diagnostic_itr_extended_consciousness_path():
     )
     composed = itr.execute_composed(plan)
     assert composed.rollback_triggered is False, json.dumps(composed.phase_results, ensure_ascii=False, default=str)
+
+
+
+def test_runtime_diagnostic_autonomy_phase_boundary():
+    import json
+    system = build_default_system(fail_closed=True)
+    result = system.sistema_vivo.process("promover autonomia comunitária", cycle_id="diagnostic-phase-001")
+    cycle = result.loop_report.cycles[-1]
+    expected = [
+        "ingestion", "audit", "regeneration", "identity", "ethics",
+        "strategy", "execution", "validation", "persistence",
+        "snapshot", "monitoring", "governance",
+    ]
+    assert all(p in cycle["phases"] for p in expected), json.dumps(cycle, ensure_ascii=False, default=str)
