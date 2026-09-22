@@ -4,6 +4,9 @@ Status: IMPLEMENTED
 from __future__ import annotations
 import copy
 import json
+import os
+import threading
+from pathlib import Path
 from dataclasses import dataclass, asdict
 from typing import Any, Optional
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
@@ -28,9 +31,11 @@ class RegenerativeMemory:
     DEPENDENCIES = ()
     CYCLE_PHASES = (CyclePhase.PERSISTENCE,)
 
-    def __init__(self) -> None:
+    def __init__(self, persist_path: str | None = None) -> None:
         self._versions: list[VersionRecord] = []
         self._counter = 0
+        self._persist_path = (persist_path or os.getenv("SARA_MEMORY_PERSIST_PATH", "")).strip() or None
+        self._lock = threading.RLock()
 
     def describe(self) -> dict:
         return {
@@ -41,20 +46,23 @@ class RegenerativeMemory:
             "versions": len(self._versions),
             "latest_integrity": self._versions[-1].integrity if self._versions else None,
             "integrity_valid": self.verify_integrity(),
+            "persistence_enabled": self._persist_path is not None,
+            "persistence_path": self._persist_path,
         }
 
     def store(self, state: dict, label: str = "") -> VersionRecord:
-        self._counter += 1
-        integrity = short_hash(state)
-        v = VersionRecord(
-            id=self._counter,
-            label=label,
-            state=copy.deepcopy(state),
-            ts=now_iso(),
-            integrity=integrity,
-        )
-        self._versions.append(v)
-        return v
+        with self._lock:
+            self._counter += 1
+            integrity = short_hash(state)
+            v = VersionRecord(
+                id=self._counter,
+                label=label,
+                state=copy.deepcopy(state),
+                ts=now_iso(),
+                integrity=integrity,
+            )
+            self._versions.append(v)
+            return v
 
     def get(self, version_id: int) -> Optional[VersionRecord]:
         for v in self._versions:
@@ -115,15 +123,36 @@ class RegenerativeMemory:
         return list(self._versions)
 
     def persist(self, path: str) -> None:
-        payload = [asdict(v) for v in self._versions]
-        with open(path, "w", encoding="utf-8") as f:
+        target = Path(path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with self._lock:
+            payload = [asdict(v) for v in self._versions]
+        tmp = target.with_name(target.name + ".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, target)
+
+    def persist_if_configured(self) -> bool:
+        if not self._persist_path:
+            return False
+        self.persist(self._persist_path)
+        return True
 
     def load(self, path: str) -> None:
         with open(path, "r", encoding="utf-8") as f:
             payload = json.load(f)
-        self._versions = [VersionRecord(**p) for p in payload]
-        self._counter = max((v.id for v in self._versions), default=0)
+        loaded = [VersionRecord(**p) for p in payload]
+        if any(not isinstance(v.state, dict) or short_hash(v.state) != v.integrity for v in loaded):
+            raise ValueError("REGN_MEMORY_INTEGRITY_FAILED")
+        with self._lock:
+            self._versions = loaded
+            self._counter = max((v.id for v in self._versions), default=0)
+
+    def load_if_configured(self) -> bool:
+        if not self._persist_path or not Path(self._persist_path).exists():
+            return False
+        self.load(self._persist_path)
+        return True
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
