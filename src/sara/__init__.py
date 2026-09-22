@@ -22,6 +22,7 @@ from sara.research import (
 )
 from sara.audit import CycleAuditor
 from sara.bootstrap import build_default_system, SaraSystem
+from sara.omega import SoulETROmegaSystem
 
 __version__ = "3.1.0"
 
@@ -37,5 +38,5 @@ __all__ = [
     "QuantumSnapshotSystem", "ERU_Engine", "TransystemSARA",
     "QuantumCrawler", "NeuralLens", "InnovationRadar",
     "NeuroIntegrator", "QuantumScanner",
-    "CycleAuditor", "build_default_system", "SaraSystem",
+    "CycleAuditor", "build_default_system", "SaraSystem", "SoulETROmegaSystem",
 ]
