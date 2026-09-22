@@ -63,3 +63,12 @@ Os arquivos originais do Clareira foram reconciliados novamente com main. Altera
 ## Próximo gate
 
 Executar CI, corrigir primeiro erro real, repetir até obter execução verde e então promover a frente para teste/validação. Só depois reabrir as frentes congeladas.
+## Atualização SARA — rodada de engenharia — 2026-09-22
+
+- `ClareiraSubsystem` permanece adaptador/autoridade de evidência; o `ERU_Engine` existente continua sendo a autoridade ERU.
+- O SARA valida schema/blueprint 1.1.0, 61 nós, 120 canais, IDs únicos e coerência básica de métricas.
+- Estado Android opcional é validado quanto a tipo, domínio e finitude antes do freeze.
+- Proveniência e mutações concorrentes usam proteção com RLock.
+- Comandos vagais possuem ciclo PENDING→EXECUTED/DELIVERY_FAILED e não são tratados como executados antes de ACK.
+- O CI do SARA foi configurado para rodar também em pushes da branch de fusão.
+- Não há evidência de execução verde do pytest nesta sessão; a limitação do conector de workflow impede declarar o resultado sem logs.
