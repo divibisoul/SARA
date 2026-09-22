@@ -80,6 +80,7 @@ class RegenerativeLoop:
         registry: ModuleRegistry | None = None, governance_backend: Any = None,
         cycle_auditor: Any = None, max_cycles: int = 3,
         connected_runtime: ConnectedRuntime | None = None,
+        trinity: Any = None,
     ) -> None:
         self._ara, self._etr, self._itr = ara, etr, itr
         self._identity, self._memory = identity, memory
@@ -89,6 +90,7 @@ class RegenerativeLoop:
         self._registry, self._gov_backend = registry, governance_backend
         self._auditor, self._max_cycles = cycle_auditor, max(1, max_cycles)
         self._connected_runtime = connected_runtime
+        self._trinity = trinity
         self._history: list[LoopReport] = []
         self._invariants = InvariantValidator()
 
@@ -432,8 +434,24 @@ class RegenerativeLoop:
                      trace_valid=self._trace.verify() if self._trace is not None else False)
 
     def _phase_governance(self, ctx, cycle):
+        meta = None
+        if self._trinity is not None and hasattr(self._trinity, "assess"):
+            meta = self._trinity.assess(ctx.current)
+            cycle["phases"]["governance"] = {
+                "pending_infrastructure": "not_executed",
+                "trinity_assessment": meta,
+            }
+            self._record(
+                ctx, CyclePhase.GOVERNANCE, "TrinitySynergy", True,
+                trinity_assessment=meta,
+            )
+        else:
+            cycle["phases"]["governance"] = {
+                "pending_infrastructure": "not_executed",
+            }
         self._record(ctx, CyclePhase.GOVERNANCE, "RegenerativeLoop", True,
-                     pending_infrastructure="not_executed")
+                     pending_infrastructure="not_executed",
+                     trinity_assessment_attached=meta is not None)
     
     def _dispatch_emit_trace(self, ctx: CycleContext, phase: CyclePhase) -> None:
         if self._registry is None:
