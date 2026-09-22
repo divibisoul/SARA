@@ -97,6 +97,31 @@ def http_check() -> None:
         server.server_close()
 
 
+
+
+def diagnostic_inputs() -> None:
+    system = build_default_system(fail_closed=True)
+    inputs = (
+        "promover autonomia comunitária",
+        "promover consciência comunitária",
+        "promover autonomia e transparência",
+    )
+    for index, value in enumerate(inputs, 1):
+        report = system.sistema_vivo.process(
+            value, cycle_id=f"selfcheck-diagnostic-{index}"
+        ).loop_report
+        last = report.cycles[-1] if report.cycles else {}
+        dump("DIAGNOSTIC", {
+            "input": value,
+            "converged": report.converged,
+            "rollback": report.rollback_performed,
+            "phases": [s["phase"] for s in report.context_steps],
+            "last_cycle_phases": list(last.get("phases", {}).keys()),
+            "aborted_at": last.get("aborted_at"),
+            "abort_reason": last.get("abort_reason"),
+        })
+
+
 def trinity_check() -> None:
     system = build_default_system(fail_closed=True)
     unified = system.components["trinity_eru"]
@@ -115,4 +140,5 @@ if __name__ == "__main__":
     plain_loop_check()
     full_loop_check()
     http_check()
+    diagnostic_inputs()
     trinity_check()
