@@ -11,6 +11,11 @@ FORBIDDEN_NAMES = {"os", "sys", "subprocess", "shutil", "socket",
                    "eval", "exec", "__import__"}
 
 
+class IsolationBackend(Protocol):
+    def execute(self, code: str, timeout_s: float, limits: dict | None) -> "SandboxResult": ...
+    def terminate(self, execution_id: str) -> None: ...
+
+
 @dataclass
 class StaticAnalysis:
     parsed: bool
@@ -34,7 +39,7 @@ class SafeSandbox:
     DEPENDENCIES = ()
     CYCLE_PHASES = (CyclePhase.EXECUTION,)
 
-    def __init__(self, isolation_backend: object | None = None) -> None:
+    def __init__(self, isolation_backend: IsolationBackend | None = None) -> None:
         self._isolation = isolation_backend
 
     def describe(self) -> dict:
@@ -80,16 +85,31 @@ class SafeSandbox:
                 "Nenhum backend foi injetado em SafeSandbox(isolation_backend=...). "
                 "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('SafeSandbox')."
             )
-        raise NotImplementedError(
-            f"SafeSandbox.execute: backend '{type(self._isolation).__name__}' "
-            "não implementa a interface de isolamento esperada."
-        )
+        executor = getattr(self._isolation, "execute", None)
+        if not callable(executor):
+            raise NotImplementedError(
+                f"SafeSandbox.execute: backend '{type(self._isolation).__name__}' "
+                "não expõe execute(code, timeout_s, limits)."
+            )
+        result = executor(code, timeout_s, limits or {})
+        if not isinstance(result, SandboxResult):
+            raise TypeError(
+                "SafeSandbox backend execute deve retornar SandboxResult"
+            )
+        return result
 
     def terminate(self, execution_id: str) -> None:
         if self._isolation is None:
             raise NotImplementedError(
                 "SafeSandbox.terminate requer backend de isolamento ativo."
             )
+        terminator = getattr(self._isolation, "terminate", None)
+        if not callable(terminator):
+            raise NotImplementedError(
+                f"SafeSandbox.terminate: backend '{type(self._isolation).__name__}' "
+                "não expõe terminate(execution_id)."
+            )
+        terminator(execution_id)
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
