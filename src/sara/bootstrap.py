@@ -109,6 +109,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     storm = StormMonitor(interval_s=0.1)
     governance_backend = GovernanceBackend(module_status={})
     auditor = CycleAuditor()
+    trinity = TrinitySynergy(ara_extended, etr_extended, itr_extended)
     connected_runtime = ConnectedRuntime(registry)
 
     loop = RegenerativeLoop(
@@ -118,13 +119,12 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         provenance=prov, registry=registry, governance_backend=governance_backend,
         cycle_auditor=auditor, max_cycles=3,
         connected_runtime=connected_runtime,
+        trinity=trinity,
     )
     sistema = SistemaVivo(
         loop, storm, trace, registry=registry, provenance=prov,
         connected_runtime=connected_runtime,
     )
-    trinity = TrinitySynergy(ara_extended, etr_extended, itr_extended)
-
     candidates = [
         prov, dna, temporal, memory, rollback, trace,
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
