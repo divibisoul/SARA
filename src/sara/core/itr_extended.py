@@ -80,9 +80,12 @@ class ITR_Extended(ITR):
     # Passos adicionais
     EXTRA_STEPS: dict[str, Callable[[str], str]] = {
         "deep_structure": lambda t: (
-            f"[ESTRUTURADO]\n{t}\n"
-            f"[/ESTRUTURADO]\n"
-            f"METADADOS: len={len(t)}"
+            t if str(t).lstrip().startswith("[ESTRUTURADO]")
+            else (
+                f"[ESTRUTURADO]\n{t}\n"
+                f"[/ESTRUTURADO]\n"
+                f"METADADOS: len={len(t)}"
+            )
         ),
         "ethical_align": lambda t: (
             t + "\n[ITR_Extended: alinhamento ético verificado]"
