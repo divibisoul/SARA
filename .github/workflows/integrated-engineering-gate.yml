@@ -59,6 +59,27 @@ jobs:
           print("FINDINGS=", len(data["findings"]))
           PY
 
+      - name: Current cycle diagnostic
+        run: |
+          python - <<'PY'
+          from sara.bootstrap import build_default_system
+          system = build_default_system(fail_closed=True)
+          itr = system.components["itr_extended"]
+          try:
+              plan = itr.generate_strategic("promover consciência comunitária", {"cycle": 1, "clean_state": False})
+              print("ITR_PLAN:", plan)
+              print("ITR_STEPS:", [s for p in plan.phases for s in p["steps"]])
+              print("ITR_EXEC:", itr.execute_composed(plan).metrics)
+          except Exception as exc:
+              print("ITR_DIRECT_ERROR:", type(exc).__name__, str(exc))
+          result = system.sistema_vivo.process(
+              "promover consciência comunitária", cycle_id="gate-runtime-diagnostic"
+          )
+          print("CYCLE_CONVERGED:", result.loop_report.converged)
+          print("CYCLE_PHASES:", [s["phase"] for s in result.loop_report.context_steps])
+          print("CYCLE_LAST:", result.loop_report.cycles[-1] if result.loop_report.cycles else None)
+          PY
+
       - name: Integrated regression tests
         run: |
           python -m pytest -q             tests/test_engineering_gate.py             tests/test_trinity_extended.py             tests/test_trinity_self_optimization.py             tests/test_eru_behavior_evidence.py             tests/test_eru_trinity_symbiosis.py             tests/test_http_api.py
