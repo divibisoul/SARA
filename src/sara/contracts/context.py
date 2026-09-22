@@ -43,7 +43,6 @@ class CycleContext:
     input: str
     current: str
     sink: TraceSink
-    fusion: CycleFusionState | None
     steps: list[CycleStep] = field(default_factory=list)
     artifacts: dict[str, Any] = field(default_factory=dict)
     flags: dict[str, Any] = field(default_factory=dict)
