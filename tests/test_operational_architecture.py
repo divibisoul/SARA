@@ -13,8 +13,8 @@ def test_bootstrap_is_ready():
 def test_all_pending_modules_are_explicit():
     system = build_default_system()
     pending = set(system.registration_report["pending"])
-    assert "SafeSandbox" in pending
-    assert "QuantumCrawler" in pending
+    assert ("SafeSandbox" in pending) == (not system.components["safe_sandbox"].is_isolation_ready())
+    assert ("QuantumCrawler" in pending) == (not system.components["quantum_crawler"].is_backends_ready())
     assert "QuantumScanner" in pending
     assert "TransystemSARA" in pending
     assert "LegalAI" in pending
