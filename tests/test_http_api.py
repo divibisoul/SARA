@@ -15,7 +15,7 @@ def _start_server():
     return server, thread
 
 
-def _request(server, path, method="GET", body=None, token=None):
+def _request(server, path, method="GET", body=None, token=None, correlation_id=None):
     host, port = server.server_address
     data = None if body is None else json.dumps(body).encode()
     request = urllib.request.Request(
@@ -25,6 +25,7 @@ def _request(server, path, method="GET", body=None, token=None):
         headers={
             "Content-Type": "application/json",
             **({"Authorization": f"Bearer {token}"} if token else {}),
+            **({"X-Correlation-ID": correlation_id} if correlation_id else {}),
         },
     )
     try:
@@ -119,9 +120,12 @@ def test_cycle_propagates_correlation_id():
             method="POST",
             body={"input": "preservar autonomia e validar resultado"},
             token="test-token-123456789",
+            correlation_id="corr-http-test-001",
         )
         assert status == 200
         assert payload["cycle_id"]
+        assert payload["request_id"] == "corr-http-test-001"
+        assert payload["correlation_id"] == "corr-http-test-001"
         assert payload["final_state"]
     finally:
         server.shutdown()
