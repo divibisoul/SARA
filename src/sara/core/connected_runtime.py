@@ -280,14 +280,15 @@ class ConnectedRuntime:
     @staticmethod
     def _record(ctx: Any, action: ConnectedAction) -> None:
         if hasattr(ctx, "record"):
+            info = dict(action.detail)
+            info.setdefault("operation", action.operation)
             ctx.record(
                 action.phase,
                 action.module,
                 action.ok,
                 connected=True,
                 executed=action.executed,
-                operation=action.operation,
-                **action.detail,
+                **info,
             )
 
     def last_actions(self) -> list[ConnectedAction]:
