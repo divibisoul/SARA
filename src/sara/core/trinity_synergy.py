@@ -106,20 +106,29 @@ class TrinitySynergy:
 
             # 4. ARA regenera (se necessário)
             regenerated = False
+            post_regeneration = None
             if all_flaws:
                 regen = self._ara.regenerate_semantic(current, all_flaws)
                 current = regen.transformed
                 regenerated = True
 
-            # 5. ITR executa
+            # 5. ETR valida o estado regenerado antes da execução estratégica.
+            post_regeneration = self._etr.validate_multi_framework(current)
+
+            # 6. ITR executa
             result = self._itr.execute_composed(plan)
             current = result.transformed
             executed = not result.rollback_triggered
 
-            # 6. Convergência
+            # 7. ETR valida novamente o resultado da execução.
+            post_execution = self._etr.validate_multi_framework(current)
+
+            # 8. Convergência
             converged = (
                 not all_flaws
                 and multi.approved
+                and post_regeneration.approved
+                and post_execution.approved
                 and executed
             )
 
@@ -136,6 +145,9 @@ class TrinitySynergy:
                 converged=converged,
                 details={
                     "plan_criteria": list(plan.convergence_criteria),
+                    "pre_regeneration_ethical": multi.approved,
+                    "post_regeneration_ethical": post_regeneration.approved,
+                    "post_execution_ethical": post_execution.approved,
                     "rollback_triggered": result.rollback_triggered,
                     "metrics": result.metrics,
                 },
