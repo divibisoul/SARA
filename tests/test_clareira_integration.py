@@ -142,6 +142,22 @@ def test_clareira_frontier_fuses_eru_mmd_rgo_and_trinity_without_execution_claim
     assert second["eru"]["functional_equivalence_proven"] is False
     assert system.components["provenance"].verify_integrity() is True
 
+    
+def test_clareira_frontier_ignores_transport_metadata_only_changes():
+    system = build_default_system(fail_closed=True)
+    clareira = system.components["clareira"]
+    frontier = system.components["clareira_frontier"]
+
+    first = _snapshot("stable-001")
+    clareira.ingest_snapshot(first, correlation_id="stable-001")
+    clareira.ingest_snapshot(first, correlation_id="stable-002")
+    result = frontier.assess_latest(correlation_id="stable-audit")
+    assert result["eru"]["transition_audited"] is True
+    assert result["mmd"]["counts"]["changed"] == 0
+    assert result["mmd"]["counts"]["missing"] == 0
+    assert result["mmd"]["counts"]["added"] == 0
+    assert result["rgo"]["status"] == "NO_FINDING"
+
 
 def test_clareira_requires_canonical_topology():
     system = build_default_system(fail_closed=True)
