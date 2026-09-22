@@ -46,7 +46,7 @@ class _PhaseTraceProxy:
         self.phase = phase
 
     def record(self, _phase: str, module: str, success: bool, **info: Any) -> None:
-        self._ctx.record(self.phase.value, module, ok, **info)
+        self._ctx.record(self.phase.value, module, success, **info)
 
     def emit_decision(self, decision: dict) -> None:
         self._ctx.emit_decision(decision)
