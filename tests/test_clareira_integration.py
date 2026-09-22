@@ -225,6 +225,25 @@ def test_clareira_http_endpoints_call_canonical_runtime(monkeypatch):
             assert body["accepted"] is True
             assert body["executed"] is True
             assert body["result"]["eru_hash"]
+            assert body["frontier_audit"]["status"] == "DERIVED"
+            assert "mmd" in body["frontier_audit"]
+            assert "rgo" in body["frontier_audit"]
+            assert "trinity" in body["frontier_audit"]
+
+        audit_req = Request(
+            f"http://127.0.0.1:{port}/v1/clareira/audit",
+            method="GET",
+            headers={
+                "Authorization": "Bearer test-token",
+                "X-Correlation-ID": "clareira-http-audit-001",
+            },
+        )
+        with urlopen(audit_req, timeout=5) as response:
+            audit_body = json.loads(response.read().decode("utf-8"))
+            assert response.status == 200
+            assert audit_body["correlation_id"] == "clareira-http-audit-001"
+            assert audit_body["status"] == "DERIVED"
+            assert audit_body["audit"]["correlation_id"] == "clareira-http-vagal-001:frontier"
 
         command = json.dumps({
             "node_id": "NP-001",
