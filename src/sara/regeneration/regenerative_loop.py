@@ -428,6 +428,7 @@ class RegenerativeLoop:
                         "flaws": [getattr(f, "kind", str(f)) for f in cycle.get("_flaws", [])],
                         "semantic_fingerprint": ctx.artifacts.get("audit_semantic_fingerprint"),
                     },
+                    "etr_approved": bool(cycle.get("phases", {}).get("ethics", {}).get("approved", False)),
                     "rgo_regeneration_inputs": list(ctx.flags.get("rgo_regeneration_inputs", [])),
                 }
                 strategy = self._itr.generate_strategic(ctx.current, strategy_context)
