@@ -450,6 +450,10 @@ class RegenerativeLoop:
                      snapshot_hash=snap)
 
     def _phase_monitoring(self, ctx, cycle):
+        # Registra a fase canônica antes das integrações auxiliares.
+        cycle["phases"]["monitoring"] = {
+            "trace_valid": self._trace.verify() if self._trace is not None else False,
+        }
         if self._gov_backend is not None and hasattr(self._gov_backend, "register_decision"):
             self._gov_backend.register_decision({
                 "event": "cycle_monitoring",
