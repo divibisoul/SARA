@@ -122,6 +122,8 @@ class ClareiraSubsystem:
             raise ValueError("CLAREIRA_SNAPSHOT_MISSING:" + ",".join(missing))
         if str(snapshot["schemaVersion"]) != CLAREIRA_SCHEMA_VERSION:
             raise ValueError("CLAREIRA_SCHEMA_VERSION_UNSUPPORTED")
+        if str(snapshot["blueprintVersion"]) != CLAREIRA_BLUEPRINT_VERSION:
+            raise ValueError("CLAREIRA_BLUEPRINT_VERSION_UNSUPPORTED")
         if not isinstance(snapshot["metrics"], dict):
             raise ValueError("CLAREIRA_METRICS_INVALID")
         if not isinstance(snapshot["nodes"], list):
@@ -132,6 +134,27 @@ class ClareiraSubsystem:
             raise ValueError("CLAREIRA_HOMEOSTASIS_INVALID")
         if not isinstance(snapshot["vagus"], dict):
             raise ValueError("CLAREIRA_VAGUS_INVALID")
+
+        if len(snapshot["nodes"]) != 61:
+            raise ValueError("CLAREIRA_TOPOLOGY_NODE_COUNT_INVALID")
+        if len(snapshot["channels"]) != 120:
+            raise ValueError("CLAREIRA_TOPOLOGY_CHANNEL_COUNT_INVALID")
+
+        node_ids = [
+            str(node.get("id"))
+            for node in snapshot["nodes"]
+            if isinstance(node, dict)
+        ]
+        if len(node_ids) != 61 or len(set(node_ids)) != 61:
+            raise ValueError("CLAREIRA_TOPOLOGY_NODE_IDS_INVALID")
+
+        channel_ids = [
+            str(channel.get("id"))
+            for channel in snapshot["channels"]
+            if isinstance(channel, dict) and channel.get("id")
+        ]
+        if len(channel_ids) != 120 or len(set(channel_ids)) != 120:
+            raise ValueError("CLAREIRA_TOPOLOGY_CHANNEL_IDS_INVALID")
         device = snapshot.get("deviceState")
         if device is not None:
             if not isinstance(device, dict):
