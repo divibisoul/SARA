@@ -99,3 +99,43 @@ def test_eru_recovery_preserves_none_values():
     recovery = eru.recover("old-none", "new-none")
     assert recovery["state_fused"]["feature"] is None
     assert "feature" in recovery["recovered_paths"]
+def test_bridge_capability_observation_and_drift():
+    class V1:
+        def describe(self):
+            return {"name": "V1", "version": "1.0", "status": "IMPLEMENTED",
+                    "role": "meta", "dependencies": [], "phases": []}
+
+        def alpha(self, value):
+            return value
+
+    class V2:
+        def describe(self):
+            return {"name": "V2", "version": "2.0", "status": "IMPLEMENTED",
+                    "role": "meta", "dependencies": [], "phases": []}
+
+        def alpha(self, value, extra=None):
+            return value
+
+        def beta(self):
+            return True
+
+    eru = ERU_Engine()
+    bridge = ERUTrinityBridge(eru)
+    bridge.register_trinity(V1(), V1(), V1())
+    bridge.observe("cap-cycle", "INPUT", {"state": "before"})
+    bridge.observe_capabilities("cap-cycle", "INPUT")
+
+    bridge.register_trinity(V2(), V2(), V2())
+    bridge.observe("cap-cycle", "FINAL", {"state": "after"})
+    bridge.observe_capabilities("cap-cycle", "FINAL")
+
+    audit = bridge.audit_cycle("cap-cycle")
+    assert audit["capability_drifts"]
+    assert any(
+        "alpha" in item["changed_methods"]
+        for item in audit["capability_drifts"]
+    )
+    assert any(
+        item["role"] == "ARA"
+        for item in audit["capability_drifts"]
+    )
