@@ -80,3 +80,40 @@ def test_audit_uses_real_ara_and_etr_paths():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_capabilities_include_federation_identity_and_trace():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server, "/v1/capabilities", token="test-token-123456789"
+        )
+        assert status == 200
+        assert payload["identity"]["node_id"] == "SARA"
+        assert "sara.trace@1.0.0" in payload["operations"]
+        trace_descriptor = next(
+            d for d in payload["capability_descriptors"]
+            if d["operation"] == "sara.trace@1.0.0"
+        )
+        assert trace_descriptor["endpoint"] == "/v1/trace/{cycle_id}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_cycle_propagates_correlation_id():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={"input": "preservar autonomia e validar resultado"},
+            token="test-token-123456789",
+        )
+        assert status == 200
+        assert payload["cycle_id"]
+        assert payload["final_state"]
+    finally:
+        server.shutdown()
+        server.server_close()
