@@ -87,11 +87,13 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "sara.trace@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
                     "activation": system.registration_report.get("pending", []),
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
+                    "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
                 })
                 return
