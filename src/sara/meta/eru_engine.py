@@ -151,7 +151,7 @@ class ERU_Engine:
 
     @staticmethod
     def _lookup_path(obj: Any, path: str) -> tuple[bool, Any]:
-        tokens = re.findall(r"([^.\\[\\]]+)|\\[(\\d+)\\]", path)
+        tokens = re.findall(r"([^.\[\]]+)|\[(\d+)\]", path)
         cur = obj
         for key, index in tokens:
             if index:
