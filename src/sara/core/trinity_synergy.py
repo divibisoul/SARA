@@ -225,6 +225,8 @@ class TrinitySynergy:
                 self._eru_bridge.observe(
                     cycle_id, "INPUT", {"iteration": i, "state": current}
                 )
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe_capabilities(cycle_id, "INPUT")
             # 1. ARA detecta (3 camadas)
             lexical_flaws = self._ara.detect(current)
             structural_flaws = self._ara.detect_structural(current)
@@ -363,6 +365,9 @@ class TrinitySynergy:
                     cycle_id, "FINAL_RESULT",
                     {"state": current, "converged": converged},
                 )
+
+            if self._eru_bridge is not None:
+                self._eru_bridge.observe_capabilities(cycle_id, "FINAL")
 
             iteration = TrinityIteration(
                 iteration=i,
