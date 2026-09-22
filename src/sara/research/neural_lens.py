@@ -40,6 +40,7 @@ class NeuralLens:
             "phases": [p.value for p in self.CYCLE_PHASES],
             "repo_client_ready": self.is_repo_client_ready(),
             "remote_provenance": "git_blob_sha",
+            "private_repo_auth_available": bool(os.getenv("GITHUB_TOKEN", "").strip()),
         }
 
     def extract(self, source_code: str, language: str = "python") -> CodeStructure:
@@ -61,7 +62,8 @@ class NeuralLens:
                              len(source_code.splitlines()))
 
     def is_repo_client_ready(self) -> bool:
-        return bool(os.getenv("GITHUB_TOKEN", "").strip())
+        # Public GitHub Contents API works without a token; token only extends private/rate-limited access.
+        return True
 
     def extract_from_repo(self, repo_url: str, path: str, ref: str | None = None) -> CodeStructure:
         parsed = urllib.parse.urlparse(str(repo_url).strip())
