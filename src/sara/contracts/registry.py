@@ -63,6 +63,43 @@ class ModuleRegistry:
             out[m.status.value].append(m.name)
         return out
 
+    def dependency_order(self) -> list[str]:
+        """Retorna ordem topológica determinística do grafo de módulos."""
+        names = set(self._modules)
+        deps = {
+            name: {d for d in entry.dependencies if d in names}
+            for name, entry in self._modules.items()
+        }
+        indegree = {name: len(values) for name, values in deps.items()}
+        dependents: dict[str, set[str]] = {name: set() for name in names}
+        for name, values in deps.items():
+            for dep in values:
+                dependents[dep].add(name)
+
+        ready = sorted(name for name, degree in indegree.items() if degree == 0)
+        order: list[str] = []
+        while ready:
+            name = ready.pop(0)
+            order.append(name)
+            for child in sorted(dependents[name]):
+                indegree[child] -= 1
+                if indegree[child] == 0:
+                    ready.append(child)
+                    ready.sort()
+
+        if len(order) != len(names):
+            cyclic = sorted(names - set(order))
+            raise RegistryError(
+                "ciclo de dependências detectado: " + ", ".join(cyclic)
+            )
+        return order
+
+    def dependency_graph(self) -> dict[str, list[str]]:
+        return {
+            name: list(entry.dependencies)
+            for name, entry in self._modules.items()
+        }
+
     def snapshot(self) -> dict:
         return {
             "count": len(self._modules),
