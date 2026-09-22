@@ -119,7 +119,7 @@ class ARA:
         if n == 0:
             return []
         unique_ratio = len(set(text)) / n
-        sentences = re.split(r"[.!?]s+", text)
+        sentences = re.split(r"[.!?]\s+", text)
         avg_sentence = sum(len(s) for s in sentences) / max(len(sentences), 1)
         nesting_depth = self._max_nesting_depth(text)
 
