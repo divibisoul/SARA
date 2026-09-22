@@ -45,3 +45,57 @@ def test_unified_trinity_keeps_existing_api():
     assert unified.describe()["status"] == "IMPLEMENTED"
     assessed = unified.assess("promover autonomia com transparência")
     assert assessed["ethics"]["approved"] is True
+
+def test_eru_capability_snapshot_detects_method_signature_and_contract_drift():
+    from sara.core.provenance import ProvenanceTracker
+
+    class DemoV1:
+        NAME = "Demo"
+        VERSION = "1.0"
+        STATUS = type("S", (), {"value": "IMPLEMENTED"})()
+        ROLE = type("R", (), {"value": "meta"})()
+        DEPENDENCIES = ("A",)
+        CYCLE_PHASES = ()
+
+        def describe(self):
+            return {
+                "name": self.NAME,
+                "version": self.VERSION,
+                "status": self.STATUS.value,
+                "role": self.ROLE.value,
+                "dependencies": list(self.DEPENDENCIES),
+                "phases": list(self.CYCLE_PHASES),
+            }
+
+        def alpha(self, value):
+            return value
+
+    class DemoV2(DemoV1):
+        VERSION = "2.0"
+        DEPENDENCIES = ("A", "B")
+
+        def alpha(self, value, extra=None):
+            return value
+
+        def beta(self):
+            return True
+
+    eru = ERU_Engine(provenance=ProvenanceTracker())
+    h1 = eru.freeze_capabilities("demo-v1", DemoV1())
+    h2 = eru.freeze_capabilities("demo-v2", DemoV2())
+    assert h1 != h2
+
+    diff = eru.capability_diff("CAP::demo-v1", "CAP::demo-v2")
+    assert diff["added_methods"] == ["beta"]
+    assert diff["changed_methods"] == ["alpha"]
+    assert diff["changed_contract"] == ["dependencies", "version"]
+    assert diff["functional_equivalence_proven"] is False
+
+
+def test_eru_recovery_preserves_none_values():
+    eru = ERU_Engine()
+    eru.freeze("old-none", {"feature": None, "keep": 1})
+    eru.freeze("new-none", {"keep": 1})
+    recovery = eru.recover("old-none", "new-none")
+    assert recovery["state_fused"]["feature"] is None
+    assert "feature" in recovery["recovered_paths"]
