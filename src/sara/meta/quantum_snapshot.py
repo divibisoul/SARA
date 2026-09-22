@@ -41,8 +41,8 @@ class QuantumSnapshotSystem:
         }
 
     def snapshot(self, state: dict) -> str:
-        sid = short_hash({"state": state, "ts": now_iso()})
         ts = now_iso()
+        sid = short_hash({"state": state, "ts": ts})
         snapshot_hash = chain_hash(
             self._chain[-1] if self._chain else "GENESIS",
             {"id": sid, "ts": ts, "state": state},
