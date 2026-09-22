@@ -34,9 +34,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
         raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
-        correlation = self.headers.get("X-Correlation-ID", "").strip()
-        if correlation:
-            self.send_header("X-Correlation-ID", correlation)
+        correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+        self.send_header("X-Correlation-ID", correlation)
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -73,6 +72,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             system = self._runtime()
             if path == "/health":
                 self._json(200, {
+                    "service": "SARA",
                     "status": "ok" if system.ready else "not_ready",
                     "ready": system.ready,
                     "version": "3.1.0",
@@ -148,7 +148,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 self._json(200, system.sistema_vivo.state())
                 return
             if path.startswith("/v1/trace/"):
-                cycle_id = path.rsplit("/", 1)[-1]
+                from urllib.parse import unquote
+                cycle_id = unquote(path.rsplit("/", 1)[-1])
+                if not cycle_id:
+                    raise SaraAPIError(422, "INVALID_CYCLE_ID", "cycle_id não pode ser vazio.")
                 entries = system.components["trace"].query({"cycle_id": cycle_id})
                 temporal = system.components["temporal"].by_data({"cycle_id": cycle_id})
                 self._json(200, {
@@ -179,7 +182,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
                 cycle_id = body.get("cycle_id")
-                correlation = self.headers.get("X-Correlation-ID", "").strip()
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 if cycle_id is None and correlation:
                     cycle_id = correlation
                 if cycle_id is not None and (
@@ -189,10 +192,12 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 result = system.sistema_vivo.process(text, cycle_id=cycle_id)
                 self._json(200, {
                     "cycle_id": result.cycle_id,
+                    "correlation_id": correlation,
                     "input": result.input,
                     "final_state": result.loop_report.final_state,
                     "converged": result.loop_report.converged,
                     "rollback_performed": result.loop_report.rollback_performed,
+                    "fusion": result.loop_report.fusion,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
                 })

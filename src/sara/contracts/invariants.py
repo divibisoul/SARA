@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from sara.contracts.base import CyclePhase, ModuleStatus
 from sara.contracts.lifecycle import CANONICAL_ORDER
+from sara.infra.hashing import hash_json
 
 
 @dataclass(frozen=True)
@@ -145,7 +146,21 @@ class InvariantValidator:
 
         canonical = [p.value for p in CANONICAL_ORDER]
         positions = [canonical.index(p) for p in phase_order if p in canonical]
-        monotonic = positions == sorted(positions)
+
+        # ctx.steps acumula todas as tentativas regenerativas do mesmo ciclo.
+        # A ordem deve ser monotônica dentro de cada iteração, mas um novo
+        # "ingestion" inicia legitimamente uma nova iteração.
+        monotonic = True
+        previous = -1
+        for phase in phase_order:
+            current = canonical.index(phase) if phase in canonical else previous
+            if phase == canonical[0] and previous > current:
+                previous = current
+                continue
+            if current < previous:
+                monotonic = False
+                break
+            previous = current
         checks.append(InvariantCheck(
             "phase_order_monotonic", monotonic, True,
             "ok" if monotonic else f"observed={phase_order}",
@@ -172,6 +187,35 @@ class InvariantValidator:
         if ctx.aborted:
             checks.append(InvariantCheck(
                 "abort_reason_present", bool(ctx.abort_reason), True, ctx.abort_reason
+            ))
+
+        fusion = getattr(ctx, "fusion", None)
+        if fusion is not None:
+            checks.append(InvariantCheck(
+                "fusion_cycle_identity",
+                fusion.cycle_id == ctx.cycle_id and fusion.version >= 1,
+                True,
+                f"cycle_id={fusion.cycle_id};version={fusion.version}",
+            ))
+            checks.append(InvariantCheck(
+                "fusion_target_hash_matches_context",
+                hash_json(ctx.current) == fusion.target_hash,
+                True,
+                "ok" if hash_json(ctx.current) == fusion.target_hash else "target_hash_mismatch",
+            ))
+            component_hashes_present = all(
+                bool(getattr(fusion, name, ""))
+                for name in ("ara_hash", "etr_hash", "itr_hash", "fused_hash")
+            )
+            checks.append(InvariantCheck(
+                "fusion_component_hashes_present",
+                component_hashes_present,
+                True,
+            ))
+            checks.append(InvariantCheck(
+                "fusion_integrity_ok",
+                bool(fusion.integrity_ok),
+                True,
             ))
 
         failures = tuple(c.name for c in checks if c.blocking and not c.ok)

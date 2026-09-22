@@ -15,7 +15,7 @@ def _start_server():
     return server, thread
 
 
-def _request(server, path, method="GET", body=None, token=None):
+def _request(server, path, method="GET", body=None, token=None, correlation_id=None):
     host, port = server.server_address
     data = None if body is None else json.dumps(body).encode()
     request = urllib.request.Request(
@@ -25,6 +25,7 @@ def _request(server, path, method="GET", body=None, token=None):
         headers={
             "Content-Type": "application/json",
             **({"Authorization": f"Bearer {token}"} if token else {}),
+            **({"X-Correlation-ID": correlation_id} if correlation_id else {}),
         },
     )
     try:
@@ -104,16 +105,59 @@ def test_capabilities_include_federation_identity_and_trace():
 def test_cycle_propagates_correlation_id():
     server, _ = _start_server()
     try:
+        correlation_id = "http-correlation-test-001"
         status, payload = _request(
             server,
             "/v1/cycle",
             method="POST",
             body={"input": "preservar autonomia e validar resultado"},
             token="test-token-123456789",
+            correlation_id=correlation_id,
         )
         assert status == 200
-        assert payload["cycle_id"]
+        assert payload["cycle_id"] == correlation_id
+        assert payload["correlation_id"] == correlation_id
         assert payload["final_state"]
+        assert payload["execution_report"]["cycle_id"] == correlation_id
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_cycle_trace_and_fusion_evidence_are_retrievable():
+    server, _ = _start_server()
+    try:
+        cycle_id = "http-e2e-fusion-001"
+        correlation_id = "http-e2e-correlation-001"
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={"input": "preservar autonomia comunitária e transparência", "cycle_id": cycle_id},
+            token="test-token-123456789",
+            correlation_id=correlation_id,
+        )
+        assert status == 200
+        assert payload["cycle_id"] == cycle_id
+        assert payload["correlation_id"] == correlation_id
+        assert payload["fusion"] is not None
+        assert payload["fusion"]["integrity_ok"] is True
+        assert payload["execution_report"]["artifacts"]["fusion_mirror"]["fused_hash"]
+
+        status, trace = _request(
+            server,
+            f"/v1/trace/{cycle_id}",
+            token="test-token-123456789",
+            correlation_id=correlation_id,
+        )
+        assert status == 200
+        assert trace["cycle_id"] == cycle_id
+        assert trace["integrity"] is True
+        assert trace["provenance_integrity"] is True
+        assert trace["entries"]
+        assert trace["temporal_records"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+

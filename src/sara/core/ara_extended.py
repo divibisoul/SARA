@@ -146,7 +146,7 @@ class ARA_Extended(ARA):
 
         # 1b. Repetição estrutural (possível loop degenerado)
         words = s.lower().split()
-        if len(words) > 10:
+        if len(words) >= 5:
             last_5 = words[-5:]
             if all(w == last_5[0] for w in last_5):
                 flaws.append(StructuralFlaw(
@@ -177,7 +177,11 @@ class ARA_Extended(ARA):
         flaws: list[Flaw] = []
 
         # Relação: tag protegida + operação + sujeito
-        tag_positions = [(t, lower.find(t)) for t in self._dna.PROTECTED if t in lower]
+        tag_positions = [
+            (t, lower.find(t.lower()))
+            for t in self._dna.PROTECTED
+            if t.lower() in lower
+        ]
         for tag, pos in tag_positions:
             if pos < 0:
                 continue
