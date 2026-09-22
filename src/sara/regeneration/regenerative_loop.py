@@ -395,26 +395,43 @@ class RegenerativeLoop:
         return base
 
     def _phase_strategy(self, ctx, cycle, idx):
-        if hasattr(self._itr, "generate_strategic"):
-            strategy_context = {
-                "cycle": idx,
-                "ara_audit": {
-                    "flaws": [getattr(f, "kind", str(f)) for f in cycle.get("_flaws", [])],
-                    "semantic_fingerprint": ctx.artifacts.get("audit_semantic_fingerprint"),
-                },
-                "rgo_regeneration_inputs": list(ctx.flags.get("rgo_regeneration_inputs", [])),
-            }
-            strategy = self._itr.generate_strategic(ctx.current, strategy_context)
+        try:
+            if hasattr(self._itr, "generate_strategic"):
+                strategy_context = {
+                    "cycle": idx,
+                    "ara_audit": {
+                        "flaws": [getattr(f, "kind", str(f)) for f in cycle.get("_flaws", [])],
+                        "semantic_fingerprint": ctx.artifacts.get("audit_semantic_fingerprint"),
+                    },
+                    "rgo_regeneration_inputs": list(ctx.flags.get("rgo_regeneration_inputs", [])),
+                }
+                strategy = self._itr.generate_strategic(ctx.current, strategy_context)
+                cycle["phases"]["strategy"] = {
+                    "type": "StrategicPlan",
+                    "phases": len(strategy.phases),
+                    "criteria": list(strategy.convergence_criteria),
+                }
+            else:
+                strategy = self._itr.generate(ctx.current, context={"cycle": idx})
+                cycle["phases"]["strategy"] = {"type": "Strategy", "variant": strategy.variant}
+            self._record(ctx, CyclePhase.STRATEGY, "ITR", True, **cycle["phases"]["strategy"])
+            return strategy
+        except Exception as exc:
             cycle["phases"]["strategy"] = {
-                "type": "StrategicPlan",
-                "phases": len(strategy.phases),
-                "criteria": list(strategy.convergence_criteria),
+                "type": "failure",
+                "error": f"{type(exc).__name__}: {exc}",
             }
-        else:
-            strategy = self._itr.generate(ctx.current, context={"cycle": idx})
-            cycle["phases"]["strategy"] = {"type": "Strategy", "variant": strategy.variant}
-        self._record(ctx, CyclePhase.STRATEGY, "ITR", True, **cycle["phases"]["strategy"])
-        return strategy
+            self._record(
+                ctx,
+                CyclePhase.STRATEGY,
+                "ITR",
+                False,
+                **cycle["phases"]["strategy"],
+            )
+            raise _Aborted(
+                "STRATEGY",
+                f"itr_strategy_failure:{type(exc).__name__}:{exc}",
+            ) from exc
 
     def _phase_execution(self, ctx, cycle, strategy):
         if hasattr(strategy, "phases") and hasattr(self._itr, "execute_composed"):
