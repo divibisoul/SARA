@@ -117,11 +117,28 @@ class LegalAI:
                 "jurisdiction": jurisdiction,
             }
         result = self._patent_oracle.check(tech_name, jurisdiction)
+        if not isinstance(result, dict):
+            raise RuntimeError("PATENT_ORACLE_INVALID_RESPONSE")
+        # Transporte HTTP bem-sucedido não equivale a verificação jurídica.
+        # O oracle precisa declarar explicitamente o resultado de verificação.
+        verified = result.get("verified")
+        if not isinstance(verified, bool):
+            return {
+                "verified": False,
+                "status": "UNVERIFIED_ORACLE_RESPONSE",
+                "tech": tech_name,
+                "jurisdiction": jurisdiction,
+                "oracle": type(self._patent_oracle).__name__,
+                "verification_mode": "oracle_must_explicitly_verify",
+                "result": result,
+            }
         return {
-            "verified": True,
+            "verified": verified,
+            "status": "VERIFIED" if verified else "NOT_VERIFIED",
             "tech": tech_name,
             "jurisdiction": jurisdiction,
             "oracle": type(self._patent_oracle).__name__,
+            "verification_mode": "oracle_explicit_boolean",
             "result": result,
         }
 
