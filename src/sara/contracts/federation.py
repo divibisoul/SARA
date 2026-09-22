@@ -66,6 +66,9 @@ class CapabilityDescriptor:
     requires_external_infrastructure: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
 
 @dataclass(frozen=True)
 class ExecuteResult:
