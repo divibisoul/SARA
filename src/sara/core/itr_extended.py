@@ -143,6 +143,34 @@ class ITR_Extended(ITR):
         base = self._analyze(objective)
         semantic = self.semantic_strategy_profile(objective)
 
+        if ctx.get("clean_state"):
+            # Um estado já sem falhas não deve ser degradado por reprocessamento.
+            # Mantemos as quatro fases para preservar o contrato observável,
+            # mas as fases mutáveis passam a ser estabilizadoras.
+            phases = (
+                {
+                    "phase": 1, "name": "normalize",
+                    "steps": ["normalize"],
+                    "purpose": "estabilizar entrada sem alteração semântica",
+                },
+                {
+                    "phase": 2, "name": "extract",
+                    "steps": ["extract_keywords"],
+                    "purpose": "observar núcleo semântico sem mutar o texto",
+                    "semantic_profile": semantic,
+                },
+                {
+                    "phase": 3, "name": "structure",
+                    "steps": ["preserve"],
+                    "purpose": "manter estrutura já estável",
+                },
+                {
+                    "phase": 4, "name": "guard",
+                    "steps": ["preserve"],
+                    "purpose": "manter guardrails já estabilizados",
+                },
+            )
+        else:
         phases = [
             {
                 "phase": 1, "name": "normalize",
@@ -166,6 +194,8 @@ class ITR_Extended(ITR):
                 "purpose": "aplicar guardrails éticos e de resiliência",
             },
         ]
+
+            phases = tuple(phases)
 
         criteria = (
             "output_maior_que_input",
