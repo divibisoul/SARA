@@ -524,21 +524,46 @@ class RegenerativeLoop:
         meta = None
         if self._trinity is not None and hasattr(self._trinity, "assess"):
             meta = self._trinity.assess(ctx.current)
-            cycle["phases"]["governance"] = {
-                "pending_infrastructure": "not_executed",
-                "trinity_assessment": meta,
-            }
             self._record(
                 ctx, CyclePhase.GOVERNANCE, "TrinitySynergy", True,
                 trinity_assessment=meta,
             )
-        else:
-            cycle["phases"]["governance"] = {
-                "pending_infrastructure": "not_executed",
-            }
-        self._record(ctx, CyclePhase.GOVERNANCE, "RegenerativeLoop", True,
-                     pending_infrastructure="not_executed",
-                     trinity_assessment_attached=meta is not None)
+
+        connected_actions = []
+        if self._connected_runtime is not None:
+            connected_actions = [
+                action for action in self._connected_runtime.last_actions()
+                if action.phase == CyclePhase.GOVERNANCE.value
+            ]
+
+        cycle["phases"]["governance"] = {
+            "connected_runtime_active": self._connected_runtime is not None,
+            "connected_actions": [
+                {
+                    "module": action.module,
+                    "operation": action.operation,
+                    "executed": action.executed,
+                    "ok": action.ok,
+                }
+                for action in connected_actions
+            ],
+            "pending_infrastructure": [
+                action.module
+                for action in connected_actions
+                if action.operation == "pending_infrastructure"
+            ],
+            "trinity_assessment": meta,
+        }
+        self._record(
+            ctx,
+            CyclePhase.GOVERNANCE,
+            "RegenerativeLoop",
+            True,
+            connected_runtime_active=self._connected_runtime is not None,
+            connected_actions=len(connected_actions),
+            pending_infrastructure=cycle["phases"]["governance"]["pending_infrastructure"],
+            trinity_assessment_attached=meta is not None,
+        )
     
     def _dispatch_emit_trace(self, ctx: CycleContext, phase: CyclePhase) -> None:
         if self._registry is None:
