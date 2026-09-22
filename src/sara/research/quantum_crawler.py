@@ -162,9 +162,7 @@ class QuantumCrawler:
 
     def scan_configured(self, query: str) -> list[TechCandidate]:
         if not self._backends:
-            raise NotImplementedError(
-                "QuantumCrawler.scan_configured requer pelo menos um backend HTTP real."
-            )
+            raise RuntimeError("QUANTUM_CRAWLER_NO_BACKENDS")
         candidates: list[TechCandidate] = []
         for backend in self._backends:
             for item in backend.fetch(query):
@@ -183,11 +181,7 @@ class QuantumCrawler:
             raise ValueError("query não pode ser vazia")
         if self._backends:
             return self.scan_configured(query)
-        raise NotImplementedError(
-            "QuantumCrawler.scan requer pelo menos um backend de rede real. "
-            "Use HTTPJSONBackend(endpoint_template=...) ou backend equivalente. "
-            "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('QuantumCrawler')."
-        )
+        raise RuntimeError("QUANTUM_CRAWLER_NO_BACKENDS")
 
     def verify_source(self, candidate: TechCandidate) -> dict:
         """Validação de origem baseada no backend que produziu o candidato."""
