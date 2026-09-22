@@ -198,6 +198,7 @@ class ITR_Extended(ITR):
         for phase in plan.phases:
             phase_metrics: dict = {"phase": phase["phase"], "name": phase["name"]}
             phase_start_len = len(text)
+            semantic_violation = False
             try:
                 for step_name in phase["steps"]:
                     fn = _STEP_REGISTRY.get(step_name)
@@ -210,6 +211,7 @@ class ITR_Extended(ITR):
                 phase_metrics["semantic_entities_lost"] = len(semantic_delta["entity_loss"])
                 # Uma estratégia não pode apagar relações que estavam no objetivo.
                 if semantic_delta["relations_lost"]:
+                    semantic_violation = True
                     raise RuntimeError(
                         f"perda semântica na fase {phase['phase']}: "
                         f"{semantic_delta['relations_lost']}"
@@ -220,10 +222,14 @@ class ITR_Extended(ITR):
             except Exception as exc:
                 phase_metrics["ok"] = False
                 phase_metrics["error"] = str(exc)
-                if f"after_phase_{phase['phase']}" in plan.rollback_points:
+                if semantic_violation or f"after_phase_{phase['phase']}" in plan.rollback_points:
                     text = snapshot
                     phase_metrics["rolled_back"] = True
                     rollback_triggered = True
+                if semantic_violation:
+                    phase_metrics["blocking"] = True
+                    phase_results.append(phase_metrics)
+                    break
             phase_results.append(phase_metrics)
             snapshot = text
 
