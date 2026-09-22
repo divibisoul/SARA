@@ -194,6 +194,7 @@ class ITR_Extended(ITR):
         rollback_triggered = False
         snapshot = text
 
+        baseline = self.analyze_semantics(plan.objective)
         for phase in plan.phases:
             phase_metrics: dict = {"phase": phase["phase"], "name": phase["name"]}
             phase_start_len = len(text)
@@ -203,6 +204,17 @@ class ITR_Extended(ITR):
                     if fn is None:
                         raise KeyError(f"passo '{step_name}' não registrado")
                     text = fn(text)
+
+                semantic_delta = self._semantic.compare(plan.objective, text)
+                phase_metrics["semantic_relations_lost"] = len(semantic_delta["relations_lost"])
+                phase_metrics["semantic_entities_lost"] = len(semantic_delta["entity_loss"])
+                # Uma estratégia não pode apagar relações que estavam no objetivo.
+                if semantic_delta["relations_lost"]:
+                    raise RuntimeError(
+                        f"perda semântica na fase {phase['phase']}: "
+                        f"{semantic_delta['relations_lost']}"
+                    )
+
                 phase_metrics["ok"] = True
                 phase_metrics["delta_len"] = len(text) - phase_start_len
             except Exception as exc:
@@ -224,6 +236,10 @@ class ITR_Extended(ITR):
                 "output_len": len(text),
                 "phases": len(plan.phases),
                 "rollbacks": sum(1 for p in phase_results if p.get("rolled_back")),
+                "baseline_semantic_fingerprint": baseline.fingerprint,
+                "semantic_guard_passed": not any(
+                    p.get("semantic_relations_lost", 0) > 0 for p in phase_results
+                ),
             },
         )
 
