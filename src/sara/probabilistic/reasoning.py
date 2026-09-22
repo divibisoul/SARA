@@ -322,7 +322,7 @@ class ProbabilisticReasoningLayer:
         if neural_result is None:
             posterior = dirichlet
             source = "dirichlet"
-            entropy = self.neural.entropy(list(posterior))
+            entropy = self.neural.entropy(list(posterior.values()))
         elif len(neural_result["probabilities"]) != len(states):
             raise ProbabilisticReasoningError(f"NEURAL_STATE_COUNT_MISMATCH:{name}")
         elif evidence is None:
