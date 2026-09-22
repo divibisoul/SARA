@@ -15,6 +15,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from sara.bootstrap import SaraSystem, build_default_system
+from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 
 
 class SaraAPIError(Exception):
@@ -86,10 +87,30 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/capabilities":
                 modules = system.registry.snapshot()["modules"]
+                descriptors = [
+                    CapabilityDescriptor(
+                        name=op.split("@", 1)[0],
+                        version=op.split("@", 1)[1],
+                        operation=op,
+                        endpoint="/v1/" + op.split(".", 1)[1].split("@", 1)[0],
+                        phases=tuple(p.value for p in system.components["loop"].CYCLE_PHASES),
+                        status="IMPLEMENTED",
+                        requires_auth=True,
+                    ).as_dict()
+                    for op in (
+                        "sara.cycle@1.0.0",
+                        "sara.audit@1.0.0",
+                        "sara.regenerate@1.0.0",
+                        "sara.state@1.0.0",
+                        "sara.trace@1.0.0",
+                    )
+                ]
+                identity = FederationIdentity(node_id="SARA", node_name="SARA")
                 self._json(200, {
                     "service": "SARA",
                     "protocol": "sara-http/1",
-                    "contract_version": "1.0",
+                    "contract_version": identity.protocol_version,
+                    "identity": identity.as_dict(),
                     "ready": system.ready,
                     "operations": [
                         "sara.cycle@1.0.0",
@@ -100,6 +121,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
+                    "capability_descriptors": descriptors,
                     "activation": system.registration_report.get("pending", []),
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
