@@ -43,6 +43,43 @@ HISTORICAL_PY_FILES = (
     "audit/cycle_auditor.py",
 )
 
+REQUIRED_SYMBOLS = {
+    "core/ara_extended.py": (
+        "detect_structural", "detect_relational", "detect_semantic",
+        "regenerate_semantic", "meta_audit_complete", "propose_rule_upgrade",
+        "applied_to_self",
+    ),
+    "core/etr_extended.py": (
+        "validate_multi_framework", "validate_against_self",
+        "validate_trinity", "validate_proposal", "explain_decision",
+        "propose_ethical_upgrade",
+    ),
+    "core/itr_extended.py": (
+        "generate_strategic", "execute_composed", "analyze_patterns",
+        "optimize_registry", "propose_trinity_evolution",
+    ),
+    "core/trinity_synergy.py": (
+        "assess", "fuse_and_mirror", "mirror", "audit_mirror",
+        "apply_to", "apply_to_self",
+    ),
+    "meta/eru_engine.py": (
+        "freeze", "checkpoint", "compare", "recover",
+        "detect_information_loss", "reconstructability", "audit",
+    ),
+    "regeneration/regenerative_loop.py": (
+        "run", "_phase_ingestion", "_phase_audit", "_phase_regeneration",
+        "_phase_identity", "_phase_ethics", "_phase_strategy",
+        "_phase_execution", "_phase_validation", "_phase_persistence",
+        "_phase_snapshot", "_phase_monitoring", "_phase_governance",
+    ),
+}
+
+API_MARKERS = (
+    '"/health"', '"/v1/capabilities"', '"/v1/cycle"',
+    '"/v1/audit"', '"/v1/regenerate"', '"/v1/state"',
+)
+
+
 EXTERNAL_BLOCKED_FILES = {
     "security/safe_sandbox.py",
     "research/quantum_crawler.py",
@@ -158,6 +195,38 @@ class EngineeringGate:
 
         return pass_hits, todo_hits, forbidden_hits
 
+    def _required_symbols(self) -> list[GateItem]:
+        items: list[GateItem] = []
+        for rel, symbols in REQUIRED_SYMBOLS.items():
+            path = self.source_root / rel
+            tree = self._ast(path) if path.exists() else None
+            found = set()
+            if tree is not None:
+                found = {
+                    node.name for node in ast.walk(tree)
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                }
+            missing = [s for s in symbols if s not in found]
+            items.append(
+                GateItem(
+                    f"symbols:{rel}",
+                    UNMEASURABLE if missing else REAL,
+                    f"missing={missing}" if missing else f"verified={len(symbols)}",
+                )
+            )
+        http = self.source_root / "service/http_api.py"
+        if http.exists():
+            source = http.read_text(encoding="utf-8")
+            missing_api = [marker for marker in API_MARKERS if marker not in source]
+            items.append(
+                GateItem(
+                    "api_contract_markers",
+                    UNMEASURABLE if missing_api else REAL,
+                    f"missing={missing_api}" if missing_api else "core endpoint markers present",
+                )
+            )
+        return items
+
     def _classify_external_blockers(self) -> list[GateItem]:
         items: list[GateItem] = []
         for rel in sorted(EXTERNAL_BLOCKED_FILES):
@@ -211,6 +280,10 @@ class EngineeringGate:
             # source comments and compatibility helpers must be examined by scope.
             findings.append(f"mock/stub/fake/dummy textual hits: {len(forbidden_hits)}")
         items.append(GateItem("anti_simulation_scan", PARTIAL if forbidden_hits else REAL, f"count={len(forbidden_hits)}"))
+
+        symbol_items = self._required_symbols()
+        items.extend(symbol_items)
+        blockers.extend(i.item for i in symbol_items if i.status == UNMEASURABLE)
 
         external = self._classify_external_blockers()
         items.extend(external)
