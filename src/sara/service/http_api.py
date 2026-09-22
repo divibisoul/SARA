@@ -11,11 +11,15 @@ import hmac
 import uuid
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
+
+_RATE_WINDOW_S = 60
+_RATE_MAX = 60
+_rate_state: dict[str, tuple[int, float]] = {}
 
 
 class SaraAPIError(Exception):
@@ -28,7 +32,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
     server_version = "SARA/3.1.0"
 
     def _runtime(self) -> SaraSystem:
-        return self.server.sara_system  # type: ignore[attr-defined]
+        return cast(SaraHTTPServer, self.server).sara_system
 
     def _json(self, status: int, payload: dict) -> None:
         raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
@@ -43,6 +47,17 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
 
     def _error(self, exc: SaraAPIError) -> None:
         self._json(exc.status, {"error": {"code": exc.code, "message": exc.message, "details": exc.details}})
+
+    def _rate_limit(self) -> None:
+        now = __import__('time').time()
+        key = self.client_address[0] if self.client_address else 'unknown'
+        count, started = _rate_state.get(key, (0, now))
+        if now - started >= _RATE_WINDOW_S:
+            count, started = 0, now
+        count += 1
+        _rate_state[key] = (count, started)
+        if count > _RATE_MAX:
+            raise SaraAPIError(429, 'RATE_LIMITED', 'Limite temporário de requisições excedido.', {'window_seconds': _RATE_WINDOW_S, 'max_requests': _RATE_MAX})
 
     def _authorized(self, path: str) -> None:
         if path == "/health":
@@ -70,6 +85,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             self._authorized(path)
+            self._rate_limit()
             system = self._runtime()
             if path == "/health":
                 self._json(200, {
