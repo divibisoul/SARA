@@ -65,8 +65,23 @@ Operações versionadas:
 - sara.regenerate@1.0.0
 - sara.state@1.0.0
 - sara.trace@1.0.0
+- sara.health@1.0.0
 
 ## Regra de maturidade
 
 IMPLEMENTED só pode ser usado quando a lógica local correspondente existe.
 Capacidades externas não são promovidas a IMPLEMENTED sem backend real, credencial, execução verificável e reauditoria.
+## Conexão SOUL ↔ SARA — contrato federado
+
+A conexão com o SOUL é aditiva: SARA continua autoridade de ARA/ETR/ITR, ERU, memória, proveniência, rastreabilidade e governança; os núcleos SOUL continuam proprietários de suas capacidades nativas. A afinidade abaixo define onde as funções se complementam, não transferência de propriedade.
+
+| Núcleo | Funções SOUL relacionadas | Operações SARA com maior afinidade | Complemento SARA |
+|---|---|---|---|
+| N01 | gateway, Android, runtime/host, observabilidade | sara.health, sara.capabilities, sara.state, sara.trace, sara.cycle | ConnectedRuntime, DecisionTrace, GovernanceBackend |
+| N02 | conversação, interação, cognição | sara.audit, sara.cycle, sara.regenerate, sara.trace | ARA_Extended, ETR_Extended, ITR_Extended |
+| N03 | percepção, voz, multimodalidade | sara.audit, sara.regenerate, sara.trace | ARA_Extended, ETR_Extended, SafeSandbox |
+| N04 | ferramentas, documentos, artefatos | sara.audit, sara.regenerate, sara.cycle, sara.trace | ARA_Extended, ETR_Extended, LegalAI, ProvenanceTracker |
+| N05 | orquestração, despacho, execução | sara.cycle, sara.audit, sara.regenerate, sara.trace | TrinityERUUnified, ConnectedRuntime, CycleAuditor |
+| N06 | cognição, síntese, auditoria, governança | sara.audit, sara.state, sara.trace, sara.regenerate, sara.cycle | ERU_Engine, GovernedSARA, DecisionTrace, ProvenanceTracker |
+
+**Prova de conexão:** manifesto = contrato; configuração = URL + credencial; conexão = requisição HTTP real + resposta válida + correlação; falha = erro explícito. Declaração de afinidade não conta como execução.
