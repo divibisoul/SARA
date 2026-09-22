@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 import uuid
 from typing import Any
 
@@ -47,32 +48,99 @@ class SoulETROmegaSystem:
             "hal": self.adapter.capabilities().__dict__,
         }
 
-    def run_cycle(self, facts: dict[str, Any] | None = None) -> OmegaCycleReport:
-        cycle_id = f"omega-{uuid.uuid4().hex[:12]}"
+    def run_cycle(
+        self,
+        facts: dict[str, Any] | None = None,
+        cycle_id: str | None = None,
+    ) -> OmegaCycleReport:
+        cycle_id = cycle_id or f"omega-{uuid.uuid4().hex[:12]}"
+        facts_map = dict(facts or {})
         metrics = self.scanner.scan()
-        context = ETRContext(cycle_id, metrics, dict(facts or {}))
+        context = ETRContext(cycle_id, metrics, facts_map)
         reports = self.etr.analyze(context)
         reality = next((r for r in reports if r.nucleus == "ETR_RealityFilterNucleus"), None)
         if reality is not None and not reality.ok:
             raise RuntimeError("OMEGA_REALITY_FILTER_REJECTED")
+
+        habit_evidence: dict[str, Any] = {}
+        habit_key = facts_map.get("habit_key")
+        if isinstance(habit_key, str) and habit_key.strip():
+            habit_evidence["observation"] = self.habits.observe(
+                habit_key,
+                context=facts_map.get("habit_context") if isinstance(facts_map.get("habit_context"), dict) else {},
+            )
+        candidates = facts_map.get("habit_candidates")
+        if isinstance(candidates, list):
+            normalized = [str(item).strip() for item in candidates if str(item).strip()]
+            if normalized:
+                habit_evidence["predictions"] = self.habits.predict(normalized)
+
+        anticipation_context: dict[str, Any] = {}
+        battery = context.metric("battery_percent")
+        if battery is not None:
+            anticipation_context["battery_percent"] = battery.value
+        for key in ("network", "hour"):
+            if key in facts_map:
+                anticipation_context[key] = facts_map[key]
+        if anticipation_context:
+            anticipation = self.anticipation.anticipate(anticipation_context)
+        else:
+            anticipation = {"recommendations": [], "evidence": {}, "reason": "no_context_supplied"}
+
         plan = self.etr.build_plan(context, reports)
         results = self.etr.execute(plan)
         success = all(r.get("ok", False) for r in results) if results else True
         health = self._health(metrics)
-        state = self.micro_macro.transition(health_score=health, completed=self.micro_macro.completed + 1)
+
+        explicit_completed = facts_map.get("completed_cycles")
+        if isinstance(explicit_completed, (int, float)) and math.isfinite(float(explicit_completed)):
+            completed = max(0, int(explicit_completed))
+            completion_source = "explicit_fact"
+        else:
+            completed = self.micro_macro.completed + 1
+            completion_source = "omega_cycle_count"
+        state = self.micro_macro.transition(health_score=health, completed=completed)
+
         arm = self.etr.adaptive.choose()
-        adaptation = self.etr.adaptive.update(arm, reward=(0.5 if success else -0.5))
-        self.audit_log.append("omega_cycle", cycle_id=cycle_id, ok=success, health_score=health)
+        observed_reward = facts_map.get("observed_reward")
+        if isinstance(observed_reward, (int, float)) and math.isfinite(float(observed_reward)):
+            adaptation = self.etr.adaptive.update(arm, reward=float(observed_reward))
+            adaptation["updated"] = True
+            adaptation["reward_source"] = "external_observation"
+        else:
+            adaptation = {
+                "arm": arm,
+                "updated": False,
+                "reason": "no_observed_reward",
+            }
+
+        adaptation["phase_state"] = state
+        self.audit_log.append(
+            "omega_cycle",
+            cycle_id=cycle_id,
+            ok=success,
+            health_score=health,
+            adaptive_updated=bool(adaptation.get("updated")),
+        )
         report = OmegaCycleReport(
             cycle_id=cycle_id, ok=success,
             analysis=reports, plan=plan,
             results=tuple(self._result_objects(results)),
-            adaptation={**adaptation, "phase_state": state},
+            adaptation=adaptation,
             evidence={
                 "metrics": [m.__dict__ for m in metrics],
                 "health_score": health,
                 "scanner": self.scanner.NAME,
                 "permissions": [p.__dict__ for p in self.permissions.inspect()],
+                "facts": dict(facts_map),
+                "parent_cycle_id": facts_map.get("parent_cycle_id"),
+                "habit": habit_evidence,
+                "anticipation": anticipation,
+                "micro_macro": {
+                    "state": state,
+                    "completed": self.micro_macro.completed,
+                    "completion_source": completion_source,
+                },
             },
         )
         self._last = report
