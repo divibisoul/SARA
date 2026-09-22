@@ -90,17 +90,11 @@ class SafeSandbox:
 
     def execute(self, code: str, timeout_s: float = 5.0, limits: dict | None = None) -> SandboxResult:
         if self._isolation is None:
-            raise NotImplementedError(
-                "SafeSandbox.execute requer backend de isolamento real "
-                "(Docker, Firecracker, nsjail, bubblewrap ou similar). "
-                "Nenhum backend foi injetado em SafeSandbox(isolation_backend=...). "
-                "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('SafeSandbox')."
-            )
+            raise RuntimeError("SAFE_SANDBOX_NOT_CONFIGURED")
         executor = getattr(self._isolation, "execute", None)
         if not callable(executor):
-            raise NotImplementedError(
-                f"SafeSandbox.execute: backend '{type(self._isolation).__name__}' "
-                "não expõe execute(code, timeout_s, limits)."
+            raise RuntimeError(
+                f"SAFE_SANDBOX_BACKEND_INVALID:{type(self._isolation).__name__}"
             )
         result = executor(code, timeout_s, limits or {})
         if not isinstance(result, SandboxResult):
@@ -111,14 +105,11 @@ class SafeSandbox:
 
     def terminate(self, execution_id: str) -> None:
         if self._isolation is None:
-            raise NotImplementedError(
-                "SafeSandbox.terminate requer backend de isolamento ativo."
-            )
+            raise RuntimeError("SAFE_SANDBOX_NOT_CONFIGURED")
         terminator = getattr(self._isolation, "terminate", None)
         if not callable(terminator):
-            raise NotImplementedError(
-                f"SafeSandbox.terminate: backend '{type(self._isolation).__name__}' "
-                "não expõe terminate(execution_id)."
+            raise RuntimeError(
+                f"SAFE_SANDBOX_BACKEND_INVALID:{type(self._isolation).__name__}"
             )
         terminator(execution_id)
 
