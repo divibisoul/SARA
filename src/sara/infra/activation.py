@@ -12,6 +12,7 @@ from typing import Any
 
 from sara.security.safe_sandbox import IsolationBackend, SandboxResult
 from sara.research.quantum_crawler import CrawlBackend, HTTPJSONBackend
+from sara.governance.legal_ai import HTTPPatentOracle, PatentOracle
 
 
 @dataclass
@@ -97,12 +98,24 @@ def network_crawler_backends_from_environment() -> list[CrawlBackend]:
     return backends
 
 
+def patent_oracle_from_environment() -> PatentOracle | None:
+    endpoint = os.getenv("SARA_PATENT_ORACLE_URL", "").strip()
+    if not endpoint:
+        return None
+    try:
+        return HTTPPatentOracle(endpoint)
+    except ValueError:
+        return None
+
+
 def environment_activation_report() -> dict[str, Any]:
     docker = docker_backend_from_environment()
     crawlers = network_crawler_backends_from_environment()
+    patent_oracle = patent_oracle_from_environment()
     return {
         "safe_sandbox": {"ready": docker is not None, "backend": type(docker).__name__ if docker else None},
         "quantum_crawler": {"ready": bool(crawlers), "backends": [type(b).__name__ for b in crawlers]},
+        "legal_ai": {"patent_oracle_ready": patent_oracle is not None, "oracle": type(patent_oracle).__name__ if patent_oracle else None},
         "github_token_present": bool(os.getenv("GITHUB_TOKEN", "").strip()),
         "hf_token_present": bool(os.getenv("HF_TOKEN", "").strip()),
     }
