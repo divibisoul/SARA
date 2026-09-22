@@ -67,7 +67,21 @@ class ConnectedRuntime:
 
     def validate_connection(self) -> dict:
         report = self._validator.validate_registry(self._registry)
-        order = self._registry.dependency_order()
+        try:
+            order = self._registry.dependency_order()
+        except Exception as exc:
+            invariant_payload = report.as_dict()
+            invariant_payload["ok"] = False
+            invariant_payload["blocking_failures"] = [
+                *invariant_payload.get("blocking_failures", []),
+                f"dependency_graph:{type(exc).__name__}:{exc}",
+            ]
+            return {
+                "ok": False,
+                "invariants": invariant_payload,
+                "dependency_order": [],
+                "connected_count": 0,
+            }
         return {
             "ok": report.ok,
             "invariants": report.as_dict(),
