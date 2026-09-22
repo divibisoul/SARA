@@ -95,7 +95,13 @@ class TrinitySynergy:
             lexical_flaws = self._ara.detect(current)
             structural_flaws = self._ara.detect_structural(current)
             relational_flaws = self._ara.detect_relational(current)
-            all_flaws = list(lexical_flaws) + list(relational_flaws)
+            semantic_flaws = self._ara.detect_semantic(current)
+            all_flaws = (
+                list(lexical_flaws)
+                + list(semantic_flaws)
+                + list(relational_flaws)
+                + list(structural_flaws)
+            )
 
             # 2. ITR gera plano estratégico
             plan = self._itr.generate_strategic(current)
@@ -116,7 +122,7 @@ class TrinitySynergy:
             post_regeneration = self._etr.validate_multi_framework(current)
 
             # 6. ITR executa
-            result = self._itr.execute_composed(plan)
+            result = self._itr.execute_composed(plan, initial_text=current)
             current = result.transformed
             executed = not result.rollback_triggered
 
@@ -149,6 +155,7 @@ class TrinitySynergy:
                     "post_regeneration_ethical": post_regeneration.approved,
                     "post_execution_ethical": post_execution.approved,
                     "rollback_triggered": result.rollback_triggered,
+                    "semantic_flaws": [f.kind for f in semantic_flaws],
                     "metrics": result.metrics,
                 },
             )
