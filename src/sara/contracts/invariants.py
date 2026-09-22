@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any
 from sara.contracts.base import CyclePhase, ModuleStatus
 from sara.contracts.lifecycle import CANONICAL_ORDER
+from sara.infra.hashing import hash_json
 
 
 @dataclass(frozen=True)
@@ -172,6 +173,35 @@ class InvariantValidator:
         if ctx.aborted:
             checks.append(InvariantCheck(
                 "abort_reason_present", bool(ctx.abort_reason), True, ctx.abort_reason
+            ))
+
+        fusion = getattr(ctx, "fusion", None)
+        if fusion is not None:
+            checks.append(InvariantCheck(
+                "fusion_cycle_identity",
+                fusion.cycle_id == ctx.cycle_id and fusion.version >= 1,
+                True,
+                f"cycle_id={fusion.cycle_id};version={fusion.version}",
+            ))
+            checks.append(InvariantCheck(
+                "fusion_target_hash_matches_context",
+                hash_json(ctx.current) == fusion.target_hash,
+                True,
+                "ok" if hash_json(ctx.current) == fusion.target_hash else "target_hash_mismatch",
+            ))
+            component_hashes_present = all(
+                bool(getattr(fusion, name, ""))
+                for name in ("ara_hash", "etr_hash", "itr_hash", "fused_hash")
+            )
+            checks.append(InvariantCheck(
+                "fusion_component_hashes_present",
+                component_hashes_present,
+                True,
+            ))
+            checks.append(InvariantCheck(
+                "fusion_integrity_ok",
+                bool(fusion.integrity_ok),
+                True,
             ))
 
         failures = tuple(c.name for c in checks if c.blocking and not c.ok)
