@@ -264,11 +264,13 @@ class RegenerativeLoop:
 
     def _phase_audit(self, ctx, cycle):
         lexical = list(self._ara.detect(ctx.current))
+        semantic = list(getattr(self._ara, "detect_semantic", lambda _t: [])(ctx.current))
         structural = list(getattr(self._ara, "detect_structural", lambda _t: [])(ctx.current))
         relational = list(getattr(self._ara, "detect_relational", lambda _t: [])(ctx.current))
-        cycle["_flaws"] = lexical + relational
+        cycle["_flaws"] = lexical + semantic + relational + structural
         cycle["phases"]["audit"] = {
             "lexical": [f.kind for f in lexical],
+            "semantic": [f.kind for f in semantic],
             "structural": [f.kind for f in structural],
             "relational": [f.kind for f in relational],
         }
