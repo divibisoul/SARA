@@ -254,7 +254,7 @@ class ETR_Extended(ETR):
 
     def explain_decision(self, text: str,
                           mode: Literal["default", "strict"] = "default") -> DecisionExplanation:
-        """Gera cadeia de raciocínio completa para a decisão."""
+        """Gera cadeia de decisão observável e verificável para a decisão."""
         result = self.validate(text, mode=mode)
         chain: list[str] = []
 
