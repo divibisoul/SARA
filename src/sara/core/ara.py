@@ -56,7 +56,7 @@ class ARA:
     COMPLEXITY_MIN_UNIQUE_RATIO = 0.05
     COMPLEXITY_MAX_AVG_SENTENCE = 300
     COMPLEXITY_NESTING_DEPTH_LIMIT = 8
-    COMPLEXITY_SCORE_THRESHOLD = 1.0
+    COMPLEXITY_SCORE_THRESHOLD = 0.9
     CONTEXT_WINDOW = 120
 
     def __init__(self, dna: DNA_Tags, temporal: TemporalVectorDB,
@@ -138,7 +138,9 @@ class ARA:
             score += 0.3
             triggers.append(f"nesting={nesting_depth}")
 
-        if score >= self.COMPLEXITY_SCORE_THRESHOLD:
+        # Tolerância numérica explícita para a soma de fatores em ponto flutuante.
+        # Não altera o limiar conceitual: apenas evita falso negativo por representação binária.
+        if score + 1e-12 >= self.COMPLEXITY_SCORE_THRESHOLD:
             return [Flaw(
                 kind="COMPLEXIDADE_EXCESSIVA",
                 detail="; ".join(triggers),

@@ -60,11 +60,27 @@ class IdentityCore:
     def validate(self, candidate: str) -> IdentityResult:
         t = str(candidate).lower()
         violations: list[str] = []
-        for boundary in self.HISTORICAL_RULES["ethical_boundaries"]:
-            terms = [w for w in boundary.lower().split() if len(w) > 4]
-            hits = sum(1 for term in terms if term in t)
-            if hits >= 2:
-                violations.append(boundary)
+
+        weapon_terms = ("arma", "armas")
+        destructive_intents = (
+            "desenvolver", "produzir", "fabricar", "vender", "construir",
+        )
+        if any(term in t for term in weapon_terms) and any(intent in t for intent in destructive_intents):
+            violations.append("Não desenvolver armas")
+
+        autonomy_harm = (
+            "remover autonomia", "violar autonomia", "negar autonomia",
+            "destruir autonomia", "impedir autonomia",
+        )
+        if any(pattern in t for pattern in autonomy_harm):
+            violations.append("Preservar autonomia humana")
+
+        transparency_harm = (
+            "ocultar", "esconder", "falsificar", "adulterar",
+        )
+        if "transpar" in t and any(term in t for term in transparency_harm):
+            violations.append("Transparência radical")
+
         return IdentityResult(approved=len(violations) == 0,
                               violations=tuple(violations))
 

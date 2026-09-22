@@ -19,6 +19,9 @@ class FederationIdentity:
     node_name: str = "SARA"
     protocol_version: str = "1.0"
 
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
 
 @dataclass(frozen=True)
 class IntentEnvelope:
@@ -65,6 +68,9 @@ class CapabilityDescriptor:
     requires_auth: bool = True
     requires_external_infrastructure: bool = False
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True)

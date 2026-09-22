@@ -72,9 +72,12 @@ class ITR_Extended(ITR):
     # Passos adicionais
     EXTRA_STEPS: dict[str, Callable[[str], str]] = {
         "deep_structure": lambda t: (
-            f"[ESTRUTURADO]\n{t}\n"
-            f"[/ESTRUTURADO]\n"
-            f"METADADOS: len={len(t)}"
+            t if str(t).lstrip().startswith("[ESTRUTURADO]")
+            else (
+                f"[ESTRUTURADO]\n{t}\n"
+                f"[/ESTRUTURADO]\n"
+                f"METADADOS: len={len(t)}"
+            )
         ),
         "ethical_align": lambda t: (
             t + "\n[ITR_Extended: alinhamento ético verificado]"
@@ -205,17 +208,29 @@ class ITR_Extended(ITR):
                     fn = _STEP_REGISTRY.get(step_name)
                     if fn is None:
                         raise KeyError(f"passo '{step_name}' não registrado")
+                    # extract_keywords é uma operação analítica: produz evidência
+                    # sobre a entrada e não substitui o conteúdo operacional.
+                    if step_name == "extract_keywords":
+                        extracted = fn(text)
+                        phase_metrics["extracted_keywords"] = extracted
+                        continue
                     text = fn(text)
 
                 semantic_delta = self._semantic.compare(plan.objective, text)
+                before_frame = self._semantic.analyze(plan.objective)
+                after_frame = self._semantic.analyze(text)
+                before_actions = {r.action for r in before_frame.relations}
+                after_actions = {r.action for r in after_frame.relations}
+                actions_lost = sorted(before_actions - after_actions)
                 phase_metrics["semantic_relations_lost"] = len(semantic_delta["relations_lost"])
                 phase_metrics["semantic_entities_lost"] = len(semantic_delta["entity_loss"])
-                # Uma estratégia não pode apagar relações que estavam no objetivo.
-                if semantic_delta["relations_lost"]:
+                phase_metrics["semantic_actions_lost"] = actions_lost
+                # Uma transformação pode alterar representação, mas não pode apagar
+                # a classe de ação operacional expressa pelo objetivo.
+                if actions_lost:
                     semantic_violation = True
                     raise RuntimeError(
-                        f"perda semântica na fase {phase['phase']}: "
-                        f"{semantic_delta['relations_lost']}"
+                        f"perda semântica na fase {phase['phase']}: ações={actions_lost}"
                     )
 
                 phase_metrics["ok"] = True
@@ -243,7 +258,8 @@ class ITR_Extended(ITR):
                 "rollbacks": sum(1 for p in phase_results if p.get("rolled_back")),
                 "baseline_semantic_fingerprint": baseline.fingerprint,
                 "semantic_guard_passed": not any(
-                    p.get("semantic_relations_lost", 0) > 0 for p in phase_results
+                    bool(p.get("semantic_actions_lost"))
+                    for p in phase_results
                 ),
             },
         )

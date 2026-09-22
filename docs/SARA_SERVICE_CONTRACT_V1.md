@@ -18,7 +18,7 @@ SARA permanece operacional como monólito modular. A fronteira HTTP é uma camad
 Resposta 200:
 
 ```json
-{"status":"ok","ready":true,"version":"3.1.0","protocol":"sara-http/1","invariants_ok":true,"trace_integrity":true,"provenance_integrity":true,"rollback_chain_integrity":true}
+{"service":"SARA","status":"ok","ready":true,"version":"3.1.0","protocol":"sara-http/1","invariants_ok":true,"trace_integrity":true,"provenance_integrity":true,"rollback_chain_integrity":true}
 ```
 
 ### GET /v1/capabilities
@@ -41,7 +41,7 @@ Request:
 {"input":"texto a processar","cycle_id":"opcional-id"}
 ```
 
-Executa o ciclo regenerativo completo no runtime real e retorna convergência, rollback, estado final, evidência e hash de trace.
+Executa o ciclo regenerativo completo no runtime real e retorna convergência, rollback, estado final, evidência, hash de trace e o espelho versionado ARA/ETR/ITR/ERU quando o ciclo o produzir.
 
 ### POST /v1/audit
 
@@ -69,7 +69,11 @@ Retorna estado observável do SistemaVivo, histórico, trace, registry e proveni
 
 ### GET /v1/trace/{cycle_id}
 
-Retorna entradas encadeadas do DecisionTrace daquele ciclo, registros temporais relacionados e integridade de trace/proveniência.
+Retorna entradas encadeadas do DecisionTrace daquele ciclo, registros temporais relacionados e integridade de trace/proveniência. O ID pode conter caracteres percent-encoded.
+
+### Estado de fusão
+
+Cada iteração do ciclo mantém um espelho versionado ARA/ETR/ITR/ERU. A versão, os hashes dos três subsistemas, os hashes dos snapshots ERU e o hash final da fusão são preservados no estado observável do ciclo. Divergência do espelho é tratada como falha de validação e evento regenerativo, com rollback antes de nova tentativa.
 
 ## Erros
 
