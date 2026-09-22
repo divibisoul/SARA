@@ -120,10 +120,13 @@ class QuantumCrawler:
         return [c for c in candidates if c.name]
 
     def scan(self, query: str) -> list[TechCandidate]:
+        if not str(query).strip():
+            raise ValueError("query não pode ser vazia")
+        if self._backends:
+            return self.scan_configured(query)
         raise NotImplementedError(
-            "QuantumCrawler.scan requer backends reais de rede (GitHub API, "
-            "HuggingFace API, arXiv API) com credenciais e rate limiting. "
-            "Nenhum backend está configurado. "
+            "QuantumCrawler.scan requer pelo menos um backend de rede real. "
+            "Use HTTPJSONBackend(endpoint_template=...) ou backend equivalente. "
             "Ativação: ver CANONICAL_ACTIVATION_PLAN.for_module('QuantumCrawler')."
         )
 
