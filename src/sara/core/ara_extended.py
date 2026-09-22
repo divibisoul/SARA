@@ -296,6 +296,11 @@ class ARA_Extended(ARA):
         return plan
 
     @staticmethod
+    def _annotate_complexity(text: str) -> str:
+        marker = "[ARA_Extended: complexidade sinalizada — conteúdo preservado integralmente]"
+        return text if marker in text else text + "\n" + marker
+
+    @staticmethod
     def _annotate_semantic_guard(text: str) -> str:
         marker = "[ARA_Extended: guardrail semântico preservou o conteúdo original]"
         return text if marker in text else text + "\n" + marker
