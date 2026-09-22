@@ -4,6 +4,7 @@ Status: IMPLEMENTED (análise estática) | PENDING_INFRASTRUCTURE (execução is
 from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
+from typing import Protocol
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 
