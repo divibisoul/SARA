@@ -99,7 +99,12 @@ def test_capabilities_include_federation_identity_and_trace():
         assert trace_descriptor["endpoint"] == "/v1/trace/{cycle_id}"
         federation = payload["soul_federation"]
         assert federation["contract_version"] == "1.0.0"
-        assert {item["nucleus"] for item in federation["nucleus_affinities"]} == {"N01","N02","N03","N04","N05","N06"}
+        assert {item["nucleus"] for item in federation["nucleus_affinities"]} == {"N01", "N02", "N03", "N04", "N05", "N06", "N07"}
+        memory_layers = payload["memory_layers"]
+        assert memory_layers["working"]["layer"] == "working_memory"
+        assert memory_layers["working"]["storage_scope"] == "process_ram_bounded"
+        assert memory_layers["episodic"]["name"] == "RegenerativeMemory"
+        assert memory_layers["semantic_vector"]["name"] == "TemporalVectorDB"
     finally:
         server.shutdown()
         server.server_close()
