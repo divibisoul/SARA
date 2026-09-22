@@ -189,6 +189,7 @@ class RegenerativeLoop:
                     report.rollback_performed = restored.restored
                     if restored.restored:
                         ctx.current = restored.state.get("input", ctx.input)
+                        ctx.fusion = None
                         state.transition(CycleState.ROLLED_BACK, "max_iterations_without_convergence", now_iso())
             except _Aborted as exc:
                 ctx.abort(f"{exc.phase}:{exc.reason}")
@@ -197,6 +198,7 @@ class RegenerativeLoop:
                 report.rollback_performed = restored.restored
                 if restored.restored:
                     ctx.current = restored.state.get("input", ctx.input)
+                    ctx.fusion = None
 
                 # Divergência do espelho é tratada como evento regenerativo RGO:
                 # rollback do estado inválido, registro do evento e nova iteração.
@@ -225,6 +227,7 @@ class RegenerativeLoop:
                 report.rollback_performed = restored.restored
                 if restored.restored:
                     ctx.current = restored.state.get("input", ctx.input)
+                    ctx.fusion = None
                 state.transition(CycleState.ROLLED_BACK if restored.restored else CycleState.ABORTED,
                                  str(exc), now_iso())
                 report.cycles.append(cycle)
