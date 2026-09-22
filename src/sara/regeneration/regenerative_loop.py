@@ -178,12 +178,14 @@ class RegenerativeLoop:
                     "flaws": [f.kind for f in post_flaws],
                 }
 
-                converged = (
-                    post_etr.approved
-                    and not post_flaws
-                    and bool(ctx.flags.get("execution_ok", False))
-                    and invariant_report.ok
-                )
+                convergence_checks = {
+                    "post_etr_approved": bool(post_etr.approved),
+                    "post_flaws_empty": not bool(post_flaws),
+                    "execution_ok": bool(ctx.flags.get("execution_ok", False)),
+                    "invariants_ok": bool(invariant_report.ok),
+                }
+                cycle["convergence_checks"] = convergence_checks
+                converged = all(convergence_checks.values())
                 cycle["converged"] = converged
                 report.cycles.append(cycle)
 
