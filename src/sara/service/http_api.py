@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
+from sara.meta.soul_federation import federation_manifest
 
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
@@ -171,6 +172,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
+                    "soul_federation": federation_manifest(),
                 })
                 return
             if path == "/v1/state":
