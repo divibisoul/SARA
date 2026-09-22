@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import threading
 from dataclasses import dataclass, field
 from typing import Any
@@ -107,7 +108,7 @@ class ClareiraSubsystem:
             number = float(value)
         except (TypeError, ValueError):
             return default
-        return number
+        return number if math.isfinite(number) else default
 
     @classmethod
     def _validate_snapshot(cls, snapshot: dict[str, Any]) -> None:
@@ -134,7 +135,7 @@ class ClareiraSubsystem:
             if not isinstance(device, dict):
                 raise ValueError("CLAREIRA_DEVICE_STATE_INVALID")
             battery = device.get("batteryPercent")
-            if not isinstance(battery, (int, float)) or not 0 <= float(battery) <= 100:
+            if not isinstance(battery, (int, float)) or not math.isfinite(float(battery)) or not 0 <= float(battery) <= 100:
                 raise ValueError("CLAREIRA_DEVICE_BATTERY_INVALID")
             if not isinstance(device.get("charging"), bool):
                 raise ValueError("CLAREIRA_DEVICE_CHARGING_INVALID")
