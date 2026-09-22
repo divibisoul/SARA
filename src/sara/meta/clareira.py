@@ -171,6 +171,35 @@ class ClareiraSubsystem:
         ]
         if len(channel_ids) != 120 or len(set(channel_ids)) != 120:
             raise ValueError("CLAREIRA_TOPOLOGY_CHANNEL_IDS_INVALID")
+
+        central_ids = {
+            str(node.get("id"))
+            for node in snapshot["nodes"]
+            if node.get("level") == "Central"
+        }
+        primary_ids = [
+            str(node.get("id"))
+            for node in snapshot["nodes"]
+            if node.get("level") == "Primary"
+        ]
+        secondary_ids = [
+            str(node.get("id"))
+            for node in snapshot["nodes"]
+            if node.get("level") == "Secondary"
+        ]
+        if central_ids != {"NC-001"} or len(primary_ids) != 12 or len(secondary_ids) != 48:
+            raise ValueError("CLAREIRA_TOPOLOGY_LEVEL_DISTRIBUTION_INVALID")
+
+        expected_channels: set[str] = set()
+        for primary in primary_ids:
+            expected_channels.add(f"ch_{primary}_NC-001")
+            expected_channels.add(f"ch_NC-001_{primary}")
+        for index, secondary in enumerate(secondary_ids):
+            primary = primary_ids[index // 4]
+            expected_channels.add(f"ch_{secondary}_{primary}")
+            expected_channels.add(f"ch_{primary}_{secondary}")
+        if set(channel_ids) != expected_channels:
+            raise ValueError("CLAREIRA_TOPOLOGY_CHANNEL_WIRING_INVALID")
         device = snapshot.get("deviceState")
         if device is not None:
             if not isinstance(device, dict):
