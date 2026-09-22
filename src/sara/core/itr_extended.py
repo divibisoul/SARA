@@ -140,13 +140,12 @@ class ITR_Extended(ITR):
                             context: dict | None = None) -> StrategicPlan:
         """Gera plano multi-fase com critérios de convergência."""
         ctx = dict(context or {})
-        base = self._analyze(objective)
+        self._analyze(objective)
         semantic = self.semantic_strategy_profile(objective)
 
         if ctx.get("clean_state"):
-            # Um estado já sem falhas não deve ser degradado por reprocessamento.
-            # Mantemos as quatro fases para preservar o contrato observável,
-            # mas as fases mutáveis passam a ser estabilizadoras.
+            # Estado já auditado como limpo: manter as quatro fases observáveis
+            # sem voltar a transformar o conteúdo indefinidamente.
             phases = (
                 {
                     "phase": 1, "name": "normalize",
@@ -171,31 +170,29 @@ class ITR_Extended(ITR):
                 },
             )
         else:
-        phases = [
-            {
-                "phase": 1, "name": "normalize",
-                "steps": ["normalize"],
-                "purpose": "estabilizar entrada",
-            },
-            {
-                "phase": 2, "name": "extract",
-                "steps": ["extract_keywords"],
-                "purpose": "isolar núcleo semântico",
-                "semantic_profile": semantic,
-            },
-            {
-                "phase": 3, "name": "structure",
-                "steps": ["structure", "deep_structure"],
-                "purpose": "organizar e enquadrar",
-            },
-            {
-                "phase": 4, "name": "guard",
-                "steps": ["guardrails", "ethical_align", "resilience_check"],
-                "purpose": "aplicar guardrails éticos e de resiliência",
-            },
-        ]
-
-            phases = tuple(phases)
+            phases = (
+                {
+                    "phase": 1, "name": "normalize",
+                    "steps": ["normalize"],
+                    "purpose": "estabilizar entrada",
+                },
+                {
+                    "phase": 2, "name": "extract",
+                    "steps": ["extract_keywords"],
+                    "purpose": "isolar núcleo semântico",
+                    "semantic_profile": semantic,
+                },
+                {
+                    "phase": 3, "name": "structure",
+                    "steps": ["structure", "deep_structure"],
+                    "purpose": "organizar e enquadrar",
+                },
+                {
+                    "phase": 4, "name": "guard",
+                    "steps": ["guardrails", "ethical_align", "resilience_check"],
+                    "purpose": "aplicar guardrails éticos e de resiliência",
+                },
+            )
 
         criteria = (
             "output_maior_que_input",
@@ -203,7 +200,6 @@ class ITR_Extended(ITR):
             "guardrails_presentes",
             "alinhamento_ético_confirmado",
         )
-
         rollbacks = ("after_phase_2", "after_phase_3")
 
         return StrategicPlan(
