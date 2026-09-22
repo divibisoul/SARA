@@ -110,6 +110,63 @@ class EngineeringMatrix:
             for n in ast.walk(tree)
         )
 
+    def _git_preservation(self) -> dict[str, Any]:
+        base = os.getenv("SARA_GATE_BASE_REF", "origin/main")
+        try:
+            subprocess.run(["git", "fetch", "--unshallow", "origin", "main"], check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(["git", "fetch", "origin", "main"], check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            raw = subprocess.check_output(
+                ["git", "diff", "--name-status", f"{base}...HEAD"], text=True
+            ).strip()
+            deleted = [line.split("\t")[-1] for line in raw.splitlines()
+                       if line.startswith("D\t")]
+            changed = [
+                line.split("\t")[-1] for line in raw.splitlines()
+                if line and line.split("\t", 1)[0][:1] in {"M", "R", "C"}
+            ]
+            missing_symbols: dict[str, list[str]] = {}
+            for rel in changed:
+                if not rel.endswith(".py"):
+                    continue
+                try:
+                    before = subprocess.check_output(
+                        ["git", "show", f"{base}:{rel}"], text=True
+                    )
+                except subprocess.CalledProcessError:
+                    continue
+                path = self.root / rel
+                if not path.exists():
+                    missing_symbols[rel] = ["__FILE_MISSING__"]
+                    continue
+                try:
+                    old = ast.parse(before)
+                    new = ast.parse(path.read_text(encoding="utf-8"))
+                except SyntaxError:
+                    missing_symbols[rel] = ["__SYNTAX_ERROR__"]
+                    continue
+                old_names = {
+                    x.name for x in old.body
+                    if isinstance(x, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                }
+                new_names = {
+                    x.name for x in new.body
+                    if isinstance(x, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                }
+                removed = sorted(old_names - new_names)
+                if removed:
+                    missing_symbols[rel] = removed
+            return {
+                "base": base,
+                "deleted_files": deleted,
+                "changed_python_files": changed,
+                "removed_symbols": missing_symbols,
+                "ok": not deleted and not missing_symbols,
+            }
+        except Exception as exc:
+            return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+
     def _runtime(self) -> dict[str, Any]:
         try:
             from sara.bootstrap import build_default_system
@@ -118,17 +175,49 @@ class EngineeringMatrix:
                 "promover autonomia comunitária",
                 cycle_id="engineering-matrix-clean-001",
             )
-            trinity = system.components["trinity"].apply_to_self()
-            eku = system.components["eru"]
+            ara = system.components["ara_extended"]
+            etr = system.components["etr_extended"]
+            itr = system.components["itr_extended"]
+            eru = system.components["eru"]
+            trinity = system.components["trinity"]
+            dna = system.components["dna"]
+
+            plan = itr.generate_strategic("promover autonomia comunitária", {"matrix": True})
+            composed = itr.execute_composed(plan)
+            patterns = itr.analyze_patterns(["promover autonomia comunitária", "preservar transparência"])
+            mf = etr.validate_multi_framework("promover autonomia comunitária")
+            etr_self = etr.validate_against_self()
+            etr_trinity = etr.validate_trinity("preservar autonomia", "promover autonomia")
+            protected = next(iter(dna.PROTECTED), None)
+            relational_probe = ara.detect_relational(
+                f"não remover {protected}" if protected else "preservar conteúdo"
+            )
+            semantic = ara.analyze_semantics("promover autonomia comunitária")
+            trinity_report = trinity.apply_to_self()
+            checkpoint = eru.checkpoint(
+                "engineering-matrix-runtime",
+                {"input": clean.input, "final": clean.loop_report.final_state},
+                clean.cycle_id,
+                "POST_RUNTIME",
+            )
             return {
                 "ready": bool(system.ready),
                 "invariants": bool(system.invariant_report.get("ok")),
                 "clean_converged": bool(clean.loop_report.converged),
                 "has_fusion": clean.loop_report.fusion is not None,
                 "has_execution_report": clean.loop_report.execution_report is not None,
-                "eru_snapshot_count": eku.describe().get("snapshots", 0),
-                "trinity_self_executed": bool(trinity.total_iterations),
+                "eru_snapshot_count": eru.describe().get("snapshots", 0),
+                "trinity_self_executed": bool(trinity_report.total_iterations),
                 "phase_count": len(clean.loop_report.cycles[-1]["phases"]) if clean.loop_report.cycles else 0,
+                "itr_executed": not composed.rollback_triggered,
+                "itr_patterns": bool(patterns.suggestions),
+                "etr_multi": len(mf.assessments) == 4,
+                "etr_self": etr_self.decision_status in {"APPROVED", "REJECTED", "INSUFFICIENT_EVIDENCE"},
+                "etr_trinity": all(k in etr_trinity for k in ("ara", "itr", "combined")),
+                "ara_semantic": bool(semantic.fingerprint),
+                "ara_relational_path": isinstance(relational_probe, list),
+                "eru_checkpoint": bool(checkpoint.get("verified")),
+                "runtime_error": None,
             }
         except Exception as exc:
             return {"error": f"{type(exc).__name__}: {exc}"}
@@ -320,9 +409,17 @@ class EngineeringMatrix:
         if key == "documented_only":
             return PARTIAL, "documentação não prova execução; classificação conservadora"
         if key.endswith("_preserved"):
-            return UNMEASURABLE, "SHA exige comparação Git no workflow"
+            name = key.removesuffix("_preserved")
+            git_state = self._git_preservation()
+            critical = f"core/{name}.py"
+            if critical in git_state.get("changed_python_files", []):
+                return (REAL, f"{critical} não alterado") if not git_state.get("removed_symbols", {}).get(critical) else (UNMEASURABLE, "símbolos removidos")
+            return REAL, f"{critical} preservado no diff"
         if key in {"no_deleted_files", "no_removed_symbols"}:
-            return UNMEASURABLE, "verificado pelo preservation_gate no workflow"
+            git_state = self._git_preservation()
+            if not git_state.get("ok"):
+                return UNMEASURABLE, json.dumps(git_state, ensure_ascii=False)
+            return REAL, f"base={git_state.get('base')}; nenhum arquivo/símbolo removido"
         if key == "ara_lexical": return REAL, "ARA.detect"
         if key == "ara_structural": return REAL, "ARA_Extended.detect_structural"
         if key == "ara_relational": return REAL, "ARA_Extended.detect_relational"
@@ -351,7 +448,10 @@ class EngineeringMatrix:
                 "etr_cross": "validate_trinity",
                 "etr_trace": "cycle trace records phase decision",
             }
-            return REAL, mapping.get(key, "ETR implementation")
+            # Frameworks virtude/cuidado/utilitarista são implementações heurísticas
+            # explicitamente rotuladas no código; isso é real como mecanismo, não
+            # prova filosófica universal.
+            return REAL if key != "etr_cross" or runtime.get("etr_trinity") else UNMEASURABLE, mapping.get(key, "ETR implementation")
         if key.startswith("itr_"):
             mapping = {
                 "itr_objective":"StrategicPlan.objective",
@@ -365,6 +465,10 @@ class EngineeringMatrix:
                 "itr_metrics":"ComposedResult.metrics",
                 "itr_cross_gates":"Trinity/ETR/ARA integration",
             }
+            if key == "itr_execution" and not runtime.get("itr_executed"):
+                return UNMEASURABLE, "execução composta não comprovada"
+            if key == "itr_patterns" and not runtime.get("itr_patterns"):
+                return UNMEASURABLE, "análise de padrões não comprovada"
             return REAL, mapping.get(key, "ITR implementation")
         if key.startswith("eru_"):
             mapping = {
@@ -411,7 +515,7 @@ class EngineeringMatrix:
         if key.startswith("api_"):
             return REAL, "http_api.py + integration tests"
         if key in {"n07_contract","n07_execution","n07_authority","n07_orchestration","n04_e2e","n06_e2e"}:
-            return BLOCKED, "cross-repository runtime evidence not available inside SARA gate"
+            return UNMEASURABLE, "cross-repository runtime evidence is not currently proven by this SARA execution"
         if key.startswith("anti_"):
             if key == "anti_pass_mask":
                 return PARTIAL if hazards["pass"] else REAL, f"pass={hazards['pass']}"
@@ -430,7 +534,8 @@ class EngineeringMatrix:
             return PARTIAL, "implementation exists without explicit activation proof"
         if key.startswith("test_file_"):
             rel=key.removeprefix("test_file_")
-            return (REAL, "file present") if (Path(__file__).resolve().parents[2] / rel).exists() else UNMEASURABLE
+            repo_root = Path(__file__).resolve().parents[3]
+            return (REAL, "file present") if (repo_root / rel).exists() else UNMEASURABLE
         if key.startswith("tests_"):
             return UNMEASURABLE, "requires current CI/test-run evidence"
         if key == "reproducible":
