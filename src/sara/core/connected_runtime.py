@@ -99,6 +99,11 @@ class ConnectedRuntime:
         for name in self._registry.dependency_order():
             if name in self.CORE_HANDLED or name == self.NAME:
                 continue
+            # SoulETROmegaSystem mantém fases internas próprias, mas sua
+            # execução federada no SARA outer-cycle ocorre uma única vez,
+            # na fase de monitoramento. As demais fases não recebem no-op.
+            if name == "SoulETROmegaSystem" and phase != CyclePhase.MONITORING:
+                continue
             entry = self._registry.get(name)
             if entry is None:
                 continue
@@ -195,6 +200,24 @@ class ConnectedRuntime:
         if phase == CyclePhase.SNAPSHOT and name == "QuantumSnapshotSystem":
             sid = module.snapshot(state)
             return {"_operation": "quantum_snapshot", "snapshot_id": sid}
+
+        if phase == CyclePhase.MONITORING and name == "SoulETROmegaSystem":
+            parent_cycle_id = state["cycle_id"]
+            report = module.run_cycle(
+                cycle_id=f"omega::{parent_cycle_id}",
+                facts={
+                    "parent_cycle_id": parent_cycle_id,
+                    "current_input_length": len(state["current"]),
+                },
+            )
+            return {
+                "_operation": "omega_cycle",
+                "cycle_id": report.cycle_id,
+                "ok": report.ok,
+                "health_score": report.evidence.get("health_score"),
+                "metric_count": len(report.evidence.get("metrics", [])),
+                "planned_actions": len(report.plan.actions),
+            }
 
         if phase == CyclePhase.MONITORING and name == "GovernanceBackend":
             snap = module.snapshot()
