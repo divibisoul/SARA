@@ -6,7 +6,7 @@ concurrency:
 
 on:
   push:
-    branches: ["main"]
+    branches: ["main", "eru-soul-fusion-2026-09-22"]
   pull_request:
 
 jobs:
