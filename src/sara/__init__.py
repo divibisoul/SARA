@@ -14,7 +14,7 @@ from sara.governance import (
 )
 from sara.meta import (
     ARAForge, AssimilationReviewCommittee,
-    QuantumSnapshotSystem, ERU_Engine, TransystemSARA,
+    QuantumSnapshotSystem, ERU_Engine, TransystemSARA, ClareiraSubsystem,
 )
 from sara.research import (
     QuantumCrawler, NeuralLens, InnovationRadar,
@@ -34,7 +34,7 @@ __all__ = [
     "StormMonitor", "DecisionTrace", "GovernanceBackend",
     "UbuntuEthics", "BuenVivir", "LegalAI", "LegalCompliance", "GovernedSARA",
     "ARAForge", "AssimilationReviewCommittee",
-    "QuantumSnapshotSystem", "ERU_Engine", "TransystemSARA",
+    "QuantumSnapshotSystem", "ERU_Engine", "TransystemSARA", "ClareiraSubsystem",
     "QuantumCrawler", "NeuralLens", "InnovationRadar",
     "NeuroIntegrator", "QuantumScanner",
     "CycleAuditor", "build_default_system", "SaraSystem",
