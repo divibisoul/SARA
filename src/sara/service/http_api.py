@@ -72,6 +72,11 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "version": "3.1.0",
                     "protocol": "sara-http/1",
                     "invariants_ok": bool(system.invariant_report.get("ok")),
+                    "trace_integrity": system.components["trace"].verify(),
+                    "provenance_integrity": system.components["provenance"].verify_integrity(),
+                    "rollback_chain_integrity": system.components["rollback"].verify_chain(),
+                    "module_count": system.registry.snapshot()["count"],
+                    "pending_infrastructure": system.registry.by_status().get("PENDING_INFRASTRUCTURE", []),
                 })
                 return
             if path == "/v1/capabilities":
@@ -86,7 +91,6 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.audit@1.0.0",
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
-                        "sara.trace@1.0.0",
                         "sara.trace@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
