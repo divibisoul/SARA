@@ -12,7 +12,7 @@ alterar automaticamente as regras dos módulos existentes.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from sara.core.ara_extended import ARA_Extended
@@ -38,7 +38,8 @@ class TrinitySelfOptimizationReport:
     trinity_cycle: dict[str, Any]
     proposals: dict[str, list[Any]]
     findings: tuple[str, ...]
-    integrity_hash: str
+    engineering_gate: dict[str, Any] = field(default_factory=dict)
+    integrity_hash: str = ""
 
 
 class TrinitySelfOptimizer:
@@ -134,6 +135,10 @@ class TrinitySelfOptimizer:
         synergy_report = self._synergy.apply_to_self()
         trinity_cycle = self._plain_trinity_report(synergy_report)
 
+        # 7. Gate de engenharia: inventário, sintaxe, anti-simulação e blockers.
+        from sara.audit.engineering_gate import EngineeringGate
+        engineering_gate = EngineeringGate.run()
+
         findings = self._collect_findings(
             ara_self=ara_self,
             etr_self=etr_self_result,
@@ -159,6 +164,7 @@ class TrinitySelfOptimizer:
             "trinity_cycle": trinity_cycle,
             "proposals": proposals,
             "findings": tuple(findings),
+            "engineering_gate": engineering_gate,
         }
 
     @staticmethod
@@ -246,6 +252,7 @@ class TrinitySelfOptimizer:
                 "trinity_cycle": payload["trinity_cycle"],
                 "proposals": payload["proposals"],
                 "findings": payload["findings"],
+                "engineering_gate": payload["engineering_gate"],
             })
 
             stable = previous_hash == digest
@@ -267,6 +274,7 @@ class TrinitySelfOptimizer:
                     trinity_cycle=payload["trinity_cycle"],
                     proposals=payload["proposals"],
                     findings=tuple(payload["findings"]),
+                    engineering_gate=payload["engineering_gate"],
                     integrity_hash=digest,
                 )
                 self._history.append(final)
@@ -287,6 +295,7 @@ class TrinitySelfOptimizer:
             trinity_cycle=last_payload["trinity_cycle"],
             proposals=last_payload["proposals"],
             findings=tuple(last_payload["findings"]),
+            engineering_gate=last_payload["engineering_gate"],
             integrity_hash=previous_hash or "",
         )
         self._history.append(final)
