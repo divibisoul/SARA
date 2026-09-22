@@ -71,20 +71,15 @@ class ITR_Extended(ITR):
     # Passos adicionais
     EXTRA_STEPS: dict[str, Callable[[str], str]] = {
         "deep_structure": lambda t: (
-            f"[ESTRUTURADO]
-{t}
-"
-            f"[/ESTRUTURADO]
-"
+            f"[ESTRUTURADO]\n{t}\n"
+            f"[/ESTRUTURADO]\n"
             f"METADADOS: len={len(t)}"
         ),
         "ethical_align": lambda t: (
-            t + "
-[ITR_Extended: alinhamento ético verificado]"
+            t + "\n[ITR_Extended: alinhamento ético verificado]"
         ),
         "resilience_check": lambda t: (
-            t + "
-[ITR_Extended: resiliência — fallback disponível]"
+            t + "\n[ITR_Extended: resiliência — fallback disponível]"
         ),
     }
 
