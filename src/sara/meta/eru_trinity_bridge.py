@@ -25,6 +25,8 @@ class BridgeAudit:
     cycle_id: str
     observations: list[Observation] = field(default_factory=list)
     drifts: list[dict] = field(default_factory=list)
+    capability_observations: list[dict] = field(default_factory=list)
+    capability_drifts: list[dict] = field(default_factory=list)
     recovery_candidates: list[dict] = field(default_factory=list)
 
 
@@ -85,6 +87,48 @@ class ERUTrinityBridge:
     def observed_cycle_ids(self) -> list[str]:
         return list(self._cycles)
 
+    def observe_capabilities(self, cycle_id: str, phase: str) -> list[dict]:
+        """Congela capacidades públicas de ARA/ETR/ITR nesta fase."""
+        audit = self._cycles.setdefault(cycle_id, BridgeAudit(cycle_id))
+        records: list[dict] = []
+        for role, module in self._trinity.items():
+            snapshot_name = f"{cycle_id}:{phase}:{role}"
+            snapshot_hash = self._eru.freeze_capabilities(snapshot_name, module)
+            record = {
+                "cycle_id": cycle_id,
+                "phase": phase,
+                "role": role,
+                "snapshot_name": f"CAP::{snapshot_name}",
+                "snapshot_hash": snapshot_hash,
+            }
+            audit.capability_observations.append(record)
+            records.append(record)
+        return records
+
+    def detect_capability_drift(self, cycle_id: str) -> list[dict]:
+        audit = self._cycles.get(cycle_id)
+        if audit is None:
+            return []
+
+        by_role: dict[str, list[dict]] = {}
+        for item in audit.capability_observations:
+            by_role.setdefault(item["role"], []).append(item)
+
+        drifts: list[dict] = []
+        for role, observations in by_role.items():
+            for older, newer in zip(observations, observations[1:]):
+                result = self._eru.capability_diff(
+                    older["snapshot_name"],
+                    newer["snapshot_name"],
+                )
+                result["role"] = role
+                result["from_phase"] = older["phase"]
+                result["to_phase"] = newer["phase"]
+                drifts.append(result)
+
+        audit.capability_drifts = drifts
+        return list(drifts)
+
     def detect_drift(self, cycle_id: str) -> list[dict]:
         audit = self._cycles.get(cycle_id)
         if audit is None:
@@ -132,6 +176,7 @@ class ERUTrinityBridge:
         if audit is None:
             return {"ok": False, "reason": "cycle_not_observed"}
         drifts = self.detect_drift(cycle_id)
+        capability_drifts = self.detect_capability_drift(cycle_id)
         candidates = self.advise_recovery(cycle_id=cycle_id)
         audit.recovery_candidates = candidates
         return {
@@ -139,6 +184,8 @@ class ERUTrinityBridge:
             "cycle_id": cycle_id,
             "observations": [o.__dict__ for o in audit.observations],
             "drifts": drifts,
+            "capability_drifts": capability_drifts,
+            "capability_observations": list(audit.capability_observations),
             "recovery_candidates": candidates,
             "alignment": self.align_trinity(),
         }
