@@ -255,4 +255,6 @@ class EngineeringGate:
 
 if __name__ == "__main__":
     import json
-    print(json.dumps(EngineeringGate.run(), ensure_ascii=False, indent=2, sort_keys=True))
+    report = EngineeringGate.run()
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    raise SystemExit(0 if report["critical_ok"] else 1)
