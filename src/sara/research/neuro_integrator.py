@@ -50,7 +50,7 @@ class NeuroIntegrator:
         invariants: dict = {}
         try:
             if self._registry is not None:
-                if target_module not in self._registry._modules:
+                if self._registry.get(target_module) is None:
                     raise KeyError(f"target_module '{target_module}' não registrado")
                 invariants["target_exists"] = True
 
@@ -62,7 +62,9 @@ class NeuroIntegrator:
             invariants["memory_persisted"] = True
 
             if self._registry is not None:
-                entry = self._registry._modules[target_module]
+                entry = self._registry.get(target_module)
+                if entry is None:
+                    raise KeyError(f"target_module '{target_module}' não registrado")
                 invariants["target_status"] = entry.status.value
                 invariants["target_still_registered"] = True
 
