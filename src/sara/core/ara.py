@@ -56,7 +56,9 @@ class ARA:
     COMPLEXITY_MIN_UNIQUE_RATIO = 0.05
     COMPLEXITY_MAX_AVG_SENTENCE = 300
     COMPLEXITY_NESTING_DEPTH_LIMIT = 8
-    COMPLEXITY_SCORE_THRESHOLD = 1.0
+    # A combinação de comprimento + baixa diversidade + frases longas já constitui
+    # evidência suficiente para sinalizar complexidade degenerada.
+    COMPLEXITY_SCORE_THRESHOLD = 0.9
     CONTEXT_WINDOW = 120
 
     def __init__(self, dna: DNA_Tags, temporal: TemporalVectorDB,
