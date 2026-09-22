@@ -36,6 +36,21 @@ class LoopReport:
     execution_report: dict = field(default_factory=dict)
 
 
+class _PhaseTraceProxy:
+    def __init__(self, ctx: CycleContext, phase: CyclePhase) -> None:
+        self._ctx = ctx
+        self.cycle_id = ctx.cycle_id
+        self.current = ctx.current
+        self.sink = ctx.sink
+        self.phase = phase
+
+    def record(self, _phase: str, module: str, ok: bool, **info: Any) -> None:
+        self._ctx.record(self.phase.value, module, ok, **info)
+
+    def emit_decision(self, decision: dict) -> None:
+        self._ctx.emit_decision(decision)
+
+
 class _Aborted(Exception):
     def __init__(self, phase: str, reason: str) -> None:
         self.phase = phase
@@ -389,6 +404,23 @@ class RegenerativeLoop:
         self._record(ctx, CyclePhase.GOVERNANCE, "RegenerativeLoop", True,
                      pending_infrastructure="not_executed")
     
+    def _dispatch_emit_trace(self, ctx: CycleContext, phase: CyclePhase) -> None:
+        if self._registry is None:
+            return
+        for registered in self._registry.modules_for_phase(phase):
+            status = getattr(registered.instance, "STATUS", None)
+            if status is not None and status.value == "PENDING_INFRASTRUCTURE":
+                ctx.record(phase.value, registered.name, True,
+                           skipped=True, reason="PENDING_INFRASTRUCTURE")
+                continue
+            emitter = getattr(registered.instance, "emit_trace", None)
+            if emitter is None:
+                continue
+            try:
+                emitter(_PhaseTraceProxy(ctx, phase))
+            except Exception as exc:
+                ctx.record(phase.value, registered.name, False, error=str(exc))
+
     def history(self) -> list[LoopReport]:
         return list(self._history)
 
