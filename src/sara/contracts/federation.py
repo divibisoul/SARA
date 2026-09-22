@@ -19,6 +19,9 @@ class FederationIdentity:
     node_name: str = "SARA"
     protocol_version: str = "1.0"
 
+    def as_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
 
 @dataclass(frozen=True)
 class IntentEnvelope:
