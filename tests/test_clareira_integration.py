@@ -85,8 +85,8 @@ def test_clareira_is_registered_and_implements_real_ingestion():
     assert system.ready is True
     result = clareira.ingest_snapshot(_snapshot(), correlation_id="clareira-test-001")
 
-    assert result["observed_node_count"] == 2
-    assert result["observed_channel_count"] == 1
+    assert result["observed_node_count"] == 61
+    assert result["observed_channel_count"] == 120
     assert result["eru_hash"]
     assert system.components["eru"].has_snapshot("clareira:clareira-test-001:state")
     assert system.components["provenance"].verify_integrity() is True
@@ -103,6 +103,39 @@ def test_clareira_is_registered_and_implements_real_ingestion():
     }
     second = clareira.ingest_snapshot(snapshot, correlation_id="clareira-device-001")
     assert second["device_state"]["batteryPercent"] == 38
+
+
+def test_clareira_frontier_fuses_eru_mmd_rgo_and_trinity_without_execution_claims():
+    system = build_default_system(fail_closed=True)
+    clareira = system.components["clareira"]
+    frontier = system.components["clareira_frontier"]
+
+    clareira.ingest_snapshot(_snapshot("frontier-001"), correlation_id="frontier-001")
+    first = frontier.assess_latest(correlation_id="frontier-audit-001")
+    assert first["mmd"]["counts"]["missing"] == 0
+    assert first["mmd"]["counts"]["changed"] == 0
+    assert first["rgo"]["execution_status"] == "NOT_EXECUTED"
+    assert first["trinity"]["execution_status"] == "NOT_EXECUTED"
+    assert first["eru"]["transition_audited"] is False
+
+    changed = _snapshot("frontier-002")
+    changed["nodes"][0]["energy"] = 55
+    changed["metrics"]["averageLoad"] = 0.55
+    clareira.ingest_snapshot(changed, correlation_id="frontier-002")
+    second = frontier.assess_latest(correlation_id="frontier-audit-002")
+
+    assert second["eru"]["transition_audited"] is True
+    assert second["mmd"]["counts"]["changed"] > 0
+    assert second["rgo"]["status"] == "PROPOSED"
+    assert second["rgo"]["complementary_capabilities"]
+    assert all(
+        item["execution_status"] == "PROPOSED"
+        for item in second["rgo"]["complementary_capabilities"]
+    )
+    assert second["rgo"]["execution_status"] == "NOT_EXECUTED"
+    assert second["trinity"]["assessment"]["strategy"]["phases"] >= 1
+    assert second["eru"]["functional_equivalence_proven"] is False
+    assert system.components["provenance"].verify_integrity() is True
 
 
 def test_clareira_requires_canonical_topology():
