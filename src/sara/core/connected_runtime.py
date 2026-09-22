@@ -84,7 +84,9 @@ class ConnectedRuntime:
         for name in self._registry.dependency_order():
             if name in self.CORE_HANDLED or name == self.NAME:
                 continue
-            entry = self._registry._modules[name]
+            entry = self._registry.get(name)
+            if entry is None:
+                continue
             if phase not in entry.phases:
                 continue
 
