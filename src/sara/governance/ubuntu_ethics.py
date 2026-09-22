@@ -47,6 +47,28 @@ class UbuntuEthics:
             keywords_matched=hits,
         )
 
+    def evaluate_structured(self, text: str) -> dict:
+        """Avaliação adicional por relações semânticas e evidência contextual."""
+        from sara.core.semantic_engine import SemanticEngine
+        frame = SemanticEngine.analyze(text)
+        lower = str(text).lower()
+        evidence: list[str] = []
+        for relation in frame.relations:
+            if relation.object in {"comunidade", "coletivo", "nós", "gerações", "futuro"}:
+                evidence.append(
+                    f"{relation.action}:{relation.object}:clause={relation.clause_index}"
+                )
+        keyword_hits = [k for k in self.KEYWORDS if k in lower]
+        score = min((len(keyword_hits) + len(evidence)) / 4.0, 1.0)
+        return {
+            "filter_name": self.NAME,
+            "score": round(score, 4),
+            "aligned": score >= 0.25,
+            "keyword_hits": keyword_hits,
+            "semantic_evidence": evidence,
+            "fingerprint": frame.fingerprint,
+        }
+
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
             ctx.record("validation", self.NAME, True,
