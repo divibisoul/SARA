@@ -3,6 +3,7 @@ Status: IMPLEMENTED (deep).
 """
 from __future__ import annotations
 import copy
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
@@ -88,10 +89,19 @@ class ERU_Engine:
         if isinstance(obj, dict):
             for k, v in obj.items():
                 path = f"{prefix}.{k}" if prefix else str(k)
-                if isinstance(v, dict):
+                if isinstance(v, (dict, list)):
                     out.update(self._walk_keys(v, path))
                 else:
                     out[path] = v
+        elif isinstance(obj, list):
+            for index, value in enumerate(obj):
+                path = f"{prefix}[{index}]"
+                if isinstance(value, (dict, list)):
+                    out.update(self._walk_keys(value, path))
+                else:
+                    out[path] = value
+        else:
+            out[prefix or "$"] = obj
         return out
 
     def compare(self, older: str, newer: str) -> DiffReport:
@@ -129,24 +139,50 @@ class ERU_Engine:
 
     @staticmethod
     def _get_path(obj: Any, path: str) -> Any:
-        parts = path.split(".")
+        tokens = re.findall(r"([^.\[\]]+)|\[(\d+)\]", path)
         cur = obj
-        for p in parts:
-            if isinstance(cur, dict) and p in cur:
-                cur = cur[p]
+        for key, index in tokens:
+            if index:
+                if not isinstance(cur, list):
+                    return None
+                idx = int(index)
+                if idx >= len(cur):
+                    return None
+                cur = cur[idx]
             else:
-                return None
+                if not isinstance(cur, dict) or key not in cur:
+                    return None
+                cur = cur[key]
         return cur
 
     @staticmethod
     def _set_path(obj: Any, path: str, value: Any) -> None:
-        parts = path.split(".")
+        tokens = re.findall(r"([^.\[\]]+)|\[(\d+)\]", path)
+        if not tokens:
+            return
         cur = obj
-        for p in parts[:-1]:
-            if p not in cur or not isinstance(cur[p], dict):
-                cur[p] = {}
-            cur = cur[p]
-        cur[parts[-1]] = value
+        for pos, (key, index) in enumerate(tokens):
+            last = pos == len(tokens) - 1
+            if index:
+                if not isinstance(cur, list):
+                    return
+                idx = int(index)
+                while len(cur) <= idx:
+                    cur.append({})
+                if last:
+                    cur[idx] = copy.deepcopy(value)
+                    return
+                cur = cur[idx]
+                continue
+            if not isinstance(cur, dict):
+                return
+            if last:
+                cur[key] = copy.deepcopy(value)
+                return
+            next_is_list = bool(tokens[pos + 1][1])
+            if key not in cur or not isinstance(cur[key], (dict, list)):
+                cur[key] = [] if next_is_list else {}
+            cur = cur[key]
 
     def audit(self, reference: str, target: str) -> AuditReport:
         diff = self.compare(reference, target)
