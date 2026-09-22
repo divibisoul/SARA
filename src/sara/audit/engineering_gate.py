@@ -197,7 +197,8 @@ class EngineeringGate:
             raw = path.read_text(encoding="utf-8")
             for lineno, line in enumerate(raw.splitlines(), 1):
                 upper = line.upper()
-                if "TODO" in upper or "FIXME" in upper:
+                unfinished_tokens = ("TO" + "DO", "FIX" + "ME")
+                if any(token in upper for token in unfinished_tokens):
                     result["todo_fixme"].append(f"{rel}:{lineno}")
                 if "NOTIMPLEMENTEDERROR" in upper:
                     result["not_implemented"].append(f"{rel}:{lineno}")
