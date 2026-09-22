@@ -26,7 +26,7 @@ class CodeStructure:
 
 class NeuralLens:
     NAME = "NeuralLens"
-    VERSION = "2.0"
+    VERSION = "2.1"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.RESEARCH
     DEPENDENCIES = ()
@@ -39,6 +39,7 @@ class NeuralLens:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "repo_client_ready": self.is_repo_client_ready(),
+            "remote_provenance": "git_blob_sha",
         }
 
     def extract(self, source_code: str, language: str = "python") -> CodeStructure:
