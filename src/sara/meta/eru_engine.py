@@ -207,6 +207,63 @@ class ERU_Engine:
             final_state=rec["state_fused"],
         )
 
+    def checkpoint(self, cycle_id: str, iteration: int, state: Any) -> dict:
+        """Cria checkpoint identificável e imutável para rollback/reconstrução."""
+        if not cycle_id or iteration < 1:
+            raise ValueError("cycle_id e iteration válidos são obrigatórios")
+        name = f"{cycle_id}:checkpoint:{iteration}"
+        state_hash = self.freeze(name, {
+            "cycle_id": cycle_id,
+            "iteration": int(iteration),
+            "state": copy.deepcopy(state),
+        })
+        return {
+            "name": name,
+            "cycle_id": cycle_id,
+            "iteration": int(iteration),
+            "state_hash": state_hash,
+            "verified": self.verify_snapshot(name),
+        }
+
+    def detect_information_loss(self, older: str, newer: str) -> dict:
+        """Detecta perda e informa quando a reconstrução é ou não demonstrável."""
+        diff = self.compare(older, newer)
+        if "__missing_snapshot__" in diff.lost:
+            return {
+                "reconstructable": False,
+                "reason": "missing_snapshot",
+                "lost_paths": list(diff.lost),
+            }
+        recoverable: list[str] = []
+        irrecoverable: list[str] = []
+        old_state = self._snapshots[older].state
+        for path in diff.lost:
+            value = self._get_path(old_state, path)
+            if value is None and self._get_path(old_state, path) is None:
+                irrecoverable.append(path)
+            else:
+                recoverable.append(path)
+        return {
+            "reconstructable": not irrecoverable,
+            "reason": "ok" if not irrecoverable else "missing_evidence_for_lost_paths",
+            "lost_paths": list(diff.lost),
+            "recoverable_paths": recoverable,
+            "irrecoverable_paths": irrecoverable,
+        }
+
+    def reconstructability(self, older: str, newer: str) -> dict:
+        """Retorna uma decisão explícita sobre a reversibilidade disponível."""
+        if not self.verify_snapshot(older) or not self.verify_snapshot(newer):
+            return {
+                "status": "UNMEASURABLE",
+                "reason": "snapshot_integrity_unverified",
+            }
+        loss = self.detect_information_loss(older, newer)
+        return {
+            "status": "REAL" if loss["reconstructable"] else "UNMEASURABLE",
+            **loss,
+        }
+
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
             ctx.record("persistence", self.NAME, True,
