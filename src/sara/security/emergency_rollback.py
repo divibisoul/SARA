@@ -37,6 +37,7 @@ class EmergencyRollback:
         self._snapshots: dict[str, dict] = {}
         self._history: list[RollbackRecord] = []
         self._chain: list[str] = []
+        self._chain_inputs: list[str] = []
 
     def describe(self) -> dict:
         return {
@@ -49,6 +50,7 @@ class EmergencyRollback:
     def _append_chain(self, h: str) -> str:
         prev = self._chain[-1] if self._chain else "GENESIS"
         ch = chain_hash(prev, h)
+        self._chain_inputs.append(h)
         self._chain.append(ch)
         return ch
 
@@ -78,11 +80,15 @@ class EmergencyRollback:
 
     def verify_chain(self) -> bool:
         prev = "GENESIS"
-        for h in self._chain:
-            expected = chain_hash(prev, h)
-            if expected != h:
+        if len(self._chain) != len(self._chain_inputs):
+            return False
+        for snapshot_hash, chain_value in zip(self._chain_inputs, self._chain):
+            expected = chain_hash(prev, snapshot_hash)
+            if expected != chain_value:
                 return False
-            prev = h
+            if snapshot_hash not in self._snapshots:
+                return False
+            prev = chain_value
         return True
 
     def history(self) -> list[RollbackRecord]:
