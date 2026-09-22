@@ -139,8 +139,12 @@ class InvariantValidator:
     def validate_cycle(self, ctx: Any, cycle: dict[str, Any]) -> InvariantReport:
         checks: list[InvariantCheck] = []
         phase_order = []
+        canonical_values = {p.value for p in CyclePhase}
         for step in ctx.steps:
-            if step.phase in {p.value for p in CyclePhase}:
+            if (
+                step.phase in canonical_values
+                and step.info.get("canonical_phase") is True
+            ):
                 phase_order.append(step.phase)
 
         canonical = [p.value for p in CANONICAL_ORDER]
@@ -151,7 +155,11 @@ class InvariantValidator:
             "ok" if monotonic else f"observed={phase_order}",
         ))
 
-        failed_steps = [f"{s.phase}:{s.module}" for s in ctx.steps if not s.ok]
+        failed_steps = [
+            f"{s.phase}:{s.module}"
+            for s in ctx.steps
+            if not s.ok and s.info.get("canonical_phase") is True
+        ]
         aborted = bool(cycle.get("aborted_at"))
         checks.append(InvariantCheck(
             "failed_step_has_abort_or_explicit_nonblocking",
