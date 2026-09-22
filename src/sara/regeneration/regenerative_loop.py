@@ -520,6 +520,7 @@ class RegenerativeLoop:
     def _record(self, ctx: CycleContext, phase: CyclePhase,
                 module: str, success: bool, **info: Any) -> None:
         """Registra evidência sem colidir com um campo de informação chamado ok."""
+        info.setdefault("canonical_phase", True)
         ctx.record(phase.value, module, success, **info)
 
     def history(self) -> list[LoopReport]:
