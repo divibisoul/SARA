@@ -40,6 +40,7 @@ from sara.meta.assimilation_committee import AssimilationReviewCommittee
 from sara.meta.quantum_snapshot import QuantumSnapshotSystem
 from sara.meta.eru_engine import ERU_Engine
 from sara.meta.clareira import ClareiraSubsystem
+from sara.meta.eru_mmd_rgo_clareira_bridge import ERUMMDRGOClareiraBridge
 from sara.meta.eru_trinity_bridge import ERUTrinityBridge
 from sara.core.trinity_eru_unified import TrinityERUUnified
 from sara.meta.transystem_sara import TransystemSARA
@@ -140,6 +141,12 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     trinity_eru = TrinityERUUnified(
         ara_extended, etr_extended, itr_extended, eru=eru, bridge=eru_bridge
     )
+    clareira_frontier = ERUMMDRGOClareiraBridge(
+        eru=eru,
+        clareira=clareira,
+        trinity=trinity_eru,
+        provenance=prov,
+    )
     connected_runtime = ConnectedRuntime(registry)
 
     loop = RegenerativeLoop(
@@ -161,6 +168,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         safe_sandbox, itr, itr_extended, filters,
         legal_compliance, legal_ai, committee, radar, governed,
         ara_forge, quantum_snapshot, eru, clareira, eru_bridge, trinity_eru,
+        clareira_frontier,
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
@@ -211,7 +219,9 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "etr": etr, "etr_extended": etr_extended,
             "itr": itr, "itr_extended": itr_extended,
             "trinity": trinity, "trinity_eru": trinity_eru,
-            "eru_bridge": eru_bridge, "clareira": clareira, "identity": identity,
+            "eru_bridge": eru_bridge, "clareira": clareira,
+            "clareira_frontier": clareira_frontier,
+            "identity": identity,
             "memory": memory, "temporal": temporal, "dna": dna,
             "filters": filters, "rollback": rollback, "trace": trace,
             "loop": loop, "sistema_vivo": sistema, "governed": governed,
