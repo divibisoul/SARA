@@ -78,8 +78,9 @@ class SymbiosisHostNucleus:
         reasons: list[str] = []
         memory = context.metric("memory_utilization")
         if memory and memory.value >= 85:
-            actions.append(self._gc_action())
-            reasons.append("memory_utilization_high")
+            # Não há ação host reversível comprovada para reduzir memória.
+            # O sistema registra a condição e não fabrica uma otimização.
+            reasons.append("memory_utilization_high:no_safe_reversible_host_action")
         cpu = context.metric("cpu_utilization")
         if cpu and cpu.value >= 90:
             reasons.append("cpu_utilization_high:no_safe_host_action_registered")
