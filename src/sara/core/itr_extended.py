@@ -52,6 +52,14 @@ class PatternReport:
     suggestions: tuple[str, ...]
 
 
+def _extended_structure(text: str) -> str:
+    """Structure step for Extended ITR; preserves an already structured target."""
+    s = str(text)
+    if "OBJETIVO:" in s and "CONTEXTO:" in s and "PALAVRAS_CHAVE:" in s:
+        return s
+    return _structure_objective(s)
+
+
 @dataclass(frozen=True)
 class RegistryOptimization:
     new_steps: tuple[str, ...]
@@ -72,6 +80,10 @@ class ITR_Extended(ITR):
     # Passos adicionais. Os dois passos de anotação legados permanecem
     # registrados para compatibilidade, mas não participam de planos executáveis.
     ANNOTATION_ONLY_STEPS = frozenset({"ethical_align", "resilience_check"})
+
+    EXTENDED_STEP_REGISTRY: dict[str, Callable[[str], str]] = {
+        "structure": _extended_structure,
+    }
 
     EXTRA_STEPS: dict[str, Callable[[str], str]] = {
         "deep_structure": lambda t: (
@@ -213,7 +225,7 @@ class ITR_Extended(ITR):
                             f"passo '{step_name}' é somente anotação histórica e "
                             "não pode ser classificado como execução"
                         )
-                    fn = _STEP_REGISTRY.get(step_name)
+                    fn = self.EXTENDED_STEP_REGISTRY.get(step_name, _STEP_REGISTRY.get(step_name))
                     if fn is None:
                         raise KeyError(f"passo '{step_name}' não registrado")
                     # extract_keywords é uma operação analítica: produz evidência
