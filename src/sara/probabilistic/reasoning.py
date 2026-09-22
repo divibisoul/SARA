@@ -24,6 +24,8 @@ class BayesianNode:
     pseudo_counts: float = 1.0
     evidence: dict[str, float] | None = None
     posterior: dict[str, float] | None = None
+    dirichlet_posterior: dict[str, float] | None = None
+    neural_posterior: dict[str, float] | None = None
     confidence: float = 0.0
     entropy: float = 0.0
     provenance: str = "INFERRED"
@@ -298,6 +300,7 @@ class ProbabilisticReasoningLayer:
 
         dirichlet = self._posterior_dirichlet(prior, evidence, pseudo_counts, self.prior_strength)
         neural_result: dict[str, Any] | None = None
+        neural_posterior: dict[str, float] | None = None
 
         neural_raw = raw.get("neural")
         if isinstance(neural_raw, Mapping):
@@ -326,14 +329,16 @@ class ProbabilisticReasoningLayer:
         elif len(neural_result["probabilities"]) != len(states):
             raise ProbabilisticReasoningError(f"NEURAL_STATE_COUNT_MISMATCH:{name}")
         elif evidence is None:
-            posterior = {
+            neural_posterior = {
                 state: probability
                 for state, probability in zip(states, neural_result["probabilities"])
             }
+            posterior = dict(neural_posterior)
             source = "neural"
             entropy = float(neural_result["entropy"])
         else:
-            neural_probs = dict(zip(states, neural_result["probabilities"]))
+            neural_posterior = dict(zip(states, neural_result["probabilities"]))
+            neural_probs = neural_posterior
             alpha = self.alpha_dirichlet if alpha_dirichlet is None else float(alpha_dirichlet)
             beta = self.beta_neural if beta_neural is None else float(beta_neural)
             if alpha == 0 and beta == 0:
@@ -364,6 +369,8 @@ class ProbabilisticReasoningLayer:
             pseudo_counts=pseudo_counts,
             evidence=evidence,
             posterior=posterior,
+            dirichlet_posterior=dirichlet,
+            neural_posterior=neural_posterior,
             confidence=confidence,
             entropy=entropy,
             provenance=provenance,
