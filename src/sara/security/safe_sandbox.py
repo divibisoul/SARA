@@ -9,7 +9,15 @@ from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 
 FORBIDDEN_NAMES = {"os", "sys", "subprocess", "shutil", "socket",
-                   "eval", "exec", "__import__"}
+                   "eval", "exec", "__import__", "ctypes", "multiprocessing"}
+FORBIDDEN_CALLS = {
+    "eval", "exec", "__import__", "compile",
+    "open", "input",
+}
+FORBIDDEN_ATTRIBUTES = {
+    "system", "popen", "spawn", "fork", "remove", "unlink",
+    "write_text", "write_bytes",
+}
 
 
 class IsolationBackend(Protocol):
@@ -71,8 +79,10 @@ class SafeSandbox:
                 if node.module and node.module.split(".")[0] in FORBIDDEN_NAMES:
                     vulns.append(f"import_from_proibido:{node.module}")
             elif isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec", "__import__"}:
+                if isinstance(node.func, ast.Name) and node.func.id in FORBIDDEN_CALLS:
                     vulns.append(f"chamada_perigosa:{node.func.id}")
+                elif isinstance(node.func, ast.Attribute) and node.func.attr in FORBIDDEN_ATTRIBUTES:
+                    vulns.append(f"atributo_perigoso:{node.func.attr}")
         return StaticAnalysis(True, nodes, vulns)
 
     def is_isolation_ready(self) -> bool:
