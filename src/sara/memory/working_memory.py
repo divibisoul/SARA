@@ -3,11 +3,16 @@ from __future__ import annotations
 import copy
 from collections import deque
 from typing import Any
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 
 class WorkingMemory:
     NAME = "WorkingMemory"
-    VERSION = "1.0"
+    VERSION = "1.1"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.MEMORY
+    DEPENDENCIES = ()
+    CYCLE_PHASES = (CyclePhase.PERSISTENCE,)
 
     def __init__(self, max_items: int = 256) -> None:
         if max_items < 1:
@@ -29,4 +34,25 @@ class WorkingMemory:
         return copy.deepcopy(list(self._items))
 
     def describe(self) -> dict[str, Any]:
-        return {"name": self.NAME, "version": self.VERSION, "items": len(self._items)}
+        return {
+            "name": self.NAME,
+            "version": self.VERSION,
+            "status": self.STATUS.value,
+            "role": self.ROLE.value,
+            "dependencies": list(self.DEPENDENCIES),
+            "phases": [p.value for p in self.CYCLE_PHASES],
+            "layer": "working_memory",
+            "storage_scope": "process_ram_bounded",
+            "items": len(self._items),
+        }
+
+    def emit_trace(self, ctx: Any) -> None:
+        if hasattr(ctx, "record"):
+            ctx.record(
+                CyclePhase.PERSISTENCE.value,
+                self.NAME,
+                True,
+                layer="working_memory",
+                storage_scope="process_ram_bounded",
+                items=len(self._items),
+            )
