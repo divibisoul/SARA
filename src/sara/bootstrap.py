@@ -97,7 +97,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     governed = GovernedSARA(committee, legal_compliance, radar=radar)
     ara_forge = ARAForge()
     quantum_snapshot = QuantumSnapshotSystem()
-    eru = ERU_Engine()
+    eru = ERU_Engine(provenance=prov, temporal=temporal)
 
     neuro = NeuroIntegrator(rollback, memory, registry=registry)
     neural_lens = NeuralLens()
