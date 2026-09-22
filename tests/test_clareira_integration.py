@@ -14,28 +14,16 @@ from sara.service.http_api import create_server
 
 
 def _snapshot(correlation_id: str = "clareira-test-001") -> dict:
-    return {
-        "schemaVersion": "1.1.0",
-        "blueprintVersion": "1.1.0",
-        "timestamp": 1000,
-        "status": "RUNNING",
-        "metrics": {
-            "totalNodes": 20,
-            "activeNodes": 20,
-            "averageLoad": 0.60,
-            "averageTemperature": 0.30,
-            "globalStress": 0.0,
-            "turboActive": False,
-            "packetsProcessed": 12,
-            "tunelamentosRealizados": 1,
-            "vagalTone": 0.50,
-            "activeVagusBranches": 20,
-            "timestamp": 1000,
-        },
-        "nodes": [
+    nodes = []
+    levels = ["Central", *["Primary"] * 12, *["Secondary"] * 48]
+    for index, level in enumerate(levels, start=1):
+        node_id = "NC-001" if level == "Central" else (
+            f"NP-{index - 1:03d}" if level == "Primary" else f"MS-{index - 13:03d}"
+        )
+        nodes.append(
             {
-                "id": "NC-001",
-                "level": "Central",
+                "id": node_id,
+                "level": level,
                 "active": True,
                 "energy": 60,
                 "energyCapacity": 100,
@@ -45,22 +33,35 @@ def _snapshot(correlation_id: str = "clareira-test-001") -> dict:
                 "queueSize": 0,
                 "inputChannels": 1,
                 "outputChannels": 1,
-            },
-            {
-                "id": "NP-001",
-                "level": "Primary",
-                "active": True,
-                "energy": 50,
-                "energyCapacity": 100,
-                "temperature": 0.30,
-                "processingRate": 1,
-                "packetsProcessed": 1,
-                "queueSize": 0,
-                "inputChannels": 1,
-                "outputChannels": 1,
-            },
-        ],
-        "channels": [{"id": "ch_NC-001_NP-001", "active": True}],
+            }
+        )
+
+    channels = []
+    for index in range(120):
+        source = f"NODE-{index:03d}"
+        target = f"NODE-{(index + 1) % 120:03d}"
+        channels.append({"id": f"ch_{source}_{target}", "active": True})
+
+    return {
+        "schemaVersion": "1.1.0",
+        "blueprintVersion": "1.1.0",
+        "timestamp": 1000,
+        "status": "RUNNING",
+        "metrics": {
+            "totalNodes": 61,
+            "activeNodes": 61,
+            "averageLoad": 0.60,
+            "averageTemperature": 0.30,
+            "globalStress": 0.0,
+            "turboActive": False,
+            "packetsProcessed": 61,
+            "tunelamentosRealizados": 1,
+            "vagalTone": 0.50,
+            "activeVagusBranches": 61,
+            "timestamp": 1000,
+        },
+        "nodes": nodes,
+        "channels": channels,
         "homeostasis": {"globalStress": 0.0, "energyScore": 55.0},
         "vagus": {
             "name": "VagusNerve",
