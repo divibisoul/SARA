@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.core.provenance import ProvenanceTracker, Provenance
+from sara.core.semantic_engine import SemanticEngine
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,7 @@ class IdentityCore:
 
     def __init__(self, provenance: ProvenanceTracker) -> None:
         self._prov = provenance
+        self._semantic = SemanticEngine()
         for rule in self.HISTORICAL_RULES["ethical_boundaries"]:
             self._prov.register(f"IdentityCore.{rule}", Provenance.HISTORICAL,
                                 "Pseudo-código v6 (IdentityCore)")
@@ -65,6 +67,24 @@ class IdentityCore:
                 violations.append(boundary)
         return IdentityResult(approved=len(violations) == 0,
                               violations=tuple(violations))
+
+    def validate_structured(self, candidate: str) -> dict:
+        """Validação adicional baseada em relações semânticas observáveis."""
+        frame = self._semantic.analyze(candidate)
+        violations: list[str] = []
+        for relation in frame.relations:
+            if relation.action in {"remover", "apagar", "deletar", "violar"} and not relation.negated:
+                violations.append(
+                    f"{relation.action}:{relation.object}"
+                )
+        return {
+            "approved": not violations,
+            "violations": tuple(violations),
+            "fingerprint": frame.fingerprint,
+            "relations": len(frame.relations),
+            "entities": tuple(frame.entities),
+            "negations": tuple(frame.negations),
+        }
 
     def participate(self, step: str, payload: str) -> ParticipationResult:
         r = self.validate(str(payload))
