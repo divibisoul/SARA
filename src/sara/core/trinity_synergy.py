@@ -304,7 +304,7 @@ class TrinitySynergy:
             }
             plan = self._itr.generate_strategic(
                 current,
-                context={"ara_audit": ara_state},
+                context={"ara_audit": ara_state, "etr_approved": True},
             )
 
             # 3. ETR valida o plano
