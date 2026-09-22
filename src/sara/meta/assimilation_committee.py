@@ -15,6 +15,8 @@ class AssimilationReviewCommittee:
     CYCLE_PHASES = (CyclePhase.GOVERNANCE,)
 
     def __init__(self, quorum: float = 0.75) -> None:
+        if not 0.0 <= quorum <= 1.0:
+            raise ValueError("quorum must be between 0 and 1")
         self._members: dict[str, Callable[[dict], bool]] = {}
         self._quorum = quorum
 
