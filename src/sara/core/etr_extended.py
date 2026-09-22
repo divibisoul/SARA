@@ -92,7 +92,7 @@ class ETR_Extended(ETR):
                     "clause": relation.clause_index,
                     "evidence": list(relation.evidence),
                 })
-            if relation.action in {"alterar", "apagar", "deletar", "remover", "violar"}:
+            if relation.action in {"alterar", "apagar", "deletar", "remover", "violar"} and not relation.negated:
                 relation_findings.append({
                     "kind": "DESTRUCTIVE_ACTION",
                     "subject": relation.subject,
@@ -107,9 +107,10 @@ class ETR_Extended(ETR):
             "entities": list(frame.entities),
             "negations": list(frame.negations),
             "findings": relation_findings,
-            "ok": not any(f["kind"] == "DESTRUCTIVE_ACTION" and not (
-                any(n in frame.negations for n in ("não", "nao", "nunca", "jamais"))
-            ) for f in relation_findings),
+            "ok": not any(
+                f["kind"] == "DESTRUCTIVE_ACTION"
+                for f in relation_findings
+            ),
         }
 
     def validate_transformation(self, original: str, transformed: str) -> dict:
