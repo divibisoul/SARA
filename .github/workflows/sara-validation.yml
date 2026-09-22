@@ -1,5 +1,9 @@
 name: SARA validation
 
+concurrency:
+  group: sara-validation-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: ["main"]
