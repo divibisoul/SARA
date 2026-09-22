@@ -201,6 +201,16 @@ class ERU_Engine:
             if old_desc.get(key) != new_desc.get(key)
         )
 
+        recoverable_removed_methods = sorted(
+            name for name in removed_methods
+            if old_methods.get(name, {}).get("source_available") is True
+            and bool(old_methods.get(name, {}).get("source_text"))
+        )
+        recoverable_changed_methods = sorted(
+            name for name in changed_methods
+            if old_methods.get(name, {}).get("source_available") is True
+            and bool(old_methods.get(name, {}).get("source_text"))
+        )
         return {
             "ok": True,
             "older": older,
@@ -209,6 +219,8 @@ class ERU_Engine:
             "removed_methods": removed_methods,
             "changed_methods": changed_methods,
             "changed_contract": changed_contract,
+            "recoverable_removed_methods": recoverable_removed_methods,
+            "recoverable_changed_methods": recoverable_changed_methods,
             "functional_equivalence_proven": False,
         }
 
