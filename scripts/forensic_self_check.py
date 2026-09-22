@@ -28,6 +28,8 @@ def main() -> int:
         for path in root.rglob("*"):
             if not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
                 continue
+            if path.resolve() == Path(__file__).resolve():
+                continue
             try:
                 text = path.read_text(encoding="utf-8")
             except UnicodeDecodeError:
