@@ -193,8 +193,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 cycle_id = path.rsplit("/", 1)[-1]
                 entries = system.components["trace"].query({"cycle_id": cycle_id})
                 temporal = system.components["temporal"].by_data({"cycle_id": cycle_id})
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 self._json(200, {
                     "cycle_id": cycle_id,
+                    "correlation_id": correlation,
                     "integrity": system.components["trace"].verify(),
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "entries": [e.__dict__ for e in entries],
