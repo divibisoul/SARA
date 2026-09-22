@@ -216,7 +216,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 self._json(200, {
                     "operation": "sara.clareira.audit",
                     "correlation_id": correlation,
-                    "status": "OBSERVED" if audit is not None else "EXECUTION_REQUIRED",
+                    "status": "DERIVED" if audit is not None else "EXECUTION_REQUIRED",
                     "audit": audit,
                 })
                 return
