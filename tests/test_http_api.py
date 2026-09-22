@@ -56,6 +56,7 @@ def test_v1_capabilities_requires_bearer_and_exposes_operations():
             server, "/v1/capabilities", token="test-token-123456789"
         )
         assert status == 200
+        assert "sara.health@1.0.0" in payload["operations"]
         assert "sara.cycle@1.0.0" in payload["operations"]
         assert "sara.audit@1.0.0" in payload["operations"]
     finally:
@@ -96,6 +97,9 @@ def test_capabilities_include_federation_identity_and_trace():
             if d["operation"] == "sara.trace@1.0.0"
         )
         assert trace_descriptor["endpoint"] == "/v1/trace/{cycle_id}"
+        federation = payload["soul_federation"]
+        assert federation["contract_version"] == "1.0.0"
+        assert {item["nucleus"] for item in federation["nucleus_affinities"]} == {"N01","N02","N03","N04","N05","N06"}
     finally:
         server.shutdown()
         server.server_close()
