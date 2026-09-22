@@ -85,11 +85,17 @@ def _add_guardrails(text: str) -> str:
     )
 
 
+def _preserve(text: str) -> str:
+    """Etapa explícita de estabilidade: não altera a entrada."""
+    return text
+
+
 _STEP_REGISTRY: dict[str, Callable[[str], str]] = {
     "normalize": _normalize,
     "extract_keywords": _extract_keywords,
     "structure": _structure_objective,
     "guardrails": _add_guardrails,
+    "preserve": _preserve,
 }
 
 
