@@ -90,6 +90,19 @@ def test_clareira_is_registered_and_implements_real_ingestion():
     assert system.components["eru"].has_snapshot("clareira:clareira-test-001:state")
     assert system.components["provenance"].verify_integrity() is True
 
+    snapshot = _snapshot()
+    snapshot["deviceState"] = {
+        "batteryPercent": 38,
+        "charging": False,
+        "batteryTemperatureC": 39.5,
+        "screenOn": True,
+        "network": "Wi-Fi",
+        "shizukuStatus": "AUTHORIZED",
+        "timestamp": 1000,
+    }
+    second = clareira.ingest_snapshot(snapshot, correlation_id="clareira-device-001")
+    assert second["device_state"]["batteryPercent"] == 38
+
 
 def test_clareira_rejects_invalid_snapshot_without_mutating_last_state():
     system = build_default_system(fail_closed=True)
@@ -186,3 +199,33 @@ def test_clareira_http_endpoints_call_canonical_runtime(monkeypatch):
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+def test_clareira_vagal_delivery_moves_pending_to_acknowledged():
+    import asyncio
+
+    system = build_default_system(fail_closed=True)
+    clareira = system.components["clareira"]
+
+    dispatched = asyncio.run(
+        clareira.issue_vagal_command(
+            "NP-001",
+            "calm",
+            payload={"reason": "health"},
+            priority=0.9,
+            correlation_id="clareira-vagal-delivery-001",
+        )
+    )
+    event_id = dispatched["event_id"]
+
+    pending = clareira.pending_vagal_commands()
+    assert any(item["event_id"] == event_id and item["delivery_status"] == "PENDING" for item in pending)
+
+    acknowledged = clareira.acknowledge_vagal_command(
+        event_id,
+        executed=True,
+        execution_status="APPLIED_IN_SOUL_RUNTIME",
+    )
+    assert acknowledged["delivery_status"] == "EXECUTED"
+    assert acknowledged["execution_status"] == "APPLIED_IN_SOUL_RUNTIME"
+    assert all(item["event_id"] != event_id for item in clareira.pending_vagal_commands())
