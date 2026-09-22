@@ -111,3 +111,19 @@ def test_neural_vector_encoder_is_deterministic():
     one = encoder.encode([1.0, 2.0], [[1.0, 0.0], [0.0, 1.0]])
     two = encoder.encode([1.0, 2.0], [[1.0, 0.0], [0.0, 1.0]])
     assert one == two
+
+def test_fusion_payload_overrides_defaults():
+    layer = ProbabilisticReasoningLayer(enabled=True)
+    result = layer.prepare({
+        "probabilistic": {
+            "fusion": {
+                "alpha_dirichlet": 1.0,
+                "beta_neural": 0.0,
+                "temperature": 1.0,
+            },
+            "nodes": [node(evidence={"high": 2.0}, neural={"logits": [100.0, -100.0]})],
+        }
+    })
+    posterior = result["nodes"][0]["posterior"]
+    expected = result["nodes"][0]["prior"]
+    assert posterior == expected
