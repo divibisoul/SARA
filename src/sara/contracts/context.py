@@ -33,7 +33,13 @@ class CycleContext:
     aborted: bool = False
     abort_reason: str = ""
 
-    def record(self, phase: str, module: str, ok: bool, **info: Any) -> None:
+    def record(self, phase: str, module: str, success: bool | None = None, **info: Any) -> None:
+        """Registra uma etapa aceitando ok como metadado sem colisão."""
+        if success is None and "ok" in info:
+            success = bool(info.pop("ok"))
+        if success is None:
+            raise TypeError("CycleContext.record requer sucesso explícito")
+        ok = bool(success)
         ts = now_iso()
         step = CycleStep(phase=phase, module=module, ok=ok, info=dict(info), ts=ts)
         self.steps.append(step)
