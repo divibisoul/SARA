@@ -148,6 +148,22 @@ class ClareiraSubsystem:
         if len(node_ids) != 61 or len(set(node_ids)) != 61:
             raise ValueError("CLAREIRA_TOPOLOGY_NODE_IDS_INVALID")
 
+        metrics = snapshot["metrics"]
+        if metrics.get("totalNodes") is not None and int(metrics["totalNodes"]) != 61:
+            raise ValueError("CLAREIRA_METRICS_NODE_COUNT_MISMATCH")
+        if metrics.get("activeNodes") is not None:
+            active_nodes = int(metrics["activeNodes"])
+            if active_nodes < 0 or active_nodes > 61:
+                raise ValueError("CLAREIRA_METRICS_ACTIVE_NODE_COUNT_INVALID")
+        if metrics.get("vagalTone") is not None:
+            vagal_tone = float(metrics["vagalTone"])
+            if not math.isfinite(vagal_tone) or not 0 <= vagal_tone <= 1:
+                raise ValueError("CLAREIRA_VAGAL_TONE_INVALID")
+        if metrics.get("dropRate") is not None:
+            drop_rate = float(metrics["dropRate"])
+            if not math.isfinite(drop_rate) or not 0 <= drop_rate <= 1:
+                raise ValueError("CLAREIRA_DROP_RATE_INVALID")
+
         channel_ids = [
             str(channel.get("id"))
             for channel in snapshot["channels"]
