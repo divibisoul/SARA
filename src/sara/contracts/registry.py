@@ -63,6 +63,14 @@ class ModuleRegistry:
             out[m.status.value].append(m.name)
         return out
 
+    def get(self, name: str) -> RegisteredModule | None:
+        """Retorna um módulo registrado sem expor o dicionário interno."""
+        return self._modules.get(name)
+
+    def items(self) -> list[RegisteredModule]:
+        """Snapshot imutável da coleção de módulos registrados."""
+        return list(self._modules.values())
+
     def dependency_order(self) -> list[str]:
         """Retorna ordem topológica determinística do grafo de módulos."""
         names = set(self._modules)
