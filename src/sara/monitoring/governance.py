@@ -3,6 +3,8 @@ Status: IMPLEMENTED (backend) | PENDING_INFRASTRUCTURE (UI)
 """
 from __future__ import annotations
 from dataclasses import dataclass
+import html
+import json
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.clock import now_iso
 from sara.infra.hashing import chain_hash
@@ -86,7 +88,31 @@ class GovernanceBackend:
         }
 
     def is_ui_ready(self) -> bool:
-        return False
+        return True
+
+    def render_html(self) -> str:
+        """Renderização administrativa local; não depende de framework externo."""
+        snapshot = self.snapshot()
+        decisions = self.decisions()
+        payload = {
+            "timestamp": snapshot.ts,
+            "modules": snapshot.modules,
+            "decision_count": snapshot.last_decisions,
+            "chain_integrity": self.verify_integrity(),
+            "decisions": decisions,
+        }
+        serialized = html.escape(json.dumps(payload, ensure_ascii=False, indent=2))
+        return f"""<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SARA Governance</title>
+<style>body{{font-family:system-ui,sans-serif;margin:2rem;max-width:1100px}}
+pre{{white-space:pre-wrap;background:#f4f4f4;padding:1rem;border-radius:.5rem}}
+h1{{margin-bottom:.25rem}}</style></head>
+<body><h1>SARA Governance</h1>
+<p>Estado administrativo local, com cadeia de integridade verificável.</p>
+<pre>{serialized}</pre>
+</body></html>"""
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
