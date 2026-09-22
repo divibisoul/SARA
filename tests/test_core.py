@@ -173,7 +173,7 @@ def _loop(components):
 
 def test_loop_convergencia_com_entrada_limpa(components):
     report = _loop(components).run("promover autonomia comunitária")
-    assert report.converged is True
+    assert report.converged is True, report.cycles
     assert report.rollback_performed is False
 
 
