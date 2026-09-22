@@ -28,6 +28,7 @@ class BridgeAudit:
     capability_observations: list[dict] = field(default_factory=list)
     capability_drifts: list[dict] = field(default_factory=list)
     recovery_candidates: list[dict] = field(default_factory=list)
+    capability_recovery_candidates: list[dict] = field(default_factory=list)
 
 
 class ERUTrinityBridge:
@@ -105,6 +106,13 @@ class ERUTrinityBridge:
             records.append(record)
         return records
 
+    @staticmethod
+    def _capability_pairs(audit: BridgeAudit) -> dict[str, list[dict]]:
+        by_role: dict[str, list[dict]] = {}
+        for item in audit.capability_observations:
+            by_role.setdefault(item["role"], []).append(item)
+        return by_role
+
     def detect_capability_drift(self, cycle_id: str) -> list[dict]:
         audit = self._cycles.get(cycle_id)
         if audit is None:
@@ -179,6 +187,20 @@ class ERUTrinityBridge:
         capability_drifts = self.detect_capability_drift(cycle_id)
         candidates = self.advise_recovery(cycle_id=cycle_id)
         audit.recovery_candidates = candidates
+
+        capability_candidates: list[dict] = []
+        for role, observations in self._capability_pairs(audit).items():
+            for older, newer in zip(observations, observations[1:]):
+                capability_candidates.extend(
+                    self._advisor.find_lost_capabilities(
+                        older["snapshot_name"], newer["snapshot_name"]
+                    )
+                )
+        audit.capability_recovery_candidates = [
+            c for c in capability_candidates
+            if c.get("provenance") == "ERU_CAPABILITY_CANDIDATE"
+        ]
+
         return {
             "ok": True,
             "cycle_id": cycle_id,
@@ -186,6 +208,7 @@ class ERUTrinityBridge:
             "drifts": drifts,
             "capability_drifts": capability_drifts,
             "capability_observations": list(audit.capability_observations),
+            "capability_recovery_candidates": list(audit.capability_recovery_candidates),
             "recovery_candidates": candidates,
             "alignment": self.align_trinity(),
         }
