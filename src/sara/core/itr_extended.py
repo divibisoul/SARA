@@ -22,6 +22,7 @@ from sara.core.itr import (
 )
 from sara.core.provenance import Provenance, ProvenanceTracker
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
+from sara.core.semantic_engine import SemanticEngine, SemanticFrame
 
 
 @dataclass(frozen=True)
@@ -85,6 +86,7 @@ class ITR_Extended(ITR):
 
     def __init__(self, provenance: ProvenanceTracker, safe_sandbox=None) -> None:
         super().__init__(provenance, safe_sandbox)
+        self._semantic = SemanticEngine()
         # Registra os passos extras no registry central
         for name, fn in self.EXTRA_STEPS.items():
             _STEP_REGISTRY.setdefault(name, fn)
@@ -96,6 +98,41 @@ class ITR_Extended(ITR):
         )
 
     # -----------------------------------------------------------------
+    # 1. ANÁLISE SEMÂNTICA ESTRATÉGICA
+    # -----------------------------------------------------------------
+
+    def analyze_semantics(self, objective: str) -> SemanticFrame:
+        return self._semantic.analyze(objective)
+
+    def semantic_strategy_profile(self, objective: str) -> dict:
+        frame = self.analyze_semantics(objective)
+        relation_count = len(frame.relations)
+        explicit_actions = [
+            {
+                "subject": r.subject,
+                "action": r.action,
+                "object": r.object,
+                "negated": r.negated,
+                "clause": r.clause_index,
+            }
+            for r in frame.relations
+        ]
+        return {
+            "fingerprint": frame.fingerprint,
+            "clauses": list(frame.clauses),
+            "entities": list(frame.entities),
+            "relations": explicit_actions,
+            "relation_count": relation_count,
+            "negation_count": len(frame.negations),
+            "semantic_density": round(
+                relation_count / max(len(frame.tokens), 1), 4
+            ),
+        }
+
+    def validate_execution_semantics(self, original: str, transformed: str) -> dict:
+        return self._semantic.compare(original, transformed)
+
+    # -----------------------------------------------------------------
     # 1. PLANO ESTRATÉGICO
     # -----------------------------------------------------------------
 
@@ -104,6 +141,7 @@ class ITR_Extended(ITR):
         """Gera plano multi-fase com critérios de convergência."""
         ctx = dict(context or {})
         base = self._analyze(objective)
+        semantic = self.semantic_strategy_profile(objective)
 
         phases = [
             {
@@ -115,6 +153,7 @@ class ITR_Extended(ITR):
                 "phase": 2, "name": "extract",
                 "steps": ["extract_keywords"],
                 "purpose": "isolar núcleo semântico",
+                "semantic_profile": semantic,
             },
             {
                 "phase": 3, "name": "structure",
