@@ -8,7 +8,7 @@ from typing import Any
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.hashing import hash_json
 from sara.infra.clock import now_iso
-from sara.infra.hashing import chain_hash
+from sara.core.provenance import Provenance
 
 
 @dataclass
