@@ -181,7 +181,8 @@ class ETR_Extended(ETR):
     def _assess_virtue(self, text: str) -> FrameworkAssessment:
         lower = str(text).lower()
         virtues = ("cuidado", "respeito", "responsabilidade", "coragem",
-                   "honestidade", "comunidade", "solidariedade")
+                   "honestidade", "comunidade", "solidariedade",
+                   "autonomia", "transparência", "transparencia")
         hits = sum(1 for v in virtues if v in lower)
         score = min(hits / 3.0, 1.0)
         return FrameworkAssessment(
@@ -194,7 +195,8 @@ class ETR_Extended(ETR):
     def _assess_care(self, text: str) -> FrameworkAssessment:
         lower = str(text).lower()
         care_terms = ("comunidade", "coletivo", "gerações", "natureza",
-                       "solidariedade", "vulnerável", "cuidar")
+                       "solidariedade", "vulnerável", "cuidar",
+                       "autonomia", "transparência", "transparencia")
         hits = sum(1 for c in care_terms if c in lower)
         # Ubuntu e BuenVivir reforçam o framework do cuidado.
         ubuntu = self._ubuntu.evaluate_structured(text) if hasattr(self._ubuntu, "evaluate_structured") else self._ubuntu.evaluate(text).__dict__
