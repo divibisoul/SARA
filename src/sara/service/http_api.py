@@ -263,6 +263,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 text = body.get("input")
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
+                raw_context = body.get("context")
+                context = raw_context if isinstance(raw_context, dict) else None
+                probabilistic = system.sistema_vivo.prepare_context(context)
                 ara = system.components["ara_extended"]
                 etr = system.components["etr_extended"]
                 flaws = ara.detect(text)
@@ -282,6 +285,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "semantic": [getattr(f, "__dict__", str(f)) for f in semantic],
                         "ethical": getattr(ethical, "__dict__", str(ethical)),
                         "provenance": ara.meta_audit_complete(),
+                        **({"probabilistic": probabilistic} if probabilistic is not None else {}),
                     })
                     return
                 regenerated = ara.regenerate_semantic(text, all_flaws)
