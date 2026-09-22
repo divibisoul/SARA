@@ -486,6 +486,8 @@ class RegenerativeLoop:
 
     def _phase_validation(self, ctx, cycle, etr_result):
         result = self._etr.validate(ctx.current, mode="default")
+        multi = getattr(self._etr, "validate_multi_framework", None)
+        multi_result = multi(ctx.current) if multi else None
         semantic_validation = (
             self._etr.validate_semantic_frame(ctx.current)
             if hasattr(self._etr, "validate_semantic_frame")
@@ -498,6 +500,7 @@ class RegenerativeLoop:
         )
         approved = (
             result.approved
+            and (multi_result.approved if multi_result else True)
             and bool(semantic_validation.get("ok", True))
             and bool(filter_validation.get("ok", True))
         )
@@ -511,7 +514,10 @@ class RegenerativeLoop:
             "filter_chain_ok": bool(filter_validation.get("ok", True)),
             "filter_chain_results": filter_validation.get("results", []),
             "filter_chain_failures": filter_validation.get("failures", []),
-            "decision_status": getattr(result, "reason", None),
+            "multi_framework_approved": multi_result.approved if multi_result else None,
+            "decision_status": multi_result.decision_status if multi_result else ("APPROVED" if result.approved else "REJECTED"),
+            "evidence_sufficient": multi_result.evidence_sufficient if multi_result else bool(result.evidence),
+            "conflicts": list(multi_result.conflicts) if multi_result else [],
             "evidence_count": len(getattr(result, "evidence", ())),
         }
         self._record(ctx, CyclePhase.VALIDATION, "ETR", approved,
@@ -519,6 +525,8 @@ class RegenerativeLoop:
         if not approved:
             if not result.approved:
                 reason = result.reason
+            elif multi_result is not None and not multi_result.approved:
+                reason = f"multi_framework_rejected:{multi_result.decision_status}"
             elif not semantic_validation.get("ok", True):
                 reason = "semantic_validation_rejected"
             else:
