@@ -58,6 +58,18 @@ class HTTPJSONBackend:
         self._cache: dict[str, tuple[float, list[dict]]] = {}
         self._cache_lock = threading.RLock()
 
+    def describe(self) -> dict:
+        return {
+            "source": self.source,
+            "endpoint_configured": bool(self.endpoint_template),
+            "token_env": self.token_env,
+            "timeout_s": self.timeout_s,
+            "cache_ttl_s": self.cache_ttl_s,
+            "max_retries": self.max_retries,
+            "backoff_s": self.backoff_s,
+            "retry_statuses": [429, 502, 503, 504],
+        }
+
     def fetch(self, query: str) -> list[dict]:
         encoded_query = urllib.parse.quote(str(query), safe="")
         url = self.endpoint_template.format(query=encoded_query)
@@ -142,6 +154,7 @@ class QuantumCrawler:
             "phases": [p.value for p in self.CYCLE_PHASES],
             "backends_configured": len(self._backends),
             "is_backends_ready": self.is_backends_ready(),
+            "backends": [backend.describe() for backend in self._backends if hasattr(backend, "describe")],
         }
 
     def is_backends_ready(self) -> bool:
