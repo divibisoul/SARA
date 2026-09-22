@@ -134,11 +134,13 @@ class QuantumCrawler:
         if not source or not name:
             return {"verified": False, "reason": "candidate_source_or_name_missing"}
         return {
-            "verified": True,
+            "verified": False,
+            "source_identified": True,
             "source": source,
             "name": name,
             "license_present": bool(str(candidate.license).strip()),
-            "verification_mode": "backend_identity",
+            "verification_mode": "backend_identity_only",
+            "reason": "origem identificada pelo backend; autenticidade/licença jurídica exigem consulta verificável",
         }
 
     def list_sources(self) -> list[str]:
