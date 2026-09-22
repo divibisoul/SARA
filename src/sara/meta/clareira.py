@@ -9,6 +9,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import threading
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -81,6 +82,7 @@ class ClareiraSubsystem:
         self._latest_hash = ""
         self._snapshots: list[dict[str, Any]] = []
         self._vagal_commands: list[dict[str, Any]] = []
+        self._lock = threading.RLock()
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -247,11 +249,12 @@ class ClareiraSubsystem:
             "received_at": payload["timestamp"],
             "device_state": copy.deepcopy(payload["device_state"]),
         }
-        self._latest_snapshot = record
-        self._latest_hash = digest
-        self._snapshots.append(copy.deepcopy(record))
-        if len(self._snapshots) > 128:
-            del self._snapshots[:-128]
+        with self._lock:
+            self._latest_snapshot = record
+            self._latest_hash = digest
+            self._snapshots.append(copy.deepcopy(record))
+            if len(self._snapshots) > 128:
+                del self._snapshots[:-128]
 
         if self.provenance is not None:
             self.provenance.register(
@@ -295,7 +298,8 @@ class ClareiraSubsystem:
         )
         record = copy.deepcopy(event)
         record["delivery_status"] = "PENDING"
-        self._vagal_commands.append(record)
+        with self._lock:
+            self._vagal_commands.append(record)
         if self.provenance is not None:
             self.provenance.register(
                 f"Clareira.vagal.dispatch.{event['event_id']}",
@@ -318,11 +322,12 @@ class ClareiraSubsystem:
     def pending_vagal_commands(self, *, limit: int = 32) -> list[dict[str, Any]]:
         if limit < 1:
             raise ValueError("CLAREIRA_VAGAL_LIMIT_INVALID")
-        pending = [
-            copy.deepcopy(item)
-            for item in self._vagal_commands
-            if item.get("delivery_status") == "PENDING"
-        ]
+        with self._lock:
+            pending = [
+                copy.deepcopy(item)
+                for item in self._vagal_commands
+                if item.get("delivery_status") == "PENDING"
+            ]
         return pending[-min(limit, 128):]
 
     def acknowledge_vagal_command(
@@ -334,7 +339,9 @@ class ClareiraSubsystem:
     ) -> dict[str, Any]:
         if not event_id.strip():
             raise ValueError("CLAREIRA_VAGAL_EVENT_ID_REQUIRED")
-        for item in reversed(self._vagal_commands):
+        with self._lock:
+            matches = reversed(self._vagal_commands)
+            for item in matches:
             if item.get("event_id") == event_id:
                 if item.get("delivery_status") != "PENDING":
                     raise ValueError("CLAREIRA_VAGAL_EVENT_ALREADY_ACKNOWLEDGED")
