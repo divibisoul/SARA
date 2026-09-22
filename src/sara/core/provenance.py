@@ -81,13 +81,13 @@ class ProvenanceTracker:
                 return False
             previous = "GENESIS"
             for rule, chain_value in zip(self._rules, self._chain):
-            payload = {
-                "entity": rule.entity,
-                "provenance": rule.provenance.value,
-                "evidence": rule.evidence,
-                "source": rule.source,
-            }
-            expected = chain_hash(previous, payload)
+                payload = {
+                    "entity": rule.entity,
+                    "provenance": rule.provenance.value,
+                    "evidence": rule.evidence,
+                    "source": rule.source,
+                }
+                expected = chain_hash(previous, payload)
                 if expected != chain_value or rule.hash != chain_value:
                     return False
                 previous = chain_value
