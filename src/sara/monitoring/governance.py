@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.clock import now_iso
+from sara.infra.hashing import chain_hash
 
 
 @dataclass
@@ -25,6 +26,7 @@ class GovernanceBackend:
     def __init__(self, module_status: dict[str, str]) -> None:
         self._modules = dict(module_status)
         self._decisions: list[dict] = []
+        self._decision_chain: list[str] = []
 
     def describe(self) -> dict:
         return {
@@ -36,10 +38,30 @@ class GovernanceBackend:
         }
 
     def register_decision(self, decision: dict) -> None:
-        self._decisions.append({"ts": now_iso(), **decision})
+        payload = {"ts": now_iso(), **dict(decision)}
+        previous = self._decision_chain[-1] if self._decision_chain else "GENESIS"
+        current = chain_hash(previous, payload)
+        payload["integrity"] = current
+        self._decisions.append(payload)
+        self._decision_chain.append(current)
 
     def snapshot(self) -> SystemSnapshot:
         return SystemSnapshot(now_iso(), dict(self._modules), len(self._decisions))
+
+    def verify_integrity(self) -> bool:
+        if len(self._decisions) != len(self._decision_chain):
+            return False
+        previous = "GENESIS"
+        for decision, chain_value in zip(self._decisions, self._decision_chain):
+            payload = {
+                k: v for k, v in decision.items()
+                if k != "integrity"
+            }
+            expected = chain_hash(previous, payload)
+            if expected != chain_value or decision.get("integrity") != chain_value:
+                return False
+            previous = chain_value
+        return True
 
     def decisions(self, since: str | None = None) -> list[dict]:
         if since is None:
@@ -69,4 +91,5 @@ class GovernanceBackend:
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
             ctx.record("governance", self.NAME, True,
-                       decisions_count=len(self._decisions))
+                       decisions_count=len(self._decisions),
+                       chain_integrity=self.verify_integrity())
