@@ -14,6 +14,14 @@ from typing import Final
 SARA_FEDERATION_CONTRACT_VERSION: Final[str] = "1.0.0"
 
 SARA_OPERATIONS: Final[dict[str, dict]] = {
+    "sara.health": {
+        "version": "1.0.0",
+        "endpoint": "/health",
+        "method": "GET",
+        "phases": ["monitoring"],
+        "purpose": "consultar prontidão e integridade operacional do SARA",
+        "requires_auth": False,
+    },
     "sara.cycle": {
         "version": "1.0.0",
         "endpoint": "/v1/cycle",
@@ -22,6 +30,7 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
                    "strategy", "execution", "validation", "persistence",
                    "snapshot", "monitoring", "governance"],
         "purpose": "executar o ciclo regenerativo completo",
+        "requires_auth": True,
     },
     "sara.audit": {
         "version": "1.0.0",
@@ -29,6 +38,7 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "method": "POST",
         "phases": ["audit", "ethics", "validation"],
         "purpose": "auditar entrada sem solicitar regeneração",
+        "requires_auth": True,
     },
     "sara.regenerate": {
         "version": "1.0.0",
@@ -36,6 +46,7 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "method": "POST",
         "phases": ["audit", "regeneration", "ethics", "validation"],
         "purpose": "regenerar preservando a entrada e retornar evidência",
+        "requires_auth": True,
     },
     "sara.state": {
         "version": "1.0.0",
@@ -43,6 +54,7 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "method": "GET",
         "phases": [],
         "purpose": "consultar estado operacional do SARA",
+        "requires_auth": True,
     },
     "sara.capabilities": {
         "version": "1.0.0",
@@ -50,6 +62,7 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "method": "GET",
         "phases": ["persistence"],
         "purpose": "descobrir contratos e capacidades do SARA",
+        "requires_auth": True,
     },
     "sara.trace": {
         "version": "1.0.0",
@@ -57,6 +70,7 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "method": "GET",
         "phases": ["persistence", "monitoring"],
         "purpose": "recuperar evidência correlacionada de um ciclo",
+        "requires_auth": True,
     },
 }
 
