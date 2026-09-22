@@ -171,6 +171,24 @@ class RegenerativeLoop:
                 eru_bridge.observe_capabilities(cid, f"LOOP_{idx}_INPUT")
 
             try:
+                if self._trinity is not None and hasattr(self._trinity, "checkpoint"):
+                    checkpoint = self._trinity.checkpoint(
+                        pre_state,
+                        cycle_id=cid,
+                        phase=f"ITERATION_{idx}_PRE",
+                        name="before",
+                    )
+                    cycle["eru_checkpoint"] = checkpoint
+                    self._record(
+                        ctx,
+                        CyclePhase.AUDIT,
+                        "ERU_Engine",
+                        bool(checkpoint.get("verified")),
+                        checkpoint=checkpoint,
+                    )
+                    if not checkpoint.get("verified"):
+                        raise _Aborted("PREFLIGHT", "eru_checkpoint_not_verified")
+
                 self._run_phases_canonical(ctx, cycle, idx)
                 if self._auditor is not None and hasattr(self._auditor, "check"):
                     audit_results = self._auditor.check(ctx, cycle)
@@ -201,15 +219,60 @@ class RegenerativeLoop:
                     raise _Aborted("VALIDATION", ";".join(invariant_report.blocking_failures))
 
                 post_etr = self._etr.validate(ctx.current, mode="default")
+                post_multi = (
+                    self._etr.validate_multi_framework(ctx.current)
+                    if hasattr(self._etr, "validate_multi_framework")
+                    else None
+                )
                 post_flaws = self._collect_flaws(ctx.current)
+                trinity_reaudit = (
+                    self._trinity.assess(ctx.current)
+                    if self._trinity is not None and hasattr(self._trinity, "assess")
+                    else None
+                )
                 cycle["post_validation"] = {
                     "approved": post_etr.approved,
                     "reason": post_etr.reason,
+                    "decision_status": getattr(post_multi, "decision_status", None),
+                    "evidence_sufficient": getattr(post_multi, "evidence_sufficient", None),
                     "flaws": [f.kind for f in post_flaws],
                 }
+                cycle["trinity_reaudit"] = trinity_reaudit
+
+                multi_ok = (
+                    post_multi is None
+                    or (
+                        post_multi.approved
+                        and post_multi.evidence_sufficient
+                    )
+                )
+                trinity_ok = (
+                    trinity_reaudit is None
+                    or (
+                        not any(
+                            trinity_reaudit.get("flaws", {}).get(k, [])
+                            for k in ("lexical", "semantic", "structural", "relational")
+                        )
+                        and bool(trinity_reaudit.get("ethics", {}).get("approved"))
+                    )
+                )
+                final_checkpoint = (
+                    self._trinity.checkpoint(
+                        {"iteration": idx, "state": ctx.current},
+                        cycle_id=cid,
+                        phase=f"ITERATION_{idx}_POST",
+                        name="after",
+                    )
+                    if self._trinity is not None and hasattr(self._trinity, "checkpoint")
+                    else None
+                )
+                cycle["eru_result_checkpoint"] = final_checkpoint
+                checkpoint_ok = final_checkpoint is None or bool(final_checkpoint.get("verified"))
 
                 converged = (
                     post_etr.approved
+                    and multi_ok
+                    and trinity_ok
                     and not post_flaws
                     and bool(
                         ctx.flags.get(
@@ -218,6 +281,7 @@ class RegenerativeLoop:
                         )
                     )
                     and invariant_report.ok
+                    and checkpoint_ok
                 )
                 cycle["converged"] = converged
                 if self._working_memory is not None:

@@ -1,0 +1,111 @@
+name: Integrated ARA ETR ITR ERU engineering gate
+
+on:
+  push:
+    branches:
+      - feat/integrated-engineering-gate-current
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  engineering-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e . pytest
+
+      - name: Preservation gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --unshallow origin main 2>/dev/null || git fetch origin main
+          deleted="$(git diff --name-status origin/main...HEAD | awk '$1 == "D" {print $2}')"
+          if [ -n "$deleted" ]; then
+            echo "Forbidden deleted paths:"
+            echo "$deleted"
+            exit 1
+          fi
+
+          for path in src/sara/core/ara.py src/sara/core/etr.py src/sara/core/itr.py; do
+            before="$(git show "origin/main:$path" | sha256sum | cut -d' ' -f1)"
+            after="$(git show "HEAD:$path" | sha256sum | cut -d' ' -f1)"
+            echo "$path before=$before after=$after"
+            test "$before" = "$after"
+          done
+
+      - name: Repository-wide additive preservation gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --unshallow origin main 2>/dev/null || git fetch origin main
+          python scripts/preservation_gate.py origin/main
+
+      - name: Engineering gate report
+        run: |
+          python -m sara.audit.engineering_gate | tee /tmp/engineering-gate.json
+          python - <<'PY'
+          import json
+          data = json.load(open("/tmp/engineering-gate.json", encoding="utf-8"))
+          assert data["critical_ok"] is True, data
+          print("ENGINEERING_GATE_CRITICAL_OK=TRUE")
+          print("ENGINEERING_GATE_STATUS=", data["status"])
+          print("BLOCKERS=", len(data["blockers"]))
+          print("FINDINGS=", len(data["findings"]))
+          PY
+
+      - name: Current cycle diagnostic
+        run: |
+          python - <<'PY'
+          from sara.bootstrap import build_default_system
+          system = build_default_system(fail_closed=True)
+          itr = system.components["itr_extended"]
+          try:
+              plan = itr.generate_strategic("promover consciência comunitária", {"cycle": 1, "clean_state": False})
+              print("ITR_PLAN:", plan)
+              print("ITR_STEPS:", [s for p in plan.phases for s in p["steps"]])
+              print("ITR_EXEC:", itr.execute_composed(plan).metrics)
+          except Exception as exc:
+              print("ITR_DIRECT_ERROR:", type(exc).__name__, str(exc))
+          result = system.sistema_vivo.process(
+              "promover consciência comunitária", cycle_id="gate-runtime-diagnostic"
+          )
+          print("CYCLE_CONVERGED:", result.loop_report.converged)
+          print("CYCLE_PHASES:", [s["phase"] for s in result.loop_report.context_steps])
+          print("CYCLE_LAST:", result.loop_report.cycles[-1] if result.loop_report.cycles else None)
+          PY
+
+      - name: Executable integrated engineering matrix
+        run: |
+          python -m sara.audit.engineering_matrix | tee /tmp/engineering-matrix.json
+          python - <<'PY'
+          import json
+          data = json.load(open("/tmp/engineering-matrix.json", encoding="utf-8"))
+          assert data["totals"]["REAL"] > 0, data
+          assert len(data["items"]) >= 100, data["totals"]
+          assert data["integrity_hash"], data
+          print("ENGINEERING_MATRIX_STATUS=", data["status"])
+          print("ENGINEERING_MATRIX_TOTALS=", data["totals"])
+          print("ENGINEERING_MATRIX_BLOCKERS=", len(data["blockers"]))
+          PY
+
+      - name: Integrated regression tests
+        run: |
+          python -m pytest -q             tests/test_engineering_gate.py             tests/test_trinity_extended.py             tests/test_trinity_self_optimization.py             tests/test_eru_behavior_evidence.py             tests/test_eru_trinity_symbiosis.py             tests/test_http_api.py
+
+      - name: Broad regression snapshot
+        if: always()
+        run: |
+          python -m pytest -q tests/ || true

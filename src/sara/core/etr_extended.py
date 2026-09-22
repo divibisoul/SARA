@@ -29,6 +29,8 @@ class FrameworkAssessment:
     approved: bool
     score: float
     reasoning: str
+    evidence: tuple[str, ...] = ()
+    basis: str = "STRUCTURED_HEURISTIC"
 
 
 @dataclass(frozen=True)
@@ -37,6 +39,9 @@ class MultiFrameworkResult:
     assessments: tuple[FrameworkAssessment, ...]
     consensus_score: float
     dissenting_frameworks: tuple[str, ...]
+    decision_status: str = "UNMEASURABLE"
+    evidence_sufficient: bool = False
+    conflicts: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -55,7 +60,7 @@ class ETR_Extended(ETR):
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.NUCLEAR
-    DEPENDENCIES = ETR.DEPENDENCIES + ("ETR",)
+    DEPENDENCIES = ETR.DEPENDENCIES
     CYCLE_PHASES = ETR.CYCLE_PHASES
 
     FRAMEWORKS = ("utilitarista", "deontologico", "virtude", "cuidado")
@@ -146,12 +151,33 @@ class ETR_Extended(ETR):
         if not semantic["ok"]:
             consensus = min(consensus, 0.5)
         dissenting = tuple(a.framework for a in assessments if not a.approved)
-
+        evidence_sufficient = (
+            bool(semantic["fingerprint"])
+            and len(assessments) == len(self.FRAMEWORKS)
+            and all(bool(a.evidence) for a in assessments)
+        )
+        conflicts = tuple(
+            a.framework
+            for a in assessments
+            if any(other.approved != a.approved for other in assessments if other is not a)
+        )
+        if not semantic["ok"]:
+            decision_status = "REJECTED"
+        elif not evidence_sufficient:
+            decision_status = "INSUFFICIENT_EVIDENCE"
+        elif consensus >= 0.75:
+            decision_status = "APPROVED"
+        else:
+            decision_status = "REJECTED"
+        approved = decision_status == "APPROVED"
         return MultiFrameworkResult(
-            approved=consensus >= 0.75,
+            approved=approved,
             assessments=tuple(assessments),
             consensus_score=round(consensus, 4),
             dissenting_frameworks=dissenting,
+            decision_status=decision_status,
+            evidence_sufficient=evidence_sufficient,
+            conflicts=conflicts,
         )
 
     def _assess_utilitarian(self, text: str) -> FrameworkAssessment:
@@ -161,11 +187,21 @@ class ETR_Extended(ETR):
         pos = sum(1 for p in positive if p in lower)
         neg = sum(1 for n in negative if n in lower)
         score = max(0.0, min(1.0, (pos - neg + 3) / 6))
+        evidence = tuple(
+            [f"positive_term:{p}" for p in positive if p in lower]
+            + [f"negative_term:{n}" for n in negative if n in lower]
+            + [f"positive_terms_evaluated:{len(positive)}",
+               f"negative_terms_evaluated:{len(negative)}",
+               f"positive_hits:{pos}",
+               f"negative_hits:{neg}"]
+        )
         return FrameworkAssessment(
             framework="utilitarista",
-            approved=score >= 0.5,
+            approved=score >= 0.5 and neg == 0,
             score=round(score, 3),
             reasoning=f"beneficios={pos} danos={neg}",
+            evidence=evidence,
+            basis="LEXICAL_HEURISTIC_WITH_HARM_GUARD",
         )
 
     def _assess_deontological(self, text: str) -> FrameworkAssessment:
@@ -176,6 +212,18 @@ class ETR_Extended(ETR):
             approved=r.approved,
             score=score,
             reasoning=f"reason={r.reason}",
+            evidence=(
+                tuple(
+                    f"{e.layer}:{e.kind}:{','.join(e.matched)}"
+                    for e in r.evidence
+                )
+                or (
+                    f"base_validation:{r.reason}",
+                    "prohibited_terms_absent" if r.approved else "base_rule_rejected",
+                    f"identity_checked:{r.approved}",
+                )
+            ),
+            basis="BASE_ETR_RULES",
         )
 
     def _assess_virtue(self, text: str) -> FrameworkAssessment:
@@ -185,11 +233,17 @@ class ETR_Extended(ETR):
                    "solidariedade", "autonomia", "transparência", "transparencia")
         hits = sum(1 for v in virtues if v in lower)
         score = min(hits / 3.0, 1.0)
+        evidence = tuple(
+            [f"virtue_term:{v}" for v in virtues if v in lower]
+            + [f"virtue_terms_evaluated:{len(virtues)}", f"virtue_hits:{hits}"]
+        )
         return FrameworkAssessment(
             framework="virtude",
             approved=score >= 0.33,
             score=round(score, 3),
             reasoning=f"virtudes_encontradas={hits}",
+            evidence=evidence,
+            basis="LEXICAL_HEURISTIC",
         )
 
     def _assess_care(self, text: str) -> FrameworkAssessment:
@@ -207,6 +261,18 @@ class ETR_Extended(ETR):
         semantic_evidence = len(ubuntu.get("semantic_evidence", ())) + len(buen.get("semantic_evidence", ()))
         score = min((hits + (1 if ubuntu_aligned else 0) +
                      (1 if buen_aligned else 0) + semantic_evidence) / 6.0, 1.0)
+        evidence = (
+            tuple(f"care_term:{c}" for c in care_terms if c in lower)
+            + tuple(f"ubuntu:{x}" for x in ubuntu.get("semantic_evidence", ()))
+            + tuple(f"buen_vivir:{x}" for x in buen.get("semantic_evidence", ()))
+            + (
+                f"care_terms_evaluated:{len(care_terms)}",
+                f"care_hits:{hits}",
+                f"ubuntu_aligned:{ubuntu_aligned}",
+                f"buen_vivir_aligned:{buen_aligned}",
+                f"semantic_evidence_count:{semantic_evidence}",
+            )
+        )
         return FrameworkAssessment(
             framework="cuidado",
             approved=score >= 0.25,
@@ -215,6 +281,8 @@ class ETR_Extended(ETR):
                 f"termos_cuidado={hits} ubuntu={ubuntu_aligned} "
                 f"buen={buen_aligned} semantic_evidence={semantic_evidence}"
             ),
+            evidence=evidence,
+            basis="LEXICAL_PLUS_CULTURAL_STRUCTURED",
         )
 
     # -----------------------------------------------------------------
@@ -222,13 +290,38 @@ class ETR_Extended(ETR):
     # -----------------------------------------------------------------
 
     def validate_against_self(self) -> MultiFrameworkResult:
-        """ETR aplica-se a si mesmo: valida sua própria configuração."""
+        """ETR aplica-se à sua configuração pública observável."""
         self_description = (
-            f"ETR_Extended v{self.VERSION} com frameworks={list(self.FRAMEWORKS)} "
-            f"validação em 5 camadas, respeitando autonomia, transparência, "
-            f"dignidade e promovendo o cuidado com a comunidade e as gerações futuras."
+            f"config={self.describe()} "
+            f"frameworks={list(self.FRAMEWORKS)} "
+            "autonomia transparência dignidade cuidado comunidade "
+            "validação multi-framework"
         )
         return self.validate_multi_framework(self_description)
+
+    def validate_proposal(self, proposal: Any, *, proposed_by: str) -> dict:
+        """Valida uma proposta independentemente do módulo que a produziu."""
+        result = self.validate_multi_framework(str(proposal))
+        return {
+            "proposed_by": proposed_by,
+            "approved": result.approved,
+            "decision_status": result.decision_status,
+            "evidence_sufficient": result.evidence_sufficient,
+            "consensus": result.consensus_score,
+            "dissenting": list(result.dissenting_frameworks),
+            "conflicts": list(result.conflicts),
+            "assessments": [
+                {
+                    "framework": a.framework,
+                    "approved": a.approved,
+                    "score": a.score,
+                    "reasoning": a.reasoning,
+                    "evidence": list(a.evidence),
+                    "basis": a.basis,
+                }
+                for a in result.assessments
+            ],
+        }
 
     # -----------------------------------------------------------------
     # 3. ETR VALIDA A TRINDADE
@@ -245,11 +338,17 @@ class ETR_Extended(ETR):
                 "approved": ara_assessment.approved,
                 "consensus": ara_assessment.consensus_score,
                 "dissenting": ara_assessment.dissenting_frameworks,
+                "decision_status": ara_assessment.decision_status,
+                "evidence_sufficient": ara_assessment.evidence_sufficient,
+                "conflicts": ara_assessment.conflicts,
             },
             "itr": {
                 "approved": itr_assessment.approved,
                 "consensus": itr_assessment.consensus_score,
                 "dissenting": itr_assessment.dissenting_frameworks,
+                "decision_status": itr_assessment.decision_status,
+                "evidence_sufficient": itr_assessment.evidence_sufficient,
+                "conflicts": itr_assessment.conflicts,
             },
             "combined": {
                 "approved": combined_assessment.approved,

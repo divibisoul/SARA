@@ -93,6 +93,26 @@ class TrinityERUUnified:
     def recovery_advice(self, cycle_id: str) -> list[dict]:
         return self._bridge.advise_recovery(cycle_id=cycle_id)
 
+    def fuse_and_mirror(self, *args, **kwargs):
+        """Expose the underlying Trinity fusion contract to the regenerative loop."""
+        return self._trinity.fuse_and_mirror(*args, **kwargs)
+
+    def mirror(self, *args, **kwargs):
+        return self._trinity.mirror(*args, **kwargs)
+
+    def audit_mirror(self, *args, **kwargs):
+        return self._trinity.audit_mirror(*args, **kwargs)
+
+    def checkpoint(self, state, *, cycle_id: str, phase: str, name: str = "cycle") -> dict:
+        """Create an explicit ERU checkpoint through the canonical bridge."""
+        return self._eru.checkpoint(
+            name,
+            state,
+            cycle_id=cycle_id,
+            phase=phase,
+            source="TrinityERUUnified.checkpoint",
+        )
+
     def bridge(self) -> ERUTrinityBridge:
         return self._bridge
 
