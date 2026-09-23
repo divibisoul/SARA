@@ -139,10 +139,6 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
                     ),
-                    "octacore.g0@1.0.0": (
-                        "existing sara.* operations",
-                        ("regeneration", "audit", "ethics", "validation", "persistence"),
-                    ),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -170,7 +166,6 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
-                        "octacore.g0@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -206,6 +201,70 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "temporal_records": [r.__dict__ for r in temporal],
                 })
                 return
+            if path == "/v1/vagus":
+                bus = system.components.get("vagus_bus")
+                if bus is None:
+                    raise SaraAPIError(503, "VAGUS_BUS_UNAVAILABLE", "Vagus control plane indisponível.")
+                required = (
+                    "vagus_version", "message_id", "correlation_id",
+                    "source", "target", "priority", "ttl", "type", "payload",
+                )
+                missing = [key for key in required if key not in body]
+                if missing:
+                    raise SaraAPIError(
+                        422,
+                        "INVALID_VAGUS_ENVELOPE",
+                        "Campos obrigatórios ausentes.",
+                        {"missing": missing},
+                    )
+                try:
+                    vagus_version = str(body["vagus_version"]).strip()
+                    message_id = str(body["message_id"]).strip()
+                    correlation_id = str(body["correlation_id"]).strip()
+                    source = str(body["source"]).strip()
+                    target = str(body["target"]).strip()
+                    event_type = str(body["type"]).strip()
+                    priority = int(body["priority"])
+                    ttl = int(body["ttl"])
+                except (TypeError, ValueError) as exc:
+                    raise SaraAPIError(
+                        422,
+                        "INVALID_VAGUS_ENVELOPE",
+                        "priority/ttl e identificadores devem possuir formato válido.",
+                    ) from exc
+                payload = body["payload"]
+                if not isinstance(payload, dict):
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
+                if vagus_version != "1.0":
+                    raise SaraAPIError(422, "INVALID_VAGUS_VERSION", "Vagus version não suportada.")
+                if not message_id or not correlation_id or not source or not target or not event_type:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Envelope Vagus incompleto.")
+                if not 0 <= priority <= 100 or ttl <= 0:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "priority deve estar entre 0 e 100; ttl deve ser positivo.")
+                allowed = (
+                    event_type.startswith(("health.", "capability.", "signal.", "sara.", "session.", "research."))
+                    or event_type in {"gpu.submit", "gpu.result", "gpu.barrier"}
+                )
+                if not allowed:
+                    raise SaraAPIError(422, "INVALID_VAGUS_TYPE", f"Tipo Vagus não suportado: {event_type}")
+                event = bus.publish_sync(
+                    source,
+                    target,
+                    event_type,
+                    payload,
+                    status=str(body.get("status", "EXECUTE")).strip() or "EXECUTE",
+                    correlation_id=correlation_id,
+                    message_id=message_id,
+                    priority=priority,
+                    ttl=ttl,
+                )
+                self._json(202, {
+                    "accepted": True,
+                    "event": event,
+                    "correlation_id": correlation_id,
+                })
+                return
+
             raise SaraAPIError(404, "NOT_FOUND", f"Endpointo não existe: {path}")
         except SaraAPIError as exc:
             self._error(exc)
@@ -216,52 +275,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             self._authorized(path)
-            self._rate_limit()
             system = self._runtime()
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
-
-            if path == "/v1/vagus":
-                if "vagus_bus" not in system.components:
-                    raise SaraAPIError(503, "VAGUS_BUS_UNAVAILABLE", "Vagus control plane não está disponível.")
-                required = ("vagus_version", "message_id", "correlation_id", "source", "target", "priority", "ttl", "type", "payload")
-                missing = [key for key in required if key not in body]
-                if missing:
-                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Campos obrigatórios ausentes.", {"missing": missing})
-                vagus_version = str(body.get("vagus_version", "")).strip()
-                message_id = str(body.get("message_id", "")).strip()
-                correlation_id = str(body.get("correlation_id", "")).strip()
-                source = str(body.get("source", "")).strip()
-                target = str(body.get("target", "")).strip()
-                event_type = str(body.get("type", "")).strip()
-                try:
-                    priority = int(body.get("priority"))
-                    ttl = int(body.get("ttl"))
-                except (TypeError, ValueError) as exc:
-                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "priority e ttl devem ser inteiros.") from exc
-                payload = body.get("payload")
-                if not isinstance(payload, dict):
-                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
-                if vagus_version != "1.0" or not message_id or not correlation_id or not source or not target or not event_type:
-                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Envelope Vagus incompleto ou versão não suportada.")
-                if not (0 <= priority <= 100) or ttl <= 0:
-                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "priority deve estar entre 0 e 100 e ttl deve ser positivo.")
-                if not (
-                    event_type in ("gpu.submit", "gpu.result", "gpu.barrier")
-                    or event_type.startswith(("health.", "capability.", "signal.", "sara.", "session.", "research."))
-                ):
-                    raise SaraAPIError(422, "INVALID_VAGUS_TYPE", f"Tipo Vagus não suportado: {event_type}")
-                status = str(body.get("status", "EXECUTE")).strip() or "EXECUTE"
-                event = system.components["vagus_bus"].publish_sync(
-                    source, target, event_type, payload, status,
-                    correlation_id=correlation_id,
-                    message_id=message_id,
-                    priority=priority,
-                    ttl=ttl,
-                )
-                self._json(202, {"accepted": True, "event": event, "correlation_id": correlation_id})
-                return
 
             if path == "/v1/cycle":
                 text = body.get("input")
@@ -280,18 +297,16 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     raise SaraAPIError(422, "INVALID_CONTEXT", "'context' deve ser objeto JSON.")
                 kernel = system.components.get("octacore_g0")
                 if kernel is None:
-                    # Preserva integralmente o caminho SARA legado caso o adapter
-                    # Octacore esteja indisponível; nenhuma autoridade nova é criada.
-                    result = system.sistema_vivo.process(text, cycle_id=cycle_id, context=context)
+                    result = system.sistema_vivo.process(text, cycle_id=cycle_id)
                 else:
-                    result = kernel.cycle(system.sistema_vivo, text, cycle_id=cycle_id, correlation_id=correlation, context=context)
+                    result = kernel.cycle(
+                        system.sistema_vivo,
+                        text,
+                        cycle_id=cycle_id,
+                        correlation_id=correlation,
+                        context=context,
+                    )
                 correlation_id = correlation or result.cycle_id
-                context_summary = None
-                if isinstance(context, dict):
-                    context_summary = {
-                        "present": True,
-                        "keys": sorted(str(k) for k in context.keys()),
-                    }
                 self._json(200, {
                     "request_id": correlation_id,
                     "correlation_id": correlation_id,
@@ -302,7 +317,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
-                    "octacore_context": context_summary,
+                    "octacore_context": (
+                        {"present": True, "keys": sorted(str(k) for k in context.keys())}
+                        if isinstance(context, dict) else None
+                    ),
                 })
                 return
 
@@ -310,73 +328,41 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 text = body.get("input")
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
-                kernel = system.components.get("octacore_g0")
                 ara = system.components["ara_extended"]
                 etr = system.components["etr_extended"]
-                request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+                flaws = ara.detect(text)
+                semantic = ara.detect_semantic(text)
+                structural = ara.detect_structural(text)
+                relational = ara.detect_relational(text)
+                all_flaws = [*flaws, *semantic, *structural, *relational]
                 if path == "/v1/audit":
-                    if kernel is None:
-                        # Compatibilidade com o caminho SARA anterior: mesma ARA/ETR,
-                        # sem criar um segundo motor regenerativo.
-                        flaws = [
-                            *ara.detect(text),
-                            *ara.detect_semantic(text),
-                            *ara.detect_structural(text),
-                            *ara.detect_relational(text),
-                        ]
-                        ethical = etr.validate_multi_framework(text)
-                        audited = {
-                            "operation": "audit",
-                            "flaws": [getattr(f, "__dict__", str(f)) for f in flaws],
-                            "count": len(flaws),
-                            "semantic": [getattr(f, "__dict__", str(f)) for f in ara.detect_semantic(text)],
-                            "structural": [getattr(f, "__dict__", str(f)) for f in ara.detect_structural(text)],
-                            "relational": [getattr(f, "__dict__", str(f)) for f in ara.detect_relational(text)],
-                            "ethical": getattr(ethical, "__dict__", str(ethical)),
-                            "provenance": ara.meta_audit_complete(),
-                        }
-                    else:
-                        audited = kernel.audit(ara, etr, text)
+                    ethical = etr.validate_multi_framework(text)
+                    request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                     self._json(200, {
                         "request_id": request_id,
                         "correlation_id": request_id,
-                        **audited,
+                        "operation": "audit",
+                        "flaws": [getattr(f, "__dict__", str(f)) for f in all_flaws],
+                        "count": len(all_flaws),
+                        "semantic": [getattr(f, "__dict__", str(f)) for f in semantic],
+                        "ethical": getattr(ethical, "__dict__", str(ethical)),
+                        "provenance": ara.meta_audit_complete(),
                     })
                     return
-                if kernel is None:
-                    flaws = [
-                        *ara.detect(text),
-                        *ara.detect_semantic(text),
-                        *ara.detect_structural(text),
-                        *ara.detect_relational(text),
-                    ]
-                    regenerated_obj = ara.regenerate_semantic(text, flaws)
-                    ethical = etr.validate_multi_framework(regenerated_obj.transformed)
-                    regenerated = {
-                        "operation": "regenerate",
-                        "original": regenerated_obj.original,
-                        "transformed": regenerated_obj.transformed,
-                        "applied_rules": list(regenerated_obj.applied_rules),
-                        "plan_steps": list(regenerated_obj.plan_steps),
-                        "integrity_hash": regenerated_obj.integrity_hash,
-                        "preserved_length": len(regenerated_obj.original),
-                        "preserved_length_ok": bool(regenerated_obj.preserved_length),
-                        "ethical": getattr(ethical, "__dict__", str(ethical)),
-                    }
-                else:
-                    regenerated = kernel.regenerate(ara, etr, text)
+                regenerated = ara.regenerate_semantic(text, all_flaws)
+                ethical = etr.validate_multi_framework(regenerated.transformed)
+                request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 self._json(200, {
                     "request_id": request_id,
                     "correlation_id": request_id,
                     "operation": "regenerate",
-                    "original": regenerated["original"],
-                    "transformed": regenerated["transformed"],
-                    "applied_rules": regenerated["applied_rules"],
-                    "plan_steps": regenerated["plan_steps"],
-                    "integrity_hash": regenerated["integrity_hash"],
-                    "preserved_length": len(regenerated["original"]),
-                    "preserved_length_ok": bool(regenerated["preserved_length"]),
-                    "ethical": regenerated["ethical"],
+                    "original": regenerated.original,
+                    "transformed": regenerated.transformed,
+                    "applied_rules": list(regenerated.applied_rules),
+                    "plan_steps": list(regenerated.plan_steps),
+                    "integrity_hash": regenerated.integrity_hash,
+                    "preserved_length": regenerated.preserved_length,
+                    "ethical": getattr(ethical, "__dict__", str(ethical)),
                 })
                 return
 
