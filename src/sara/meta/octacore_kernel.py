@@ -55,6 +55,7 @@ class OctaCoreG0Kernel:
         self._throttle = 0
         self._halted = False
         self._last_latency_ms = 0
+        self._vagus_bus: Any | None = None
         self._worker = Thread(target=self._worker_loop, name="sara-g0-octacore", daemon=True)
         self._worker.start()
 
@@ -72,6 +73,33 @@ class OctaCoreG0Kernel:
             "queue_capacity": self._queue_capacity,
         }
 
+    def bind_vagus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
+        if vagus_bus is None:
+            raise ValueError("VagusNerveBus is required")
+        self._vagus_bus = vagus_bus
+        vagus_bus.subscribe("signal.throttle", self._on_vagus_signal)
+        vagus_bus.subscribe("signal.halt", self._on_vagus_signal)
+        vagus_bus.subscribe("signal.resume", self._on_vagus_signal)
+        vagus_bus.subscribe("signal.degrade", self._on_vagus_signal)
+        return self
+
+    def _on_vagus_signal(self, event: dict[str, Any]) -> None:
+        event_type = str(event.get("event_type", "")).strip()
+        payload = event.get("payload")
+        payload = payload if isinstance(payload, dict) else {}
+        if event_type in ("signal.throttle", "signal.degrade"):
+            try:
+                level = int(payload.get("level", 1 if event_type == "signal.degrade" else -1))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("G0 throttle signal requires integer level") from exc
+            if level < 0:
+                raise ValueError("G0 throttle signal requires level")
+            self.set_throttle(level)
+        elif event_type == "signal.halt":
+            self.halt()
+        elif event_type == "signal.resume":
+            self.resume()
+
     def health(self) -> dict[str, Any]:
         with self._state_lock:
             throttle = self._throttle
@@ -79,7 +107,7 @@ class OctaCoreG0Kernel:
             inflight = self._inflight
             latency = self._last_latency_ms
         effective_capacity = max(1, self._queue_capacity // (2**throttle))
-        return {
+        report = {
             "slot": self.KERNEL_ID,
             "nucleus": self.NUCLEUS,
             "status": "HALTED" if halted else "READY",
@@ -89,7 +117,9 @@ class OctaCoreG0Kernel:
             "inflight": inflight,
             "throttle_level": throttle,
             "last_latency_ms": latency,
+            "vagus_control_plane": self._vagus_bus is not None,
         }
+        return report
 
     def set_throttle(self, level: int) -> None:
         if level < 0 or level > 3:
@@ -209,7 +239,40 @@ class OctaCoreG0Kernel:
                 with self._state_lock:
                     self._inflight = max(0, self._inflight - 1)
                     self._last_latency_ms = elapsed
+                self._publish_health(elapsed, request)
                 self._queue.task_done()
+
+    def _publish_health(self, latency_ms: int, request: _CycleRequest) -> None:
+        if self._vagus_bus is None:
+            return
+        with self._state_lock:
+            throttle = self._throttle
+            halted = self._halted
+            inflight = self._inflight
+        event_payload = {
+            "kernel": self.describe(),
+            "queue_depth": self._queue.qsize(),
+            "queue_capacity": max(1, self._queue_capacity // (2 ** throttle)),
+            "inflight": inflight,
+            "throttle_level": throttle,
+            "halted": halted,
+            "latency_ms": latency_ms,
+            "job_correlation_id": request.cycle_id,
+        }
+        try:
+            self._vagus_bus.publish_sync(
+                "G0",
+                "VAGUS",
+                "health.report",
+                event_payload,
+                status="EXECUTE",
+                correlation_id=request.cycle_id,
+                priority=100,
+                ttl=5000,
+            )
+        except Exception:
+            # Telemetry must never break a completed SARA cycle.
+            return
 
     def bind(self, sistema_vivo: Any) -> "OctaCoreG0Kernel":
         if sistema_vivo is None:
