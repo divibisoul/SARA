@@ -233,12 +233,18 @@ class AeternumEnforcementPipelineModule:
         )
 
     def emit_trace(self, ctx) -> None:
+        ready = (
+            self._governed_sara is not None
+            and self._executor is not None
+            and self._verifier is not None
+        )
         if hasattr(ctx, "record"):
             ctx.record(
                 "governance",
                 self.NAME,
-                True,
+                ready,
                 executor_bound=self._executor is not None,
                 verifier_bound=self._verifier is not None,
                 governance_bound=self._governed_sara is not None,
+                operational_ready=ready,
             )
