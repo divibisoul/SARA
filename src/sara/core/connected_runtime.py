@@ -49,8 +49,9 @@ class ConnectedRuntime:
         "RegenerativeLoop", "CycleAuditor",
     }
 
-    def __init__(self, registry: ModuleRegistry) -> None:
+    def __init__(self, registry: ModuleRegistry, *, vagus_bus: Any | None = None) -> None:
         self._registry = registry
+        self._vagus = vagus_bus
         self._validator = InvariantValidator()
         self._last_actions: list[ConnectedAction] = []
 
@@ -63,6 +64,7 @@ class ConnectedRuntime:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "connected_modules": len(self._registry.snapshot()["modules"]),
+            "vagus_bound": self._vagus is not None,
         }
 
     def validate_connection(self) -> dict:
@@ -300,11 +302,35 @@ class ConnectedRuntime:
 
         return None
 
-    @staticmethod
-    def _record(ctx: Any, action: ConnectedAction) -> None:
+    def _record(self, ctx: Any, action: ConnectedAction) -> None:
+        vagus_publish = "UNMEASURABLE"
+        if self._vagus is not None:
+            try:
+                self._vagus.publish_sync(
+                    "SARA.ConnectedRuntime",
+                    action.module,
+                    "module.action",
+                    {
+                        "cycle_id": getattr(ctx, "cycle_id", ""),
+                        "phase": action.phase,
+                        "module": action.module,
+                        "operation": action.operation,
+                        "executed": action.executed,
+                        "ok": action.ok,
+                    },
+                    status="EXECUTE" if action.ok else "ERROR",
+                    correlation_id=getattr(ctx, "cycle_id", None),
+                    priority=80 if action.blocking else 40,
+                    ttl=5_000,
+                )
+                vagus_publish = "VERIFIED"
+            except Exception as exc:
+                vagus_publish = f"BLOCKED:{type(exc).__name__}:{exc}"
+
         if hasattr(ctx, "record"):
             info = dict(action.detail)
             info.setdefault("operation", action.operation)
+            info["vagus_publish"] = vagus_publish
             ctx.record(
                 action.phase,
                 action.module,

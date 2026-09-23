@@ -12,6 +12,10 @@ from typing import Final
 
 
 SARA_FEDERATION_CONTRACT_VERSION: Final[str] = "1.0.0"
+SOUL_MESH_PROTOCOL: Final[str] = "soul-mesh/1"
+SOUL_MESH_CONTRACT_VERSION: Final[str] = "1.1.0"
+SOUL_MESH_NUCLEI: Final[tuple[str, ...]] = ("N01", "N02", "N03", "N04", "N05", "N06", "N07")
+OCTACORE_SLOTS: Final[tuple[str, ...]] = ("G0", "G1", "G2", "G3", "G4", "G5", "G6", "G7")
 
 SARA_OPERATIONS: Final[dict[str, dict]] = {
     "sara.health": {
@@ -62,6 +66,30 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "method": "GET",
         "phases": ["persistence"],
         "purpose": "descobrir contratos e capacidades do SARA",
+        "requires_auth": True,
+    },
+    "sara.octacore": {
+        "version": "1.0.0",
+        "endpoint": "/v1/octacore",
+        "method": "GET",
+        "phases": ["identity", "monitoring", "persistence"],
+        "purpose": "expor a fusão lógica G0..G7 sem alterar a topologia canônica N01..N07",
+        "requires_auth": True,
+    },
+    "sara.mesh.status": {
+        "version": "1.0.0",
+        "endpoint": "/v1/mesh/status",
+        "method": "GET",
+        "phases": ["identity", "monitoring"],
+        "purpose": "expor o estado comprovado da ligação do SARA ao gateway Mesh",
+        "requires_auth": True,
+    },
+    "sara.mesh.probe": {
+        "version": "1.0.0",
+        "endpoint": "/v1/mesh/probe",
+        "method": "POST",
+        "phases": ["monitoring", "validation"],
+        "purpose": "executar uma sonda real e somente leitura contra o gateway N01",
         "requires_auth": True,
     },
     "sara.trace": {
@@ -166,6 +194,14 @@ def federation_manifest() -> dict:
             name: dict(spec) for name, spec in SARA_OPERATIONS.items()
         },
         "nucleus_affinities": [item.as_dict() for item in SOUL_NUCLEUS_AFFINITIES],
+        "mesh": {
+            "protocol": SOUL_MESH_PROTOCOL,
+            "contract_version": SOUL_MESH_CONTRACT_VERSION,
+            "nuclei": list(SOUL_MESH_NUCLEI),
+            "sara_is_mesh_nucleus": False,
+            "mediator": "N01",
+            "octacore_slots": list(OCTACORE_SLOTS),
+        },
         "proof_rule": {
             "declared": "manifest-only",
             "configured": "URL + credential available",

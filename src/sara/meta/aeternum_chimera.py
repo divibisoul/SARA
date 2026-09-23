@@ -19,12 +19,13 @@ class AeternumChimeraBridge:
     DEPENDENCIES = ("GovernedSARA", "ERU_Engine", "QuantumCrawler")
     CYCLE_PHASES = (CyclePhase.GOVERNANCE, CyclePhase.PERSISTENCE, CyclePhase.MONITORING)
 
-    def __init__(self, governed_sara: Any, eru_engine: Any, quantum_crawler: Any) -> None:
+    def __init__(self, governed_sara: Any, eru_engine: Any, quantum_crawler: Any, vagus_bus: Any | None = None) -> None:
         if governed_sara is None or eru_engine is None or quantum_crawler is None:
             raise ValueError("GovernedSARA, ERU_Engine and QuantumCrawler are required")
         self._governed = governed_sara
         self._eru = eru_engine
         self._crawler = quantum_crawler
+        self._vagus = vagus_bus
 
     def describe(self) -> dict[str, Any]:
         crawler = self._crawler.describe()
@@ -77,6 +78,25 @@ class AeternumChimeraBridge:
                 "reason": "No verified quantum execution backend is registered in SARA.",
             },
         }
+        if self._vagus is not None:
+            try:
+                self._vagus.publish_sync(
+                    "HortaCore",
+                    "VagusBus",
+                    "hortacore.assessment",
+                    {
+                        "proposal": proposal_name,
+                        "accepted": bool(governance.accepted),
+                        "snapshot_hash": snapshot_hash,
+                        "research_backends_ready": bool(crawler_state.get("is_backends_ready", False)),
+                    },
+                    correlation_id=getattr(ctx, "cycle_id", None),
+                    priority=80,
+                    ttl=5_000,
+                )
+            except Exception:
+                pass
+
         if ctx is not None and hasattr(ctx, "record"):
             ctx.record(
                 "meta",
