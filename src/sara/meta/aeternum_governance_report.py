@@ -42,6 +42,8 @@ class AeternumGovernanceReportModule:
     def report(self) -> dict[str, Any]:
         snapshot = self._governance.snapshot()
         decisions = self._governance.decisions()
+        governance_ok = self._governance.verify_integrity()
+        trace_ok = self._trace.verify()
         return {
             "status": "completed",
             "execution": "real",
@@ -50,19 +52,23 @@ class AeternumGovernanceReportModule:
                 "modules": dict(snapshot.modules),
                 "decision_count": snapshot.last_decisions,
             },
-            "governance_chain_integrity": self._governance.verify_integrity(),
-            "decision_trace_integrity": self._trace.verify(),
+            "governance_chain_integrity": governance_ok,
+            "decision_trace_integrity": trace_ok,
             "decision_trace_entries": len(self._trace.query()),
             "recent_decisions": decisions[-10:],
         }
 
     def emit_trace(self, ctx) -> None:
         report = self.report()
+        integrity_ok = (
+            report["governance_chain_integrity"]
+            and report["decision_trace_integrity"]
+        )
         if hasattr(ctx, "record"):
             ctx.record(
                 "monitoring",
                 self.NAME,
-                True,
+                integrity_ok,
                 execution="real",
                 governance_chain_integrity=report["governance_chain_integrity"],
                 decision_trace_integrity=report["decision_trace_integrity"],
