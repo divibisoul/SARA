@@ -8,7 +8,7 @@ Repositório: `divibisoul/SARA`
 - `main` no início da etapa: `8d290a2d5a59d714df4f434a5ad1553eadc93e08`.
 - Frente OctaCore existente preservada: `feat/octacore-g0-r1`, head `611323bb282606a6f70c4ded82441b45c0f91f58`, PR #10.
 - A nova fusão foi criada como frente derivada, sem alterar a PR #10: `feat/octacore-hortacore-vagus-mesh-fusion-r1`.
-- Head desta auditoria: `9186b9fefe0fb6abf82e582665262c0a6026d5c7`.
+- Head desta auditoria: `188639a649b0e6e21449801d0ddc5f9f95132ab0`.
 - Comparação contra `main`: 73 commits à frente, 0 atrás.
 - A comparação não contém nenhum arquivo com status `removed`. Alterações internas de linhas não são tratadas como exclusão de arquivo.
 - A frente #10 já possuía dois workflows recentes concluídos com `success` antes da nova fusão: SARA CI e SARA validation.
@@ -140,3 +140,12 @@ sobre:
 - classificação final `IMPLEMENTED / EXECUTED / VALIDATED / VERIFIED / BLOCKED / UNMEASURABLE`.
 
 Nenhuma dessas lacunas deve ser mascarada por manifesto ou teste de presença de campos.
+
+
+## 9. Reauditoria CI após correções
+
+- SARA CI no head `188639a649b0e6e21449801d0ddc5f9f95132ab0`: **SUCCESS**.
+- Execução do conjunto completo: **154 passed in 8.74s**.
+- O primeiro CI da frente detectou 1 falha real na auditoria de registry; a causa foi a utilização incorreta da API `ModuleRegistry.items()`. Corrigida sem alterar o contrato do registry.
+- O teste adicional de `TrinitySynergy.audit_mirror()` confirma que o hash armazenado é a referência da verificação.
+- O N01 permanece separado como fronteira de federação: o seu workflow de PR falhou no passo `npm ci` por divergência pré-existente entre `package.json` e `package-lock.json` no próprio `main`, antes dos testes; portanto esse vermelho não foi atribuído à lógica desta fusão.
