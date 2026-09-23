@@ -208,13 +208,13 @@ class OctaCoreG0Kernel(SaraModule):
             }
 
     def regenerate(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-        flaws = [
-            *ara_extended.detect(input_text),
-            *getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
-        ]
         with self._serial_lock:
+            flaws = [
+                *ara_extended.detect(input_text),
+                *getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text),
+                *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
+                *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
+            ]
             regenerated = ara_extended.regenerate_semantic(input_text, flaws)
             ethical = etr_extended.validate_multi_framework(regenerated.transformed)
         return {
