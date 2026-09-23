@@ -72,7 +72,12 @@ class OctaCoreG0Kernel(SaraModule):
     def bind_vagus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
         if vagus_bus is None:
             raise ValueError("VagusBus is required")
-        self._vagus_bus = vagus_bus
+        if self._vagus_bus is not vagus_bus:
+            self._vagus_bus = vagus_bus
+            vagus_bus.subscribe("signal.throttle", self._on_vagus_signal)
+            vagus_bus.subscribe("signal.halt", self._on_vagus_signal)
+            vagus_bus.subscribe("signal.resume", self._on_vagus_signal)
+            vagus_bus.subscribe("signal.degrade", self._on_vagus_signal)
         return self
 
     def _publish_health(
