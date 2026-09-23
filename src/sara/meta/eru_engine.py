@@ -160,6 +160,7 @@ class ERU_Engine:
         if older not in self._snapshots or newer not in self._snapshots:
             return {
                 "status": "UNMEASURABLE",
+                "reconstructable": False,
                 "reconstructible": False,
                 "reason": "missing_snapshot",
                 "older": older,
