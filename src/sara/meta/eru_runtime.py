@@ -14,8 +14,8 @@ class ERURuntime:
     NAME = "ERURuntime"
     VERSION = "1.0"
 
-    def __init__(self, *, confidence_threshold: float = 0.85) -> None:
-        self.bus = VagusNerveBus()
+    def __init__(self, *, confidence_threshold: float = 0.85, vagus_bus: VagusNerveBus | None = None) -> None:
+        self.bus = vagus_bus or VagusNerveBus()
         self.meta_learner = BayesianMetaLearner(confidence_threshold)
         self.working_memory = WorkingMemory()
         self._active = True
