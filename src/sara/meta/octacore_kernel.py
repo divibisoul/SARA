@@ -69,218 +69,17 @@ class OctaCoreG0Kernel:
         self._vagus_bus = vagus_bus
         return self
 
-    def _publish_health(self, correlation_id: str | None = None) -> None:
+    def _publish_health(
+        self,
+        correlation_id: str | None = None,
+        latency_ms: int | None = None,
+        request: _CycleRequest | None = None,
+    ) -> None:
         bus = self._vagus_bus
         if bus is None:
             return
-        try:
-            bus.publish_sync(
-                "SARA.G0",
-                "VagusBus",
-                "health.report",
-                self.health(),
-                correlation_id=correlation_id,
-                priority=100,
-                ttl=5_000,
-            )
-        except Exception:
-            # Telemetry failure must never alter G0 execution authority.
-            return
-
-    def describe(self) -> dict[str, Any]:
-        return {
-            "name": self.NAME,
-            "version": self.VERSION,
-            "slot": self.KERNEL_ID,
-            "nucleus": self.NUCLEUS,
-            "type": "system_gpu_regenerative_kernel",
-            "silicon_gpu": False,
-            "authoritative": True,
-            "capabilities": list(self.CAPABILITIES),
-            "delegation": "existing SARA HTTP/runtime contracts",
-            "queue_capacity": self._queue_capacity,
-        }
-
-    def bind_vagus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
-        if vagus_bus is None:
-            raise ValueError("VagusNerveBus is required")
-        self._vagus_bus = vagus_bus
-        vagus_bus.subscribe("signal.throttle", self._on_vagus_signal)
-        vagus_bus.subscribe("signal.halt", self._on_vagus_signal)
-        vagus_bus.subscribe("signal.resume", self._on_vagus_signal)
-        vagus_bus.subscribe("signal.degrade", self._on_vagus_signal)
-        return self
-
-    def _on_vagus_signal(self, event: dict[str, Any]) -> None:
-        event_type = str(event.get("event_type", "")).strip()
-        payload = event.get("payload")
-        payload = payload if isinstance(payload, dict) else {}
-        if event_type in ("signal.throttle", "signal.degrade"):
-            try:
-                level = int(payload.get("level", 1 if event_type == "signal.degrade" else -1))
-            except (TypeError, ValueError) as exc:
-                raise ValueError("G0 throttle signal requires integer level") from exc
-            if level < 0:
-                raise ValueError("G0 throttle signal requires level")
-            self.set_throttle(level)
-        elif event_type == "signal.halt":
-            self.halt()
-        elif event_type == "signal.resume":
-            self.resume()
-
-    def health(self) -> dict[str, Any]:
-        with self._state_lock:
-            throttle = self._throttle
-            halted = self._halted
-            inflight = self._inflight
-            latency = self._last_latency_ms
-        effective_capacity = max(1, self._queue_capacity // (2**throttle))
-        report = {
-            "slot": self.KERNEL_ID,
-            "nucleus": self.NUCLEUS,
-            "status": "HALTED" if halted else "READY",
-            "queue_depth": self._queue.qsize(),
-            "queue_capacity": effective_capacity,
-            "base_queue_capacity": self._queue_capacity,
-            "inflight": inflight,
-            "throttle_level": throttle,
-            "last_latency_ms": latency,
-            "vagus_control_plane": self._vagus_bus is not None,
-        }
-        return report
-
-    def set_throttle(self, level: int) -> None:
-        if level < 0 or level > 3:
-            raise ValueError("G0 throttle level must be 0..3")
-        with self._state_lock:
-            self._throttle = level
-
-    def halt(self) -> None:
-        with self._state_lock:
-            self._halted = True
-
-    def resume(self) -> None:
-        with self._state_lock:
-            self._halted = False
-
-    def cycle(
-        self,
-        sistema_vivo: Any,
-        input_text: str,
-        *,
-        cycle_id: str | None = None,
-        correlation_id: str | None = None,
-        context: dict[str, Any] | None = None,
-    ) -> Any:
-        with self._state_lock:
-            if self._halted:
-                raise RuntimeError("G0_HALTED")
-            throttle = self._throttle
-        effective_capacity = max(1, self._queue_capacity // (2**throttle))
-        if self._queue.qsize() >= effective_capacity:
-            raise RuntimeError("G0_BACKPRESSURE")
-
-        request = _CycleRequest(
-            input_text=str(input_text),
-            cycle_id=cycle_id,
-            correlation_id=correlation_id or cycle_id or f"g0-{uuid.uuid4()}",
-            context=dict(context) if isinstance(context, dict) else context,
-            done=Event(),
-        )
-        try:
-            self._queue.put_nowait(request)
-        except Full as exc:
-            raise RuntimeError("G0_BACKPRESSURE") from exc
-
-        if not request.done.wait(timeout=120.0):
-            raise TimeoutError("G0_CYCLE_TIMEOUT")
-        if request.error is not None:
-            raise request.error
-        return request.result
-
-    def audit(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-        with self._serial_lock:
-            semantic = ara_extended.detect_semantic(input_text)
-            structural = ara_extended.detect_structural(input_text)
-            relational = ara_extended.detect_relational(input_text)
-            flaws = [*ara_extended.detect(input_text), *semantic, *structural, *relational]
-            ethical = etr_extended.validate_multi_framework(input_text)
-            provenance = ara_extended.meta_audit_complete()
-            return {
-                "operation": "audit",
-                "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
-                "count": len(flaws),
-                "semantic": [getattr(item, "__dict__", str(item)) for item in semantic],
-                "structural": [getattr(item, "__dict__", str(item)) for item in structural],
-                "relational": [getattr(item, "__dict__", str(item)) for item in relational],
-                "ethical": getattr(ethical, "__dict__", str(ethical)),
-                "provenance": provenance,
-            }
-
-    def regenerate(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-        with self._serial_lock:
-            semantic = ara_extended.detect_semantic(input_text)
-            structural = ara_extended.detect_structural(input_text)
-            relational = ara_extended.detect_relational(input_text)
-            flaws = [*ara_extended.detect(input_text), *semantic, *structural, *relational]
-            regenerated = ara_extended.regenerate_semantic(input_text, flaws)
-            ethical = etr_extended.validate_multi_framework(regenerated.transformed)
-            return {
-                "operation": "regenerate",
-                "original": regenerated.original,
-                "transformed": regenerated.transformed,
-                "applied_rules": list(regenerated.applied_rules),
-                "plan_steps": list(regenerated.plan_steps),
-                "integrity_hash": regenerated.integrity_hash,
-                "preserved_length": regenerated.preserved_length,
-                "ethical": getattr(ethical, "__dict__", str(ethical)),
-            }
-
-    def state(self, sistema_vivo: Any) -> dict[str, Any]:
-        return sistema_vivo.state()
-
-    def trace(self, trace: Any, cycle_id: str) -> dict[str, Any]:
-        entries = trace.query({"cycle_id": cycle_id})
-        return {
-            "cycle_id": cycle_id,
-            "integrity": trace.verify(),
-            "entries": [getattr(entry, "__dict__", str(entry)) for entry in entries],
-        }
-
-    def _worker_loop(self) -> None:
-        while True:
-            request = self._queue.get()
-            if request is None:
-                self._queue.task_done()
-                return
-            started = monotonic()
-            with self._state_lock:
-                self._inflight += 1
-            try:
-                system = getattr(self, "_system_vivo", None)
-                if system is None:
-                    raise RuntimeError("G0_SYSTEM_NOT_BOUND")
-                request.result = system.process(
-                    request.input_text,
-                    cycle_id=request.cycle_id,
-                    context=request.context,
-                )
-                self._publish_health(request.cycle_id)
-            except BaseException as exc:
-                request.error = exc
-                self._publish_health(request.cycle_id)
-            finally:
-                request.done.set()
-                elapsed = int((monotonic() - started) * 1000)
-                with self._state_lock:
-                    self._inflight = max(0, self._inflight - 1)
-                    self._last_latency_ms = elapsed
-                self._publish_health(elapsed, request)
-                self._queue.task_done()
-
-    def _publish_health(self, latency_ms: int, request: _CycleRequest) -> None:
-        if self._vagus_bus is None:
-            return
+        if request is not None:
+            correlation_id = correlation_id or request.correlation_id
         with self._state_lock:
             throttle = self._throttle
             halted = self._halted
@@ -292,22 +91,22 @@ class OctaCoreG0Kernel:
             "inflight": inflight,
             "throttle_level": throttle,
             "halted": halted,
-            "latency_ms": latency_ms,
-            "job_correlation_id": request.correlation_id,
+            "latency_ms": self._last_latency_ms if latency_ms is None else latency_ms,
+            "job_correlation_id": getattr(request, "correlation_id", None),
         }
         try:
-            self._vagus_bus.publish_sync(
-                "G0",
-                "VAGUS",
+            bus.publish_sync(
+                "SARA.G0",
+                "VagusBus",
                 "health.report",
                 event_payload,
                 status="EXECUTE",
-                correlation_id=request.cycle_id,
+                correlation_id=correlation_id,
                 priority=100,
-                ttl=5000,
+                ttl=5_000,
             )
         except Exception:
-            # Telemetry must never break a completed SARA cycle.
+            # Telemetry must never alter G0 execution authority.
             return
 
     def bind(self, sistema_vivo: Any) -> "OctaCoreG0Kernel":
