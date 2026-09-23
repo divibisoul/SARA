@@ -100,7 +100,6 @@ class OctaCoreMeshFusion:
         "OctaCoreG0Kernel",
         "AeternumChimeraBridge",
         "TrinityERUUnified",
-        "ConnectedRuntime",
         "DecisionTrace",
         "ProvenanceTracker",
     )
