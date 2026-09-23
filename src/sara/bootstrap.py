@@ -71,6 +71,7 @@ class SaraSystem:
 def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     registry = ModuleRegistry()
     report = {"registered": [], "failed": [], "pending": [], "memory_loaded": False, "temporal_loaded": False}
+    vagus_bus = VagusNerveBus()
 
     prov = ProvenanceTracker()
     dna = DNA_Tags()
