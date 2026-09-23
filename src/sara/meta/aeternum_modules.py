@@ -78,7 +78,6 @@ AETERNUM_8_BINDINGS: Final[tuple[AeternumBinding, ...]] = (
             "IdentityCore",
             "EmergencyRollback",
             "EthicalFilterChain",
-            "InvariantValidator",
         ),
         ("audit", "invariants", "rollback", "ethical-validation"),
     ),
