@@ -59,14 +59,18 @@ class OctaCoreG0Kernel(SaraModule):
         self._halted = False
         self._last_latency_ms = 0
         self._vagus_bus: Any | None = None
+        self._vagus_bound = False
         self._serial_lock = Lock()
         self._worker = Thread(target=self._worker_loop, name="sara-g0-octacore", daemon=True)
         self._worker.start()
+        if vagus_bus is not None:
+            self.bind_vagus(vagus_bus)
 
     def set_vagus_bus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
         if vagus_bus is None:
             raise ValueError("VagusBus is required")
         self._vagus_bus = vagus_bus
+        self._vagus_bound = False
         return self
 
     def bind_vagus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
@@ -74,10 +78,13 @@ class OctaCoreG0Kernel(SaraModule):
             raise ValueError("VagusBus is required")
         if self._vagus_bus is not vagus_bus:
             self._vagus_bus = vagus_bus
+            self._vagus_bound = False
+        if not self._vagus_bound:
             vagus_bus.subscribe("signal.throttle", self._on_vagus_signal)
             vagus_bus.subscribe("signal.halt", self._on_vagus_signal)
             vagus_bus.subscribe("signal.resume", self._on_vagus_signal)
             vagus_bus.subscribe("signal.degrade", self._on_vagus_signal)
+            self._vagus_bound = True
         return self
 
     def describe(self) -> dict[str, Any]:
@@ -194,7 +201,11 @@ class OctaCoreG0Kernel(SaraModule):
             "operation": "audit",
             "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
             "count": len(flaws),
+            "semantic": [getattr(item, "__dict__", str(item)) for item in getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text)],
+            "structural": [getattr(item, "__dict__", str(item)) for item in getattr(ara_extended, "detect_structural", lambda _t: [])(input_text)],
+            "relational": [getattr(item, "__dict__", str(item)) for item in getattr(ara_extended, "detect_relational", lambda _t: [])(input_text)],
             "ethical": getattr(ethical, "__dict__", str(ethical)),
+            "provenance": getattr(ara_extended, "meta_audit_complete", lambda: {})(),
         }
 
     def regenerate(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
