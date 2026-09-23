@@ -36,6 +36,13 @@ class AeternumChimeraBridge:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "hortacore_processors": ["codex", "blueprint", "eru", "audit", "guide"],
+            "hortacore_federation": {
+                "control_plane": "VagusBus",
+                "execution_plane": "canonical-soul-mesh",
+                "scheduler_owner": "N07/G7 Octacore",
+                "regeneration_authority": "SARA/G0",
+                "policy": "additive-preserve-optimize-connect",
+            },
             "quantum_compute_status": "BLOCKED_INFRASTRUCTURE",
             "research_backend_ready": bool(crawler.get("is_backends_ready", False)),
             "governance_authority": "GovernedSARA",
