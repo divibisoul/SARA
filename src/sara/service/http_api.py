@@ -358,7 +358,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "applied_rules": list(regenerated_obj.applied_rules),
                         "plan_steps": list(regenerated_obj.plan_steps),
                         "integrity_hash": regenerated_obj.integrity_hash,
-                        "preserved_length": regenerated_obj.preserved_length,
+                        "preserved_length": len(regenerated_obj.original),
+                        "preserved_length_ok": bool(regenerated_obj.preserved_length),
                         "ethical": getattr(ethical, "__dict__", str(ethical)),
                     }
                 else:
@@ -373,6 +374,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "plan_steps": regenerated["plan_steps"],
                     "integrity_hash": regenerated["integrity_hash"],
                     "preserved_length": regenerated["preserved_length"],
+                    "preserved_length_ok": regenerated.get("preserved_length_ok", regenerated["preserved_length"] == len(regenerated["original"])),
                     "ethical": regenerated["ethical"],
                 })
                 return
