@@ -201,6 +201,21 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "temporal_records": [r.__dict__ for r in temporal],
                 })
                 return
+            raise SaraAPIError(404, "NOT_FOUND", f"Endpointo não existe: {path}")
+        except SaraAPIError as exc:
+            self._error(exc)
+        except Exception as exc:
+            self._error(SaraAPIError(500, "INTERNAL_ERROR", str(exc)))
+
+    def do_POST(self) -> None:  # noqa: N802
+        path = urlparse(self.path).path
+        try:
+            self._authorized(path)
+            system = self._runtime()
+            body = self._body()
+            if not system.ready:
+                raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
             if path == "/v1/vagus":
                 bus = system.components.get("vagus_bus")
                 if bus is None:
@@ -264,21 +279,6 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "correlation_id": correlation_id,
                 })
                 return
-
-            raise SaraAPIError(404, "NOT_FOUND", f"Endpointo não existe: {path}")
-        except SaraAPIError as exc:
-            self._error(exc)
-        except Exception as exc:
-            self._error(SaraAPIError(500, "INTERNAL_ERROR", str(exc)))
-
-    def do_POST(self) -> None:  # noqa: N802
-        path = urlparse(self.path).path
-        try:
-            self._authorized(path)
-            system = self._runtime()
-            body = self._body()
-            if not system.ready:
-                raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
 
             if path == "/v1/cycle":
                 text = body.get("input")
