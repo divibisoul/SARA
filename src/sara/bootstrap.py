@@ -44,6 +44,7 @@ from sara.meta.eru_trinity_bridge import ERUTrinityBridge
 from sara.core.trinity_eru_unified import TrinityERUUnified
 from sara.meta.transystem_sara import TransystemSARA
 from sara.meta.aeternum_chimera import AeternumChimeraBridge
+from sara.meta.octacore_kernel import OctaCoreG0Kernel
 from sara.research.innovation_radar import InnovationRadar
 from sara.research.neuro_integrator import NeuroIntegrator
 from sara.research.neural_lens import NeuralLens
@@ -52,6 +53,7 @@ from sara.research.quantum_scanner import QuantumScanner
 from sara.audit.cycle_auditor import CycleAuditor
 from sara.omega import SoulETROmegaSystem
 from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment, transystem_adapters_from_environment
+from sara.infra.vagus_bus import VagusNerveBus
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
 
@@ -69,6 +71,7 @@ class SaraSystem:
 def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     registry = ModuleRegistry()
     report = {"registered": [], "failed": [], "pending": [], "memory_loaded": False, "temporal_loaded": False}
+    vagus_bus = VagusNerveBus()
 
     prov = ProvenanceTracker()
     dna = DNA_Tags()
@@ -145,6 +148,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     connected_runtime = ConnectedRuntime(registry)
     aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler)
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
+    octacore_g0 = OctaCoreG0Kernel()
 
     loop = RegenerativeLoop(
         ara=ara_extended, etr=etr_extended, itr=itr_extended,
@@ -160,6 +164,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         loop, storm, trace, registry=registry, provenance=prov,
         connected_runtime=connected_runtime,
     )
+    octacore_g0.bind(sistema).set_vagus_bus(vagus_bus).bind_vagus(vagus_bus)
     candidates = [
         prov, dna, temporal, memory, working_memory, rollback, trace,
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
@@ -170,6 +175,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
         aeternum_chimera, omega,
+        octacore_g0,
     ]
 
     for module in candidates:
@@ -234,5 +240,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "connected_runtime": connected_runtime,
             "aeternum_chimera": aeternum_chimera,
             "omega": omega,
+            "vagus_bus": vagus_bus,
+            "octacore_g0": octacore_g0,
         },
     )

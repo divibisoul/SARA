@@ -111,6 +111,47 @@ def test_capabilities_include_federation_identity_and_trace():
         server.server_close()
 
 
+
+def test_regenerate_http_preserved_length_is_numeric_and_flagged():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/regenerate",
+            method="POST",
+            body={"input": "auditar e preservar contexto"},
+            token="test-token-123456789",
+        )
+        assert status == 200
+        assert payload["preserved_length"] == len(payload["original"])
+        assert payload["preserved_length_ok"] is True
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_regenerate_preserves_http_response_contract():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/regenerate",
+            method="POST",
+            body={"input": "preservar autonomia e validar resultado"},
+            token="test-token-123456789",
+        )
+        assert status == 200
+        assert payload["operation"] == "regenerate"
+        assert payload["original"]
+        assert payload["transformed"]
+        assert payload["integrity_hash"]
+        assert payload["preserved_length"] == len(payload["original"])
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+
 def test_cycle_propagates_correlation_id():
     server, _ = _start_server()
     try:
@@ -127,6 +168,124 @@ def test_cycle_propagates_correlation_id():
         assert payload["request_id"] == "corr-http-test-001"
         assert payload["correlation_id"] == "corr-http-test-001"
         assert payload["final_state"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_cycle_accepts_octacore_context():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={
+                "input": "preservar autonomia e validar resultado",
+                "context": {
+                    "research_snippets": [{"source": "n04", "text": "contexto-real"}],
+                    "probabilistic": {"alpha": 0.7, "beta": 0.3},
+                    "pipeline_status": "pre-complete",
+                },
+            },
+            token="test-token-123456789",
+            correlation_id="corr-octacore-context-001",
+        )
+        assert status == 200
+        assert payload["octacore_context"]["present"] is True
+        assert set(payload["octacore_context"]["keys"]) == {
+            "pipeline_status", "probabilistic", "research_snippets"
+        }
+        assert payload["correlation_id"] == "corr-octacore-context-001"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_vagus_endpoint_publishes_to_existing_bus():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/vagus",
+            method="POST",
+            body={
+                "vagus_version": "1.0",
+                "message_id": "msg-vagus-001",
+                "correlation_id": "corr-vagus-001",
+                "source": "G7",
+                "target": "G6",
+                "priority": 90,
+                "ttl": 5000,
+                "type": "gpu.submit",
+                "payload": {"job_id": "octa-vagus-001"},
+            },
+            token="test-token-123456789",
+            correlation_id="corr-vagus-001",
+        )
+        assert status == 202
+        assert payload["accepted"] is True
+        assert payload["event"]["event_id"] == "msg-vagus-001"
+        assert payload["event"]["correlation_id"] == "corr-vagus-001"
+        system = server.sara_system
+        history = system.components["vagus_bus"].get_history()
+        assert any(event["event_id"] == "msg-vagus-001" for event in history)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_g0_vagus_signals_control_kernel_without_replacing_bus():
+    server, _ = _start_server()
+    try:
+        system = server.sara_system
+        kernel = system.components["octacore_g0"]
+        bus = system.components["vagus_bus"]
+
+        bus.publish_sync(
+            "G7", "G0", "signal.throttle", {"level": 2},
+            correlation_id="corr-g0-signal-001", message_id="msg-g0-signal-001",
+            priority=100, ttl=5000,
+        )
+        assert kernel.health()["throttle_level"] == 2
+
+        bus.publish_sync(
+            "G7", "G0", "signal.halt", {},
+            correlation_id="corr-g0-signal-002", message_id="msg-g0-signal-002",
+            priority=100, ttl=5000,
+        )
+        assert kernel.health()["status"] == "HALTED"
+
+        bus.publish_sync(
+            "G7", "G0", "signal.resume", {},
+            correlation_id="corr-g0-signal-003", message_id="msg-g0-signal-003",
+            priority=100, ttl=5000,
+        )
+        assert kernel.health()["status"] == "READY"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_g0_cycle_emits_real_health_report_with_correlation():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={"input": "preservar autonomia e validar resultado"},
+            token="test-token-123456789",
+            correlation_id="corr-g0-cycle-health-001",
+        )
+        assert status == 200
+        assert payload["correlation_id"] == "corr-g0-cycle-health-001"
+        history = server.sara_system.components["vagus_bus"].get_history()
+        reports = [event for event in history if event["event_type"] == "health.report"]
+        assert reports
+        assert reports[-1]["correlation_id"] == "corr-g0-cycle-health-001"
+        assert reports[-1]["payload"]["queue_depth"] == 0
+        assert isinstance(reports[-1]["payload"]["latency_ms"], int)
     finally:
         server.shutdown()
         server.server_close()

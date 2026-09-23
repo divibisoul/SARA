@@ -85,3 +85,11 @@ Integração N07: `SARA_SERVICE_URL`, `SARA_SERVICE_TOKEN`,
 
 Integração N04/N06: `SARA_BASE_URL`, `SARA_API_TOKEN`,
 `SARA_ENABLE_CHAT=true`.
+
+## Octacore — G0 SARA kernel
+
+Octacore is the SOUL/SARA **system GPU**: a federated software execution processor over eight domain slots G0–G7. It is **not a silicon octa-core CPU** and does not imply CUDA, NPU or physical GPU hardware.
+
+SARA is G0 and remains the sole regenerative authority. Octacore exposes the existing SARA operations `sara.cycle`, `sara.audit`, `sara.regenerate`, `sara.state` and `sara.trace` as a kernel boundary without duplicating ARA/ETR/ITR or the regenerative loop.
+
+VagusBus remains the control plane. The new `POST /v1/vagus` boundary feeds the **existing** VagusNerveBus; it does not create a second event bus.
