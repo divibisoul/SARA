@@ -66,22 +66,54 @@ class ITR_Extended(ITR):
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.NUCLEAR
-    DEPENDENCIES = ITR.DEPENDENCIES + ("ITR",)
+    HISTORICAL_DEPENDENCIES = ITR.DEPENDENCIES + ("ITR",)
+    DEPENDENCIES = ITR.DEPENDENCIES
     CYCLE_PHASES = ITR.CYCLE_PHASES
 
-    # Passos adicionais
-    EXTRA_STEPS: dict[str, Callable[[str], str]] = {
-        "deep_structure": lambda t: (
-            f"[ESTRUTURADO]\n{t}\n"
+    # Passos adicionais preservados. ethical_align/resilience_check são
+    # validações executáveis; preserve é checkpoint observacional.
+    @staticmethod
+    def _deep_structure(text: str) -> str:
+        value = str(text)
+        marker = "[ESTRUTURADO]"
+        if value.lstrip().startswith(marker):
+            return value
+        return (
+            f"[ESTRUTURADO]\n{value}\n"
             f"[/ESTRUTURADO]\n"
-            f"METADADOS: len={len(t)}"
-        ),
-        "ethical_align": lambda t: (
-            t + "\n[ITR_Extended: alinhamento ético verificado]"
-        ),
-        "resilience_check": lambda t: (
-            t + "\n[ITR_Extended: resiliência — fallback disponível]"
-        ),
+            f"METADADOS: len={len(value)}"
+        )
+
+    @staticmethod
+    def _ethical_align(text: str) -> str:
+        value = str(text)
+        prohibited = ("arma", "militar", "vigilância", "vigilancia", "desinformação", "manipulação")
+        hits = tuple(term for term in prohibited if term in value.lower())
+        if hits:
+            raise RuntimeError(f"ITR_Extended ethical guard blocked terms={hits}")
+        return value
+
+    @staticmethod
+    def _resilience_check(text: str) -> str:
+        value = str(text)
+        if not value.strip():
+            raise RuntimeError("ITR_Extended resilience check: empty output")
+        if len(value) > 2_000_000:
+            raise RuntimeError("ITR_Extended resilience check: output limit exceeded")
+        return value
+
+    @staticmethod
+    def _preserve(text: str) -> str:
+        value = str(text)
+        if not value.strip():
+            raise RuntimeError("ITR_Extended preserve: empty state")
+        return value
+
+    EXTRA_STEPS: dict[str, Callable[[str], str]] = {
+        "deep_structure": _deep_structure.__func__,
+        "ethical_align": _ethical_align.__func__,
+        "resilience_check": _resilience_check.__func__,
+        "preserve": _preserve.__func__,
     }
 
     def __init__(self, provenance: ProvenanceTracker, safe_sandbox=None) -> None:
@@ -336,7 +368,7 @@ class ITR_Extended(ITR):
     def optimize_registry(self) -> RegistryOptimization:
         """ITR propõe otimizações ao próprio registry de passos."""
         current = set(_STEP_REGISTRY.keys())
-        proposed_new = {"semantic_expand", "context_inject"}
+        proposed_new: set[str] = set()
         deprecated: set[str] = set()
         improvements: list[str] = []
 
@@ -344,7 +376,7 @@ class ITR_Extended(ITR):
             improvements.append("structure e deep_structure podem ser compostos")
 
         if len(current) < 8:
-            improvements.append("adicionar passos de enriquecimento semântico")
+            improvements.append("adicionar passos de enriquecimento semântico somente após contrato e teste de pós-condição")
 
         return RegistryOptimization(
             new_steps=tuple(proposed_new),
