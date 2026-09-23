@@ -292,11 +292,12 @@ class OctaCoreG0Kernel(SaraModule):
                 system = getattr(self, "_system_vivo", None)
                 if system is None:
                     raise RuntimeError("G0_SYSTEM_NOT_BOUND")
-                request.result = system.process(
-                    request.input_text,
-                    cycle_id=request.cycle_id,
-                    context=request.context,
-                )
+                with self._serial_lock:
+                    request.result = system.process(
+                        request.input_text,
+                        cycle_id=request.cycle_id,
+                        context=request.context,
+                    )
                 self._publish_health(request.correlation_id, request=request)
             except BaseException as exc:
                 request.error = exc
