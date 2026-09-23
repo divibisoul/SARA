@@ -69,6 +69,8 @@ class MeshProbe:
     contract_ok: bool = False
     identity_ok: bool = False
     mesh_topology_ok: bool = False
+    sara_federation_ok: bool = False
+    sara_federation_configured: bool = False
     evidence_hash: str | None = None
     detail: str = ""
 
@@ -84,6 +86,8 @@ class MeshProbe:
             "contract_ok": self.contract_ok,
             "identity_ok": self.identity_ok,
             "mesh_topology_ok": self.mesh_topology_ok,
+            "sara_federation_ok": self.sara_federation_ok,
+            "sara_federation_configured": self.sara_federation_configured,
             "evidence_hash": self.evidence_hash,
             "detail": self.detail,
         }
@@ -326,18 +330,18 @@ class OctaCoreMeshFusion:
         }
 
     def probe_mesh(self, *, mediator: str = "N01", timeout_s: float = 5.0) -> MeshProbe:
-        """Perform a real read-only probe against the canonical Mesh gateway.
+        """Perform real read-only checks for N01 Mesh and N01↔SARA federation.
 
-        No URL => UNMEASURABLE. Network or contract failure => BLOCKED.
-        HTTP 200 alone is not enough for VERIFIED: protocol, contract and
-        N01 identity must also be present.
+        No URL => UNMEASURABLE. Transport, protocol or identity failures => BLOCKED.
+        VERIFIED additionally requires N01 to report the SARA provider as configured.
         """
         mediator = mediator.strip().upper()
-        if mediator not in {"N01"}:
+        if mediator != "N01":
             raise ValueError("only the canonical N01 Mesh mediator is currently supported")
 
         base_url = os.getenv("SOUL_MESH_N01_URL", "").strip().rstrip("/")
         path = os.getenv("SOUL_MESH_N01_HEALTH_PATH", "/mesh/health").strip()
+        fusion_path = os.getenv("SOUL_MESH_N01_FUSION_PATH", "/mesh/fusion").strip()
         correlation_id = str(uuid.uuid4())
         from datetime import datetime, timezone
         checked_at = datetime.now(timezone.utc).isoformat()
@@ -354,29 +358,32 @@ class OctaCoreMeshFusion:
             self._record_probe(probe)
             return probe
 
-        url = f"{base_url}{path if path.startswith('/') else '/' + path}"
-        request = Request(
-            url,
-            method="GET",
-            headers={
-                "Accept": "application/json",
-                "Cache-Control": "no-store",
-                "X-Soul-Correlation-ID": correlation_id,
-            },
-        )
-
-        try:
+        def get_json(url: str) -> tuple[int, dict[str, Any]]:
+            request = Request(
+                url,
+                method="GET",
+                headers={
+                    "Accept": "application/json",
+                    "Cache-Control": "no-store",
+                    "X-Soul-Correlation-ID": correlation_id,
+                },
+            )
             with urlopen(request, timeout=max(0.1, float(timeout_s))) as response:
                 raw = response.read()
-                status_code = int(response.status)
-            payload = json.loads(raw.decode("utf-8"))
-            if not isinstance(payload, dict):
-                raise ValueError("Mesh health response is not a JSON object")
+                return int(response.status), json.loads(raw.decode("utf-8"))
+
+        health_url = f"{base_url}{path if path.startswith('/') else '/' + path}"
+        fusion_url = f"{base_url}{fusion_path if fusion_path.startswith('/') else '/' + fusion_path}"
+        try:
+            health_status, health = get_json(health_url)
+            fusion_status, fusion = get_json(fusion_url)
+            if not isinstance(health, dict) or not isinstance(fusion, dict):
+                raise ValueError("Mesh health/fusion response must be JSON objects")
         except (HTTPError, URLError, TimeoutError, OSError, ValueError, json.JSONDecodeError) as exc:
             probe = MeshProbe(
                 mediator=mediator,
                 status="BLOCKED",
-                url=url,
+                url=health_url,
                 checked_at=checked_at,
                 correlation_id=correlation_id,
                 detail=f"{type(exc).__name__}: {exc}",
@@ -384,11 +391,12 @@ class OctaCoreMeshFusion:
             self._record_probe(probe)
             return probe
 
-        protocol_ok = payload.get("protocol") == SOUL_MESH_PROTOCOL
-        contract_ok = payload.get("contractVersion") == SOUL_MESH_CONTRACT_VERSION
-        identity_ok = payload.get("nucleus") == mediator
-        peers = payload.get("peers")
-        peer_ids = set()
+        protocol_ok = health.get("protocol") == SOUL_MESH_PROTOCOL
+        contract_ok = health.get("contractVersion") == SOUL_MESH_CONTRACT_VERSION
+        identity_ok = health.get("nucleus") == mediator
+
+        peers = health.get("peers")
+        peer_ids: set[str] = set()
         if isinstance(peers, list):
             for peer in peers:
                 if isinstance(peer, dict):
@@ -397,36 +405,60 @@ class OctaCoreMeshFusion:
                         peer_ids.add(value)
         mesh_topology_ok = set(SOUL_NUCLEI).issubset(peer_ids | {mediator})
 
-        if status_code != 200:
+        federated_providers = fusion.get("federatedProviders")
+        sara_provider = (
+            federated_providers.get("SARA")
+            if isinstance(federated_providers, dict)
+            else None
+        )
+        sara_federation_ok = (
+            isinstance(sara_provider, dict)
+            and sara_provider.get("owner") == "SARA"
+            and sara_provider.get("transport") == "HTTP"
+            and isinstance(sara_provider.get("operations"), list)
+            and {"sara.health", "sara.cycle", "sara.audit", "sara.regenerate", "sara.trace"}.issubset(
+                set(str(item) for item in sara_provider.get("operations", []))
+            )
+        )
+        sara_federation_configured = bool(
+            sara_provider.get("configured", False)
+        ) if isinstance(sara_provider, dict) else False
+
+        if health_status != 200 or fusion_status != 200:
             state = "BLOCKED"
-            detail = f"http_status={status_code}"
-        elif protocol_ok and contract_ok and identity_ok and mesh_topology_ok:
+            detail = f"health_http={health_status}; fusion_http={fusion_status}"
+        elif protocol_ok and contract_ok and identity_ok and mesh_topology_ok and sara_federation_configured:
             state = "VERIFIED"
-            detail = "N01 Mesh health, canonical contract, identity and N01..N07 topology verified"
-        elif protocol_ok and contract_ok and identity_ok:
+            detail = "N01 Mesh + N01..N07 topology + N01↔SARA federation verified"
+        elif protocol_ok and contract_ok and identity_ok and sara_federation_ok:
             state = "CONNECTED"
-            detail = "N01 Mesh health and canonical identity verified; full N01..N07 topology not proven"
+            detail = "N01 Mesh identity and SARA federation contract observed; external SARA configuration is not fully proven"
         else:
             state = "BLOCKED"
-            detail = "Mesh response failed protocol/contract/identity validation"
+            detail = "Mesh/federation response failed contract, identity or SARA-provider validation"
 
         evidence = {
-            "url": url,
-            "status_code": status_code,
-            "payload": payload,
+            "health_url": health_url,
+            "fusion_url": fusion_url,
+            "health_status": health_status,
+            "fusion_status": fusion_status,
+            "health": health,
+            "fusion": fusion,
             "correlation_id": correlation_id,
         }
         probe = MeshProbe(
             mediator=mediator,
             status=state,
-            url=url,
+            url=health_url,
             checked_at=checked_at,
             correlation_id=correlation_id,
-            http_status=status_code,
+            http_status=health_status,
             protocol_ok=protocol_ok,
             contract_ok=contract_ok,
             identity_ok=identity_ok,
             mesh_topology_ok=mesh_topology_ok,
+            sara_federation_ok=sara_federation_ok,
+            sara_federation_configured=sara_federation_configured,
             evidence_hash=hash_json(evidence),
             detail=detail,
         )
