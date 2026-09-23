@@ -186,8 +186,11 @@ class ETR_Extended(ETR):
             approved=score >= 0.5 and neg == 0,
             score=round(score, 3),
             reasoning=f"beneficios={pos} danos={neg}",
-            evidence=tuple(f"positive_term:{p}" for p in positive if p in lower)
-                    + tuple(f"negative_term:{n}" for n in negative if n in lower),
+            evidence=(
+                tuple(f"positive_term:{p}" for p in positive if p in lower)
+                + tuple(f"negative_term:{n}" for n in negative if n in lower)
+                + (f"positive_hits={pos}", f"negative_hits={neg}")
+            ),
             basis="LEXICAL_HEURISTIC_PLUS_NEGATIVE_GUARD",
         )
 
@@ -219,7 +222,10 @@ class ETR_Extended(ETR):
             approved=score >= 0.33,
             score=round(score, 3),
             reasoning=f"virtudes_encontradas={hits}",
-            evidence=tuple(f"virtue_term:{v}" for v in virtues if v in lower),
+            evidence=(
+                tuple(f"virtue_term:{v}" for v in virtues if v in lower)
+                + (f"virtue_hits={hits}",)
+            ),
             basis="LEXICAL_HEURISTIC",
         )
 
@@ -250,6 +256,11 @@ class ETR_Extended(ETR):
                 tuple(f"care_term:{x}" for x in care_terms if x in lower)
                 + tuple(f"ubuntu:{x}" for x in ubuntu.get("semantic_evidence", ()))
                 + tuple(f"buen_vivir:{x}" for x in buen.get("semantic_evidence", ()))
+                + (
+                    f"care_hits={hits}",
+                    f"ubuntu_aligned={ubuntu_aligned}",
+                    f"buen_vivir_aligned={buen_aligned}",
+                )
             ),
             basis="LEXICAL_PLUS_CULTURAL_STRUCTURED",
         )
