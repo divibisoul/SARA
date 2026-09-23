@@ -88,10 +88,18 @@ class VagusNerveBus:
         }
         with self._history_lock:
             self._history.append(event)
+        try:
+            running_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            running_loop = None
+
         for callback in tuple(self._subscribers.get(event_type, ())):
             result = callback(event)
             if inspect.isawaitable(result):
-                asyncio.run(result)
+                if running_loop is not None:
+                    running_loop.create_task(result)
+                else:
+                    asyncio.run(result)
         return dict(event)
 
     def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
