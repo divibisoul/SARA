@@ -207,6 +207,7 @@ class OctaCoreG0Kernel:
                 "applied_rules": list(regenerated.applied_rules),
                 "plan_steps": list(regenerated.plan_steps),
                 "integrity_hash": regenerated.integrity_hash,
+                "preserved_length": regenerated.preserved_length,
                 "ethical": getattr(ethical, "__dict__", str(ethical)),
             }
 
