@@ -377,6 +377,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "plan_steps": regenerated["plan_steps"],
                         "integrity_hash": regenerated["integrity_hash"],
                         "preserved_length": regenerated["preserved_length"],
+                        "preserved_length_ok": regenerated["preserved_length_ok"],
+                        "length_preserved": regenerated["length_preserved"],
                         "ethical": regenerated["ethical"],
                     })
                     return
@@ -397,7 +399,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "applied_rules": list(regenerated.applied_rules),
                     "plan_steps": list(regenerated.plan_steps),
                     "integrity_hash": regenerated.integrity_hash,
-                    "preserved_length": regenerated.preserved_length,
+                    "preserved_length": len(regenerated.original),
+                    "preserved_length_ok": bool(regenerated.preserved_length),
+                    "length_preserved": bool(regenerated.preserved_length),
                     "ethical": getattr(ethical, "__dict__", str(ethical)),
                 })
                 return
