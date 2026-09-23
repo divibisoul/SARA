@@ -3,7 +3,7 @@ name: Integrated ARA ETR ITR ERU engineering gate
 on:
   push:
     branches:
-      - feat/integrated-engineering-gate-current
+      - feat/current-main-integrated-trinity-gate
   pull_request:
 
 permissions:
