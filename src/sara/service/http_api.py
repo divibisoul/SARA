@@ -277,7 +277,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 context = body.get("context")
                 if context is not None and not isinstance(context, dict):
                     raise SaraAPIError(422, "INVALID_CONTEXT", "'context' deve ser objeto JSON.")
-                result = system.sistema_vivo.process(text, cycle_id=cycle_id, context=context)
+                kernel = system.components.get("octacore_g0")
+                if kernel is None:
+                    raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Octacore G0 kernel não está registrado.")
+                result = kernel.cycle(system.sistema_vivo, text, cycle_id=cycle_id, context=context)
                 correlation_id = correlation or result.cycle_id
                 context_summary = None
                 if isinstance(context, dict):
