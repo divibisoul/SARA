@@ -49,8 +49,9 @@ class OctaCoreG0Kernel:
         "sara.trace",
     )
 
-    def __init__(self, *, queue_capacity: int = 32) -> None:
+    def __init__(self, *, queue_capacity: int = 32, vagus_bus: Any | None = None) -> None:
         self._queue_capacity = max(1, queue_capacity)
+        self._vagus_bus = vagus_bus
         self._queue: Queue[_CycleRequest | None] = Queue(maxsize=self._queue_capacity)
         self._state_lock = Lock()
         self._inflight = 0
@@ -61,6 +62,30 @@ class OctaCoreG0Kernel:
         self._serial_lock = Lock()
         self._worker = Thread(target=self._worker_loop, name="sara-g0-octacore", daemon=True)
         self._worker.start()
+
+    def bind_vagus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
+        if vagus_bus is None:
+            raise ValueError("VagusBus is required")
+        self._vagus_bus = vagus_bus
+        return self
+
+    def _publish_health(self, correlation_id: str | None = None) -> None:
+        bus = self._vagus_bus
+        if bus is None:
+            return
+        try:
+            bus.publish_sync(
+                "SARA.G0",
+                "VagusBus",
+                "health.report",
+                self.health(),
+                correlation_id=correlation_id,
+                priority=100,
+                ttl=5_000,
+            )
+        except Exception:
+            # Telemetry failure must never alter G0 execution authority.
+            return
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -240,8 +265,10 @@ class OctaCoreG0Kernel:
                     cycle_id=request.cycle_id,
                     context=request.context,
                 )
+                self._publish_health(request.cycle_id)
             except BaseException as exc:
                 request.error = exc
+                self._publish_health(request.cycle_id)
             finally:
                 request.done.set()
                 elapsed = int((monotonic() - started) * 1000)
