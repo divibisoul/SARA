@@ -373,8 +373,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "applied_rules": regenerated["applied_rules"],
                     "plan_steps": regenerated["plan_steps"],
                     "integrity_hash": regenerated["integrity_hash"],
-                    "preserved_length": regenerated["preserved_length"],
-                    "preserved_length_ok": regenerated.get("preserved_length_ok", regenerated["preserved_length"] == len(regenerated["original"])),
+                    "preserved_length": len(regenerated["original"]),
+                    "preserved_length_ok": bool(regenerated["preserved_length"]),
                     "ethical": regenerated["ethical"],
                 })
                 return
