@@ -120,10 +120,15 @@ class RegenerativeLoop:
             if not self._prov.verify_integrity():
                 raise _Aborted("PREFLIGHT", "provenance_integrity_failed")
 
-    def run(self, input_text: str, cycle_id: str | None = None) -> LoopReport:
+    def run(self, input_text: str, cycle_id: str | None = None, context: dict[str, Any] | None = None) -> LoopReport:
         cid = cycle_id or f"cycle-{now_iso()}"
         sink = TraceSink(self._trace, self._temporal, self._prov)
         ctx = CycleContext(cid, str(input_text), str(input_text), sink)
+        if context is not None:
+            if not isinstance(context, dict):
+                raise TypeError("cycle context must be an object")
+            ctx.register_artifact("octacore_context", dict(context))
+            ctx.flags["octacore_context_present"] = True
         if self._working_memory is not None:
             self._working_memory.put("cycle_context", {
                 "cycle_id": cid,
