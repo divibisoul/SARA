@@ -82,6 +82,7 @@ class RegenerativeLoop:
         cycle_auditor: Any = None, max_cycles: int = 3,
         connected_runtime: ConnectedRuntime | None = None,
         trinity: Any = None,
+        vagus_bus: Any | None = None,
         working_memory: WorkingMemory | None = None,
     ) -> None:
         self._ara, self._etr, self._itr = ara, etr, itr
@@ -94,6 +95,7 @@ class RegenerativeLoop:
         self._connected_runtime = connected_runtime
         self._trinity = trinity
         self._working_memory = working_memory
+        self._vagus_bus = vagus_bus
         self._history: list[LoopReport] = []
         self._invariants = InvariantValidator()
 
@@ -122,7 +124,7 @@ class RegenerativeLoop:
 
     def run(self, input_text: str, cycle_id: str | None = None, context: dict[str, Any] | None = None) -> LoopReport:
         cid = cycle_id or f"cycle-{now_iso()}"
-        sink = TraceSink(self._trace, self._temporal, self._prov)
+        sink = TraceSink(self._trace, self._temporal, self._prov, self._vagus_bus)
         ctx = CycleContext(cid, str(input_text), str(input_text), sink)
         if context is not None:
             if not isinstance(context, dict):
