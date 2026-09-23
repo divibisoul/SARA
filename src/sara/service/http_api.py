@@ -279,8 +279,11 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     raise SaraAPIError(422, "INVALID_CONTEXT", "'context' deve ser objeto JSON.")
                 kernel = system.components.get("octacore_g0")
                 if kernel is None:
-                    raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Octacore G0 kernel não está registrado.")
-                result = kernel.cycle(system.sistema_vivo, text, cycle_id=cycle_id, correlation_id=correlation, context=context)
+                    # Preserva integralmente o caminho SARA legado caso o adapter
+                    # Octacore esteja indisponível; nenhuma autoridade nova é criada.
+                    result = system.sistema_vivo.process(text, cycle_id=cycle_id, context=context)
+                else:
+                    result = kernel.cycle(system.sistema_vivo, text, cycle_id=cycle_id, correlation_id=correlation, context=context)
                 correlation_id = correlation or result.cycle_id
                 context_summary = None
                 if isinstance(context, dict):
@@ -307,20 +310,59 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
                 kernel = system.components.get("octacore_g0")
-                if kernel is None:
-                    raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Octacore G0 kernel não está registrado.")
                 ara = system.components["ara_extended"]
                 etr = system.components["etr_extended"]
                 request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 if path == "/v1/audit":
-                    audited = kernel.audit(ara, etr, text)
+                    if kernel is None:
+                        # Compatibilidade com o caminho SARA anterior: mesma ARA/ETR,
+                        # sem criar um segundo motor regenerativo.
+                        flaws = [
+                            *ara.detect(text),
+                            *ara.detect_semantic(text),
+                            *ara.detect_structural(text),
+                            *ara.detect_relational(text),
+                        ]
+                        ethical = etr.validate_multi_framework(text)
+                        audited = {
+                            "operation": "audit",
+                            "flaws": [getattr(f, "__dict__", str(f)) for f in flaws],
+                            "count": len(flaws),
+                            "semantic": [getattr(f, "__dict__", str(f)) for f in ara.detect_semantic(text)],
+                            "structural": [getattr(f, "__dict__", str(f)) for f in ara.detect_structural(text)],
+                            "relational": [getattr(f, "__dict__", str(f)) for f in ara.detect_relational(text)],
+                            "ethical": getattr(ethical, "__dict__", str(ethical)),
+                            "provenance": ara.meta_audit_complete(),
+                        }
+                    else:
+                        audited = kernel.audit(ara, etr, text)
                     self._json(200, {
                         "request_id": request_id,
                         "correlation_id": request_id,
                         **audited,
                     })
                     return
-                regenerated = kernel.regenerate(ara, etr, text)
+                if kernel is None:
+                    flaws = [
+                        *ara.detect(text),
+                        *ara.detect_semantic(text),
+                        *ara.detect_structural(text),
+                        *ara.detect_relational(text),
+                    ]
+                    regenerated_obj = ara.regenerate_semantic(text, flaws)
+                    ethical = etr.validate_multi_framework(regenerated_obj.transformed)
+                    regenerated = {
+                        "operation": "regenerate",
+                        "original": regenerated_obj.original,
+                        "transformed": regenerated_obj.transformed,
+                        "applied_rules": list(regenerated_obj.applied_rules),
+                        "plan_steps": list(regenerated_obj.plan_steps),
+                        "integrity_hash": regenerated_obj.integrity_hash,
+                        "preserved_length": regenerated_obj.preserved_length,
+                        "ethical": getattr(ethical, "__dict__", str(ethical)),
+                    }
+                else:
+                    regenerated = kernel.regenerate(ara, etr, text)
                 self._json(200, {
                     "request_id": request_id,
                     "correlation_id": request_id,
