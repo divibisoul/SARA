@@ -56,7 +56,7 @@ class HTTPPatentOracle:
 
 class LegalAI:
     NAME = "LegalAI"
-    VERSION = "2.0"
+    VERSION = "2.1"
     STATUS = ModuleStatus.PENDING_INFRASTRUCTURE
     ROLE = CycleRole.GOVERNANCE
     DEPENDENCIES = ()
@@ -70,11 +70,12 @@ class LegalAI:
     def describe(self) -> dict:
         return {
             "name": self.NAME, "version": self.VERSION,
-            "status": self.STATUS.value, "role": self.ROLE.value,
+            "status": self.STATUS.value, "local_license_validation_ready": True, "role": self.ROLE.value,
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "chain_length": len(self._chain),
             "patent_oracle_ready": self.is_patent_oracle_ready(),
+            "chain_valid": self.verify_chain(),
         }
 
     def is_patent_oracle_ready(self) -> bool:
@@ -156,6 +157,8 @@ class LegalAI:
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
-            ctx.record("governance", self.NAME, True,
+            valid = self.verify_chain()
+            ctx.record("governance", self.NAME, valid,
                        chain_length=len(self._chain),
-                       chain_valid=self.verify_chain())
+                       chain_valid=valid,
+                       patent_oracle_ready=self.is_patent_oracle_ready())
