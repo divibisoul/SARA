@@ -280,7 +280,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 kernel = system.components.get("octacore_g0")
                 if kernel is None:
                     raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Octacore G0 kernel não está registrado.")
-                result = kernel.cycle(system.sistema_vivo, text, cycle_id=cycle_id, context=context)
+                result = kernel.cycle(system.sistema_vivo, text, cycle_id=cycle_id, correlation_id=correlation, context=context)
                 correlation_id = correlation or result.cycle_id
                 context_summary = None
                 if isinstance(context, dict):
