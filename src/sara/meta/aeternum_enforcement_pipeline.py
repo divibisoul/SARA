@@ -1,7 +1,9 @@
 """AETERNUM M8 — enforcement pipeline over real SARA governance.
 
 The pipeline never reports execution success unless a real executor is
-injected and the governance gate accepts the proposal.
+injected and the governance gate accepts the proposal. Completion also
+requires an explicit verifier; without one the operation is real but
+unverified.
 """
 from __future__ import annotations
 
@@ -38,11 +40,13 @@ class AeternumEnforcementPipelineModule:
         governance: GovernanceBackend,
         trace: DecisionTrace,
         executor: Callable[[str, dict[str, Any]], Any] | None = None,
+        verifier: Callable[[str, Any], bool] | None = None,
     ) -> None:
         self._governed_sara = governed_sara
         self._governance = governance
         self._trace = trace
         self._executor = executor
+        self._verifier = verifier
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -53,6 +57,7 @@ class AeternumEnforcementPipelineModule:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [phase.value for phase in self.CYCLE_PHASES],
             "executor_bound": self._executor is not None,
+            "verifier_bound": self._verifier is not None,
             "governance_bound": self._governed_sara is not None,
         }
 
@@ -98,9 +103,16 @@ class AeternumEnforcementPipelineModule:
         )
 
         if not governance.accepted:
+            self._trace.log(
+                {
+                    "event": "enforcement_denied",
+                    "action": action,
+                    "reasons": list(governance.reasons),
+                }
+            )
             return EnforcementResult(
                 "denied",
-                "real",
+                "not_claimed",
                 action,
                 {
                     "stage": "authorize",
@@ -126,6 +138,74 @@ class AeternumEnforcementPipelineModule:
                 {"stage": "execute", "error": str(exc)},
             )
 
+        self._governance.register_decision(
+            {
+                "event": "enforcement_executed",
+                "action": action,
+            }
+        )
+
+        if self._verifier is None:
+            self._trace.log(
+                {
+                    "event": "enforcement_executed_unverified",
+                    "action": action,
+                }
+            )
+            return EnforcementResult(
+                "executed_unverified",
+                "real",
+                action,
+                {
+                    "stage": "verify",
+                    "verification": "not_bound",
+                    "executor_result": execution_result,
+                    "trace_integrity": self._trace.verify(),
+                    "governance_integrity": self._governance.verify_integrity(),
+                },
+            )
+
+        try:
+            verified = bool(self._verifier(action, execution_result))
+        except Exception as exc:
+            self._trace.log(
+                {
+                    "event": "enforcement_verification_failed",
+                    "action": action,
+                    "error": str(exc),
+                }
+            )
+            return EnforcementResult(
+                "verification_failed",
+                "real",
+                action,
+                {
+                    "stage": "verify",
+                    "verification": "error",
+                    "error": str(exc),
+                    "executor_result": execution_result,
+                },
+            )
+
+        if not verified:
+            self._trace.log(
+                {
+                    "event": "enforcement_verification_failed",
+                    "action": action,
+                    "reason": "verifier_returned_false",
+                }
+            )
+            return EnforcementResult(
+                "verification_failed",
+                "real",
+                action,
+                {
+                    "stage": "verify",
+                    "verification": "rejected",
+                    "executor_result": execution_result,
+                },
+            )
+
         self._trace.log(
             {
                 "event": "enforcement_completed",
@@ -145,6 +225,7 @@ class AeternumEnforcementPipelineModule:
             action,
             {
                 "stage": "verify",
+                "verification": "verified",
                 "executor_result": execution_result,
                 "trace_integrity": self._trace.verify(),
                 "governance_integrity": self._governance.verify_integrity(),
@@ -158,5 +239,6 @@ class AeternumEnforcementPipelineModule:
                 self.NAME,
                 True,
                 executor_bound=self._executor is not None,
+                verifier_bound=self._verifier is not None,
                 governance_bound=self._governed_sara is not None,
             )
