@@ -109,6 +109,41 @@ class OctaCoreG0Kernel:
             # Telemetry must never alter G0 execution authority.
             return
 
+    def _worker_loop(self) -> None:
+        while True:
+            request = self._queue.get()
+            if request is None:
+                self._queue.task_done()
+                return
+            started = monotonic()
+            with self._state_lock:
+                self._inflight += 1
+            try:
+                system = getattr(self, "_system_vivo", None)
+                if system is None:
+                    raise RuntimeError("G0_SYSTEM_NOT_BOUND")
+                request.result = system.process(
+                    request.input_text,
+                    cycle_id=request.cycle_id,
+                    context=request.context,
+                )
+                self._publish_health(request.correlation_id, request=request)
+            except BaseException as exc:
+                request.error = exc
+                self._publish_health(request.correlation_id, request=request)
+            finally:
+                elapsed = int((monotonic() - started) * 1000)
+                with self._state_lock:
+                    self._inflight = max(0, self._inflight - 1)
+                    self._last_latency_ms = elapsed
+                self._publish_health(
+                    request.correlation_id,
+                    latency_ms=elapsed,
+                    request=request,
+                )
+                request.done.set()
+                self._queue.task_done()
+
     def bind(self, sistema_vivo: Any) -> "OctaCoreG0Kernel":
         if sistema_vivo is None:
             raise ValueError("SistemaVivo is required")
