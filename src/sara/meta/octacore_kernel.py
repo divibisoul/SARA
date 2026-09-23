@@ -58,6 +58,7 @@ class OctaCoreG0Kernel:
         self._halted = False
         self._last_latency_ms = 0
         self._vagus_bus: Any | None = None
+        self._serial_lock = Lock()
         self._worker = Thread(target=self._worker_loop, name="sara-g0-octacore", daemon=True)
         self._worker.start()
 
@@ -173,38 +174,41 @@ class OctaCoreG0Kernel:
         return request.result
 
     def audit(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-        flaws = [
-            *ara_extended.detect(input_text),
-            *getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
-        ]
-        ethical = etr_extended.validate_multi_framework(input_text)
-        return {
-            "operation": "audit",
-            "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
-            "count": len(flaws),
-            "ethical": getattr(ethical, "__dict__", str(ethical)),
-        }
+        with self._serial_lock:
+            semantic = ara_extended.detect_semantic(input_text)
+            structural = ara_extended.detect_structural(input_text)
+            relational = ara_extended.detect_relational(input_text)
+            flaws = [*ara_extended.detect(input_text), *semantic, *structural, *relational]
+            ethical = etr_extended.validate_multi_framework(input_text)
+            provenance = ara_extended.meta_audit_complete()
+            return {
+                "operation": "audit",
+                "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
+                "count": len(flaws),
+                "semantic": [getattr(item, "__dict__", str(item)) for item in semantic],
+                "structural": [getattr(item, "__dict__", str(item)) for item in structural],
+                "relational": [getattr(item, "__dict__", str(item)) for item in relational],
+                "ethical": getattr(ethical, "__dict__", str(ethical)),
+                "provenance": provenance,
+            }
 
     def regenerate(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-        flaws = [
-            *ara_extended.detect(input_text),
-            *getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
-        ]
-        regenerated = ara_extended.regenerate_semantic(input_text, flaws)
-        ethical = etr_extended.validate_multi_framework(regenerated.transformed)
-        return {
-            "operation": "regenerate",
-            "original": regenerated.original,
-            "transformed": regenerated.transformed,
-            "applied_rules": list(regenerated.applied_rules),
-            "plan_steps": list(regenerated.plan_steps),
-            "integrity_hash": regenerated.integrity_hash,
-            "ethical": getattr(ethical, "__dict__", str(ethical)),
-        }
+        with self._serial_lock:
+            semantic = ara_extended.detect_semantic(input_text)
+            structural = ara_extended.detect_structural(input_text)
+            relational = ara_extended.detect_relational(input_text)
+            flaws = [*ara_extended.detect(input_text), *semantic, *structural, *relational]
+            regenerated = ara_extended.regenerate_semantic(input_text, flaws)
+            ethical = etr_extended.validate_multi_framework(regenerated.transformed)
+            return {
+                "operation": "regenerate",
+                "original": regenerated.original,
+                "transformed": regenerated.transformed,
+                "applied_rules": list(regenerated.applied_rules),
+                "plan_steps": list(regenerated.plan_steps),
+                "integrity_hash": regenerated.integrity_hash,
+                "ethical": getattr(ethical, "__dict__", str(ethical)),
+            }
 
     def state(self, sistema_vivo: Any) -> dict[str, Any]:
         return sistema_vivo.state()
