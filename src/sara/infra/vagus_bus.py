@@ -31,15 +31,23 @@ class VagusNerveBus:
     async def publish(
         self, source: str, target: str, event_type: str, payload: dict[str, Any],
         status: str = "EXECUTE",
+        *,
+        correlation_id: str | None = None,
+        message_id: str | None = None,
+        priority: int | None = None,
+        ttl: int | None = None,
     ) -> dict[str, Any]:
         event = {
-            "event_id": str(uuid.uuid4()),
+            "event_id": message_id or str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "source_module": source,
             "target_module": target,
             "event_type": event_type,
             "payload": payload,
             "status": status,
+            "correlation_id": correlation_id,
+            "priority": priority,
+            "ttl": ttl,
         }
         async with self._lock:
             self._history.append(event)
