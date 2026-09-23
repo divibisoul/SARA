@@ -12,7 +12,7 @@ from time import monotonic
 import uuid
 from typing import Any
 
-from sara.contracts.base import CyclePhase, CycleRole, ModuleStatus
+from sara.contracts.base import CyclePhase, CycleRole, ModuleStatus, SaraModule
 
 
 @dataclass
@@ -26,7 +26,7 @@ class _CycleRequest:
     error: BaseException | None = None
 
 
-class OctaCoreG0Kernel:
+class OctaCoreG0Kernel(SaraModule):
     NAME = "OctaCoreG0Kernel"
     VERSION = "1.1"
     STATUS = ModuleStatus.IMPLEMENTED
