@@ -80,6 +80,153 @@ class OctaCoreG0Kernel(SaraModule):
             vagus_bus.subscribe("signal.degrade", self._on_vagus_signal)
         return self
 
+    def describe(self) -> dict[str, Any]:
+        return {
+            "name": self.NAME,
+            "version": self.VERSION,
+            "slot": self.KERNEL_ID,
+            "nucleus": self.NUCLEUS,
+            "type": "system_gpu_regenerative_kernel",
+            "silicon_gpu": False,
+            "authoritative": True,
+            "capabilities": list(self.CAPABILITIES),
+            "delegation": "existing SARA HTTP/runtime contracts",
+            "queue_capacity": self._queue_capacity,
+        }
+
+    def health(self) -> dict[str, Any]:
+        with self._state_lock:
+            throttle = self._throttle
+            halted = self._halted
+            inflight = self._inflight
+            latency = self._last_latency_ms
+        effective_capacity = max(1, self._queue_capacity // (2 ** throttle))
+        return {
+            "slot": self.KERNEL_ID,
+            "nucleus": self.NUCLEUS,
+            "status": "HALTED" if halted else "READY",
+            "queue_depth": self._queue.qsize(),
+            "queue_capacity": effective_capacity,
+            "base_queue_capacity": self._queue_capacity,
+            "inflight": inflight,
+            "throttle_level": throttle,
+            "last_latency_ms": latency,
+        }
+
+    def set_throttle(self, level: int) -> None:
+        if level < 0 or level > 3:
+            raise ValueError("G0 throttle level must be 0..3")
+        with self._state_lock:
+            self._throttle = level
+        self._publish_health()
+
+    def halt(self) -> None:
+        with self._state_lock:
+            self._halted = True
+        self._publish_health()
+
+    def resume(self) -> None:
+        with self._state_lock:
+            self._halted = False
+        self._publish_health()
+
+    def _on_vagus_signal(self, event: dict[str, Any]) -> None:
+        event_type = str(event.get("event_type", "")).strip()
+        payload = event.get("payload")
+        if not isinstance(payload, dict):
+            payload = {}
+        signal = event_type.split(".", 1)[1] if "." in event_type else event_type
+        if signal in {"throttle", "degrade"}:
+            raw_level = payload.get("level", 1 if signal == "degrade" else 0)
+            try:
+                self.set_throttle(int(raw_level))
+            except (TypeError, ValueError):
+                return
+        elif signal == "halt":
+            self.halt()
+        elif signal == "resume":
+            self.resume()
+
+    def cycle(
+        self,
+        sistema_vivo: Any,
+        input_text: str,
+        *,
+        cycle_id: str | None = None,
+        correlation_id: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> Any:
+        with self._state_lock:
+            if self._halted:
+                raise RuntimeError("G0_HALTED")
+            throttle = self._throttle
+        effective_capacity = max(1, self._queue_capacity // (2 ** throttle))
+        if self._queue.qsize() >= effective_capacity:
+            raise RuntimeError("G0_BACKPRESSURE")
+        self.bind(sistema_vivo)
+        cid = cycle_id or correlation_id or str(uuid.uuid4())
+        request = _CycleRequest(
+            input_text=str(input_text),
+            cycle_id=cid,
+            correlation_id=correlation_id or cid,
+            context=dict(context) if isinstance(context, dict) else context,
+            done=Event(),
+        )
+        try:
+            self._queue.put_nowait(request)
+        except Full as exc:
+            raise RuntimeError("G0_BACKPRESSURE") from exc
+        if not request.done.wait(timeout=120.0):
+            raise TimeoutError("G0_CYCLE_TIMEOUT")
+        if request.error is not None:
+            raise request.error
+        return request.result
+
+    def audit(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
+        flaws = [
+            *ara_extended.detect(input_text),
+            *getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text),
+            *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
+            *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
+        ]
+        ethical = etr_extended.validate_multi_framework(input_text)
+        return {
+            "operation": "audit",
+            "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
+            "count": len(flaws),
+            "ethical": getattr(ethical, "__dict__", str(ethical)),
+        }
+
+    def regenerate(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
+        flaws = [
+            *ara_extended.detect(input_text),
+            *getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text),
+            *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
+            *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
+        ]
+        regenerated = ara_extended.regenerate_semantic(input_text, flaws)
+        ethical = etr_extended.validate_multi_framework(regenerated.transformed)
+        return {
+            "operation": "regenerate",
+            "original": regenerated.original,
+            "transformed": regenerated.transformed,
+            "applied_rules": list(regenerated.applied_rules),
+            "plan_steps": list(regenerated.plan_steps),
+            "integrity_hash": regenerated.integrity_hash,
+            "ethical": getattr(ethical, "__dict__", str(ethical)),
+        }
+
+    def state(self, sistema_vivo: Any) -> dict[str, Any]:
+        return sistema_vivo.state()
+
+    def trace(self, trace: Any, cycle_id: str) -> dict[str, Any]:
+        entries = trace.query({"cycle_id": cycle_id})
+        return {
+            "cycle_id": cycle_id,
+            "integrity": trace.verify(),
+            "entries": [getattr(entry, "__dict__", str(entry)) for entry in entries],
+        }
+
     def _publish_health(
         self,
         correlation_id: str | None = None,
