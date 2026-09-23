@@ -18,6 +18,7 @@ from sara.contracts.base import CyclePhase, CycleRole, ModuleStatus
 class _CycleRequest:
     input_text: str
     cycle_id: str | None
+    correlation_id: str | None
     context: dict[str, Any] | None
     done: Event
     result: Any = None
@@ -141,6 +142,7 @@ class OctaCoreG0Kernel:
         input_text: str,
         *,
         cycle_id: str | None = None,
+        correlation_id: str | None = None,
         context: dict[str, Any] | None = None,
     ) -> Any:
         with self._state_lock:
@@ -154,6 +156,7 @@ class OctaCoreG0Kernel:
         request = _CycleRequest(
             input_text=str(input_text),
             cycle_id=cycle_id,
+            correlation_id=correlation_id or cycle_id,
             context=dict(context) if isinstance(context, dict) else context,
             done=Event(),
         )
@@ -257,7 +260,7 @@ class OctaCoreG0Kernel:
             "throttle_level": throttle,
             "halted": halted,
             "latency_ms": latency_ms,
-            "job_correlation_id": request.cycle_id,
+            "job_correlation_id": request.correlation_id,
         }
         try:
             self._vagus_bus.publish_sync(
