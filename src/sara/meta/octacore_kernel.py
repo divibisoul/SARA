@@ -213,8 +213,9 @@ class OctaCoreG0Kernel(SaraModule):
             *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
             *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
         ]
-        regenerated = ara_extended.regenerate_semantic(input_text, flaws)
-        ethical = etr_extended.validate_multi_framework(regenerated.transformed)
+        with self._serial_lock:
+            regenerated = ara_extended.regenerate_semantic(input_text, flaws)
+            ethical = etr_extended.validate_multi_framework(regenerated.transformed)
         return {
             "operation": "regenerate",
             "original": regenerated.original,
