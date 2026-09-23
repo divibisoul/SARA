@@ -62,6 +62,10 @@ class RegistryOptimization:
 class ITR_Extended(ITR):
     """Extensão do ITR com planejamento estratégico e auto-otimização."""
 
+    # Preservado como contrato explícito de auditoria. Os passos atuais
+    # não são meras anotações; cada um executa uma pré/pós-condição real.
+    ANNOTATION_ONLY_STEPS = frozenset()
+
     NAME = "ITR_Extended"
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
