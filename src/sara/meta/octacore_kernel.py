@@ -58,7 +58,6 @@ class OctaCoreG0Kernel(SaraModule):
         self._throttle = 0
         self._halted = False
         self._last_latency_ms = 0
-        self._vagus_bus: Any | None = None
         self._vagus_bound = False
         self._serial_lock = Lock()
         self._worker = Thread(target=self._worker_loop, name="sara-g0-octacore", daemon=True)
@@ -190,20 +189,19 @@ class OctaCoreG0Kernel(SaraModule):
         return request.result
 
     def audit(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-        flaws = [
-            *ara_extended.detect(input_text),
-            *getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_structural", lambda _t: [])(input_text),
-            *getattr(ara_extended, "detect_relational", lambda _t: [])(input_text),
-        ]
+        base = list(ara_extended.detect(input_text))
+        semantic = list(getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text))
+        structural = list(getattr(ara_extended, "detect_structural", lambda _t: [])(input_text))
+        relational = list(getattr(ara_extended, "detect_relational", lambda _t: [])(input_text))
+        flaws = [*base, *semantic, *structural, *relational]
         ethical = etr_extended.validate_multi_framework(input_text)
         return {
             "operation": "audit",
             "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
             "count": len(flaws),
-            "semantic": [getattr(item, "__dict__", str(item)) for item in getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text)],
-            "structural": [getattr(item, "__dict__", str(item)) for item in getattr(ara_extended, "detect_structural", lambda _t: [])(input_text)],
-            "relational": [getattr(item, "__dict__", str(item)) for item in getattr(ara_extended, "detect_relational", lambda _t: [])(input_text)],
+            "semantic": [getattr(item, "__dict__", str(item)) for item in semantic],
+            "structural": [getattr(item, "__dict__", str(item)) for item in structural],
+            "relational": [getattr(item, "__dict__", str(item)) for item in relational],
             "ethical": getattr(ethical, "__dict__", str(ethical)),
             "provenance": getattr(ara_extended, "meta_audit_complete", lambda: {})(),
         }
@@ -224,6 +222,7 @@ class OctaCoreG0Kernel(SaraModule):
             "applied_rules": list(regenerated.applied_rules),
             "plan_steps": list(regenerated.plan_steps),
             "integrity_hash": regenerated.integrity_hash,
+            "preserved_length": getattr(regenerated, "preserved_length", len(regenerated.original)),
             "ethical": getattr(ethical, "__dict__", str(ethical)),
         }
 
