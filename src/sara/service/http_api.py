@@ -139,6 +139,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
                     ),
+                    "octacore.g0@1.0.0": (
+                        "existing sara.* operations",
+                        ("regeneration", "audit", "ethics", "validation", "persistence"),
+                    ),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -166,6 +170,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "octacore.g0@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
