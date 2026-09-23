@@ -112,6 +112,24 @@ def test_capabilities_include_federation_identity_and_trace():
 
 
 
+def test_regenerate_http_preserved_length_is_numeric_and_flagged():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/regenerate",
+            method="POST",
+            body={"input": "auditar e preservar contexto"},
+            token="test-token-123456789",
+        )
+        assert status == 200
+        assert payload["preserved_length"] == len(payload["original"])
+        assert payload["preserved_length_ok"] is True
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_regenerate_preserves_http_response_contract():
     server, _ = _start_server()
     try:
