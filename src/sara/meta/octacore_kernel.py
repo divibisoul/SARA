@@ -63,6 +63,12 @@ class OctaCoreG0Kernel:
         self._worker = Thread(target=self._worker_loop, name="sara-g0-octacore", daemon=True)
         self._worker.start()
 
+    def set_vagus_bus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
+        if vagus_bus is None:
+            raise ValueError("VagusBus is required")
+        self._vagus_bus = vagus_bus
+        return self
+
     def bind_vagus(self, vagus_bus: Any) -> "OctaCoreG0Kernel":
         if vagus_bus is None:
             raise ValueError("VagusBus is required")
