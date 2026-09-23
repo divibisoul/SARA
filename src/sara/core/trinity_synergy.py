@@ -43,7 +43,6 @@ class TrinityIteration:
     details: dict = field(default_factory=dict)
 
 
-@dataclass
 @dataclass(frozen=True)
 class FusionMirror:
     cycle_id: str
@@ -203,10 +202,10 @@ class TrinitySynergy:
             "eru": mirror.eru,
         }
         calculated = hash_json(payload)
-        expected = hash_json(payload)
+        expected = mirror.fused_hash
         return {
-            "ok": calculated == expected == mirror.fused_hash,
-            "fused_hash": mirror.fused_hash,
+            "ok": calculated == expected,
+            "fused_hash": expected,
             "calculated_hash": calculated,
             "eru_available": bool(mirror.eru.get("available")),
         }
