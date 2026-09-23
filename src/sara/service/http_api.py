@@ -139,6 +139,18 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
                     ),
+                    "sara.octacore@1.0.0": (
+                        "/v1/octacore",
+                        ("identity", "monitoring", "persistence"),
+                    ),
+                    "sara.mesh.status@1.0.0": (
+                        "/v1/mesh/status",
+                        ("identity", "monitoring"),
+                    ),
+                    "sara.mesh.probe@1.0.0": (
+                        "/v1/mesh/probe",
+                        ("monitoring", "validation"),
+                    ),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -166,6 +178,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "sara.octacore@1.0.0",
+                        "sara.mesh.status@1.0.0",
+                        "sara.mesh.probe@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -180,6 +195,39 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
                     "soul_federation": federation_manifest(),
+                })
+                return
+            if path == "/v1/octacore":
+                fusion = system.components.get("octacore_fusion")
+                if fusion is None:
+                    raise SaraAPIError(503, "OCTACORE_FUSION_UNAVAILABLE", "OctaCore fusion fabric indisponível.")
+                self._json(200, {
+                    "service": "SARA",
+                    "operation": "octacore",
+                    "identity": "G0",
+                    "manifest": fusion.describe(),
+                    "health": fusion.health(),
+                    "audit": fusion.audit(),
+                })
+                return
+            if path == "/v1/mesh/status":
+                fusion = system.components.get("octacore_fusion")
+                if fusion is None:
+                    raise SaraAPIError(503, "MESH_FUSION_UNAVAILABLE", "Mesh fusion fabric indisponível.")
+                manifest = fusion.describe()
+                health = fusion.health()
+                self._json(200, {
+                    "service": "SARA",
+                    "operation": "mesh.status",
+                    "mesh": manifest.get("mesh", {}),
+                    "health": health,
+                    "last_probe": health.get("mesh_last_probe"),
+                    "proof": {
+                        "configured": bool(os.getenv("SOUL_MESH_N01_URL", "").strip()),
+                        "connected": bool(health.get("mesh_last_probe") and health["mesh_last_probe"].get("status") in {"CONNECTED", "VERIFIED"}),
+                        "verified": bool(health.get("mesh_last_probe") and health["mesh_last_probe"].get("status") == "VERIFIED"),
+                        "unmeasurable_without_probe": health.get("mesh_last_probe") is None,
+                    },
                 })
                 return
             if path == "/v1/state":
@@ -215,6 +263,22 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/mesh/probe":
+                fusion = system.components.get("octacore_fusion")
+                if fusion is None:
+                    raise SaraAPIError(503, "MESH_FUSION_UNAVAILABLE", "Mesh fusion fabric indisponível.")
+                target = str(body.get("mediator", "N01")).strip().upper()
+                try:
+                    probe = fusion.probe_mesh(mediator=target)
+                except ValueError as exc:
+                    raise SaraAPIError(422, "INVALID_MESH_MEDIATOR", str(exc)) from exc
+                status_code = 200 if probe.status in {"CONNECTED", "VERIFIED", "UNMEASURABLE"} else 502
+                self._json(status_code, {
+                    "operation": "mesh.probe",
+                    "probe": probe.as_dict(),
+                })
+                return
 
             if path == "/v1/vagus":
                 bus = system.components.get("vagus_bus")
