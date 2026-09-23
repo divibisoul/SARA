@@ -57,6 +57,31 @@ class VagusNerveBus:
                 await result
         return dict(event)
 
+
+    def publish_sync(
+        self, source: str, target: str, event_type: str, payload: dict[str, Any],
+        status: str = "EXECUTE",
+        *,
+        correlation_id: str | None = None,
+        message_id: str | None = None,
+        priority: int | None = None,
+        ttl: int | None = None,
+    ) -> dict[str, Any]:
+        """Synchronous bridge for thread-based HTTP handlers; delegates to the canonical async bus."""
+        return asyncio.run(
+            self.publish(
+                source,
+                target,
+                event_type,
+                payload,
+                status,
+                correlation_id=correlation_id,
+                message_id=message_id,
+                priority=priority,
+                ttl=ttl,
+            )
+        )
+
     def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
         if limit < 0:
             raise ValueError("limit deve ser >= 0")
