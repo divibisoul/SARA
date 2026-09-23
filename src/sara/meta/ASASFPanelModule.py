@@ -37,7 +37,9 @@ class ASASFPanelModule:
             raise ValueError("ISSUE_REQUIRED")
         if self._executor is None or self._governance is None or self._trace is None:
             raise RuntimeError("ASASF_UNBOUND")
-        remediation_id = "remediation-" + str(self._trace.next_sequence())
+        remediation_id = "remediation-" + str(len(self._trace.query()))
+        self._governance.register_decision({"type": "asasf.remediation.requested", "id": remediation_id, "issue": issue, "severity": severity})
+        self._trace.log({"type": "asasf.remediation.requested", "id": remediation_id, "issue": issue, "severity": severity})
         for stage in ("detect", "isolate", "repair", "verify"):
             if not self._executor(remediation_id, stage):
                 self._state = RemediationState(remediation_id, issue, stage, "failed")
