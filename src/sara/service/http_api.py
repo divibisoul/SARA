@@ -216,6 +216,47 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
 
+            if path == "/v1/vagus":
+                if "vagus_bus" not in system.components:
+                    raise SaraAPIError(503, "VAGUS_BUS_UNAVAILABLE", "Vagus control plane não está disponível.")
+                required = ("vagus_version", "message_id", "correlation_id", "source", "target", "priority", "ttl", "type", "payload")
+                missing = [key for key in required if key not in body]
+                if missing:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Campos obrigatórios ausentes.", {"missing": missing})
+                vagus_version = str(body.get("vagus_version", "")).strip()
+                message_id = str(body.get("message_id", "")).strip()
+                correlation_id = str(body.get("correlation_id", "")).strip()
+                source = str(body.get("source", "")).strip()
+                target = str(body.get("target", "")).strip()
+                event_type = str(body.get("type", "")).strip()
+                try:
+                    priority = int(body.get("priority"))
+                    ttl = int(body.get("ttl"))
+                except (TypeError, ValueError) as exc:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "priority e ttl devem ser inteiros.") from exc
+                payload = body.get("payload")
+                if not isinstance(payload, dict):
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
+                if vagus_version != "1.0" or not message_id or not correlation_id or not source or not target or not event_type:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Envelope Vagus incompleto ou versão não suportada.")
+                if not (0 <= priority <= 100) or ttl <= 0:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "priority deve estar entre 0 e 100 e ttl deve ser positivo.")
+                if not (
+                    event_type in ("gpu.submit", "gpu.result", "gpu.barrier")
+                    or event_type.startswith(("health.", "capability.", "signal.", "sara.", "session.", "research."))
+                ):
+                    raise SaraAPIError(422, "INVALID_VAGUS_TYPE", f"Tipo Vagus não suportado: {event_type}")
+                status = str(body.get("status", "EXECUTE")).strip() or "EXECUTE"
+                event = await system.components["vagus_bus"].publish(
+                    source, target, event_type, payload, status,
+                    correlation_id=correlation_id,
+                    message_id=message_id,
+                    priority=priority,
+                    ttl=ttl,
+                )
+                self._json(202, {"accepted": True, "event": event, "correlation_id": correlation_id})
+                return
+
             if path == "/v1/cycle":
                 text = body.get("input")
                 if not isinstance(text, str) or not text.strip():
@@ -228,8 +269,17 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     not isinstance(cycle_id, str) or not cycle_id.strip()
                 ):
                     raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
-                result = system.sistema_vivo.process(text, cycle_id=cycle_id)
+                context = body.get("context")
+                if context is not None and not isinstance(context, dict):
+                    raise SaraAPIError(422, "INVALID_CONTEXT", "'context' deve ser objeto JSON.")
+                result = system.sistema_vivo.process(text, cycle_id=cycle_id, context=context)
                 correlation_id = correlation or result.cycle_id
+                context_summary = None
+                if isinstance(context, dict):
+                    context_summary = {
+                        "present": True,
+                        "keys": sorted(str(k) for k in context.keys()),
+                    }
                 self._json(200, {
                     "request_id": correlation_id,
                     "correlation_id": correlation_id,
@@ -240,6 +290,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
+                    "octacore_context": context_summary,
                 })
                 return
 
