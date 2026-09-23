@@ -225,6 +225,7 @@ class OctaCoreG0Kernel(SaraModule):
             "plan_steps": list(regenerated.plan_steps),
             "integrity_hash": regenerated.integrity_hash,
             "preserved_length": len(regenerated.original),
+            "preserved_length_ok": bool(getattr(regenerated, "preserved_length", True)),
             "length_preserved": bool(getattr(regenerated, "preserved_length", True)),
             "ethical": getattr(ethical, "__dict__", str(ethical)),
         }
