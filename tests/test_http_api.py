@@ -130,3 +130,65 @@ def test_cycle_propagates_correlation_id():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_cycle_accepts_octacore_context():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={
+                "input": "preservar autonomia e validar resultado",
+                "context": {
+                    "research_snippets": [{"source": "n04", "text": "contexto-real"}],
+                    "probabilistic": {"alpha": 0.7, "beta": 0.3},
+                    "pipeline_status": "pre-complete",
+                },
+            },
+            token="test-token-123456789",
+            correlation_id="corr-octacore-context-001",
+        )
+        assert status == 200
+        assert payload["octacore_context"]["present"] is True
+        assert set(payload["octacore_context"]["keys"]) == {
+            "pipeline_status", "probabilistic", "research_snippets"
+        }
+        assert payload["correlation_id"] == "corr-octacore-context-001"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_vagus_endpoint_publishes_to_existing_bus():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/vagus",
+            method="POST",
+            body={
+                "vagus_version": "1.0",
+                "message_id": "msg-vagus-001",
+                "correlation_id": "corr-vagus-001",
+                "source": "G7",
+                "target": "G6",
+                "priority": 90,
+                "ttl": 5000,
+                "type": "gpu.submit",
+                "payload": {"job_id": "octa-vagus-001"},
+            },
+            token="test-token-123456789",
+            correlation_id="corr-vagus-001",
+        )
+        assert status == 202
+        assert payload["accepted"] is True
+        assert payload["event"]["event_id"] == "msg-vagus-001"
+        assert payload["event"]["correlation_id"] == "corr-vagus-001"
+        system = server.sara_system
+        history = system.components["vagus_bus"].get_history()
+        assert any(event["event_id"] == "msg-vagus-001" for event in history)
+    finally:
+        server.shutdown()
+        server.server_close()
