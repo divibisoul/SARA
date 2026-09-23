@@ -164,7 +164,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         loop, storm, trace, registry=registry, provenance=prov,
         connected_runtime=connected_runtime,
     )
-    octacore_g0.bind(sistema)
+    octacore_g0.bind(sistema).bind_vagus(vagus_bus)
     candidates = [
         prov, dna, temporal, memory, working_memory, rollback, trace,
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
