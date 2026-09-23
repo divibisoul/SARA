@@ -111,6 +111,29 @@ def test_capabilities_include_federation_identity_and_trace():
         server.server_close()
 
 
+
+def test_regenerate_preserves_http_response_contract():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/regenerate",
+            method="POST",
+            body={"input": "preservar autonomia e validar resultado"},
+            token="test-token-123456789",
+        )
+        assert status == 200
+        assert payload["operation"] == "regenerate"
+        assert payload["original"]
+        assert payload["transformed"]
+        assert payload["integrity_hash"]
+        assert payload["preserved_length"] == len(payload["original"])
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+
 def test_cycle_propagates_correlation_id():
     server, _ = _start_server()
     try:
