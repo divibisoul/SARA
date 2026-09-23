@@ -306,41 +306,32 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 text = body.get("input")
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
+                kernel = system.components.get("octacore_g0")
+                if kernel is None:
+                    raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Octacore G0 kernel não está registrado.")
                 ara = system.components["ara_extended"]
                 etr = system.components["etr_extended"]
-                flaws = ara.detect(text)
-                semantic = ara.detect_semantic(text)
-                structural = ara.detect_structural(text)
-                relational = ara.detect_relational(text)
-                all_flaws = [*flaws, *semantic, *structural, *relational]
+                request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 if path == "/v1/audit":
-                    ethical = etr.validate_multi_framework(text)
-                    request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+                    audited = kernel.audit(ara, etr, text)
                     self._json(200, {
                         "request_id": request_id,
                         "correlation_id": request_id,
-                        "operation": "audit",
-                        "flaws": [getattr(f, "__dict__", str(f)) for f in all_flaws],
-                        "count": len(all_flaws),
-                        "semantic": [getattr(f, "__dict__", str(f)) for f in semantic],
-                        "ethical": getattr(ethical, "__dict__", str(ethical)),
-                        "provenance": ara.meta_audit_complete(),
+                        **audited,
                     })
                     return
-                regenerated = ara.regenerate_semantic(text, all_flaws)
-                ethical = etr.validate_multi_framework(regenerated.transformed)
-                request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+                regenerated = kernel.regenerate(ara, etr, text)
                 self._json(200, {
                     "request_id": request_id,
                     "correlation_id": request_id,
                     "operation": "regenerate",
-                    "original": regenerated.original,
-                    "transformed": regenerated.transformed,
-                    "applied_rules": list(regenerated.applied_rules),
-                    "plan_steps": list(regenerated.plan_steps),
-                    "integrity_hash": regenerated.integrity_hash,
-                    "preserved_length": regenerated.preserved_length,
-                    "ethical": getattr(ethical, "__dict__", str(ethical)),
+                    "original": regenerated["original"],
+                    "transformed": regenerated["transformed"],
+                    "applied_rules": regenerated["applied_rules"],
+                    "plan_steps": regenerated["plan_steps"],
+                    "integrity_hash": regenerated["integrity_hash"],
+                    "preserved_length": regenerated["preserved_length"],
+                    "ethical": regenerated["ethical"],
                 })
                 return
 
