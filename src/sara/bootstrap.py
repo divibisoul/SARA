@@ -239,6 +239,6 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "decision_trace": trace, "activation_plan": CANONICAL_ACTIVATION_PLAN,
             "connected_runtime": connected_runtime,
             "aeternum_chimera": aeternum_chimera,
-            "omega": omega,
+            "omega": omega, "trinity_self_optimizer": trinity_self_optimizer,
         },
     )
