@@ -88,6 +88,101 @@ class ERU_Engine:
             )
         return h
 
+    def checkpoint(
+        self,
+        name: str,
+        state: Any,
+        *,
+        cycle_id: str,
+        phase: str,
+        source: str = "ERU_Engine.checkpoint",
+    ) -> dict[str, Any]:
+        """Cria checkpoint verificável sem alegar reversibilidade inexistente."""
+        if not name or not cycle_id or not phase:
+            raise ValueError("ERU_CHECKPOINT_FIELDS_REQUIRED")
+        snapshot_name = f"CHECKPOINT::{cycle_id}::{phase}::{name}"
+        state_hash = self.freeze(snapshot_name, state)
+        record = {
+            "name": snapshot_name,
+            "logical_name": name,
+            "snapshot_name": snapshot_name,
+            "cycle_id": cycle_id,
+            "phase": phase,
+            "hash": state_hash,
+            "source": source,
+            "status": "REAL",
+            "verified": self.verify_snapshot(snapshot_name),
+            "reversible": self.has_snapshot(snapshot_name),
+        }
+        if self._temporal is not None:
+            self._temporal.insert({
+                "event": "eru_checkpoint",
+                **record,
+                "ts": now_iso(),
+            })
+        if self._provenance is not None:
+            self._provenance.register(
+                f"ERU.checkpoint.{cycle_id}.{phase}.{name}",
+                Provenance.RECONSTRUCTED,
+                "Checkpoint explícito do estado do ciclo",
+                source=source,
+            )
+        return copy.deepcopy(record)
+
+    def detect_information_loss(self, older: str, newer: str) -> dict[str, Any]:
+        """Detecta perda estrutural entre snapshots; ausência de snapshot é inconclusiva."""
+        diff = self.compare(older, newer)
+        if diff.lost == ["__missing_snapshot__"]:
+            return {
+                "status": "UNMEASURABLE",
+                "loss_detected": False,
+                "lost_paths": [],
+                "recoverable": [],
+                "reason": "missing_snapshot",
+                "older": older,
+                "newer": newer,
+            }
+        recovery = self.recover(older, newer)
+        recoverable = list(recovery.get("recovered_paths", []))
+        return {
+            "status": "REAL",
+            "loss_detected": bool(diff.lost),
+            "lost_paths": list(diff.lost),
+            "recoverable": recoverable,
+            "changed_paths": list(diff.changed),
+            "added_paths": list(diff.added),
+            "older": older,
+            "newer": newer,
+        }
+
+    def reconstructability(self, older: str, newer: str) -> dict[str, Any]:
+        """Determina se a perda estrutural pode ser reconstruída pelos snapshots."""
+        if older not in self._snapshots or newer not in self._snapshots:
+            return {
+                "status": "UNMEASURABLE",
+                "reconstructable": False,
+                "reconstructible": False,
+                "reason": "missing_snapshot",
+                "older": older,
+                "newer": newer,
+            }
+        diff = self.compare(older, newer)
+        recovery = self.recover(older, newer)
+        lost = set(diff.lost)
+        recovered = set(recovery.get("recovered_paths", []))
+        reconstructible = lost.issubset(recovered)
+        return {
+            "status": "REAL",
+            "reconstructable": reconstructible,
+            "reconstructible": reconstructible,
+            "lost_paths": sorted(lost),
+            "recovered_paths": sorted(recovered),
+            "unrecovered_paths": sorted(lost - recovered),
+            "evidence": "snapshot_pair_and_structural_recovery",
+            "older": older,
+            "newer": newer,
+        }
+
     def _walk_keys(self, obj: Any, prefix: str = "") -> dict[str, Any]:
         out: dict[str, Any] = {}
         if isinstance(obj, dict):
@@ -165,6 +260,13 @@ class ERU_Engine:
         snapshot_name = f"CAP::{name}"
         snapshot_hash = self.freeze(snapshot_name, state)
         return snapshot_hash
+
+    def verify_snapshot(self, name: str) -> bool:
+        """Verifica o hash de um snapshot ERU existente."""
+        frozen = self._snapshots.get(name)
+        if frozen is None:
+            return False
+        return hash_json(frozen.state) == frozen.hash
 
     def has_snapshot(self, name: str) -> bool:
         return name in self._snapshots
