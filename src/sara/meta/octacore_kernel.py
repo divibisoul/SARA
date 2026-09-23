@@ -189,7 +189,7 @@ class OctaCoreG0Kernel(SaraModule):
         return request.result
 
     def audit(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-            with self._serial_lock:
+        with self._serial_lock:
             base = list(ara_extended.detect(input_text))
             semantic = list(getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text))
             structural = list(getattr(ara_extended, "detect_structural", lambda _t: [])(input_text))
