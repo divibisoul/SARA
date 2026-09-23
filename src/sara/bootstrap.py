@@ -42,6 +42,7 @@ from sara.meta.quantum_snapshot import QuantumSnapshotSystem
 from sara.meta.eru_engine import ERU_Engine
 from sara.meta.eru_trinity_bridge import ERUTrinityBridge
 from sara.core.trinity_eru_unified import TrinityERUUnified
+from sara.core.trinity_self_optimization import TrinitySelfOptimizer
 from sara.meta.transystem_sara import TransystemSARA
 from sara.meta.aeternum_chimera import AeternumChimeraBridge
 from sara.research.innovation_radar import InnovationRadar
@@ -145,6 +146,11 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     connected_runtime = ConnectedRuntime(registry)
     aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler)
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
+    trinity_self_optimizer = TrinitySelfOptimizer(
+        ara_extended, etr_extended, itr_extended,
+        synergy=trinity_eru._trinity,
+        max_passes=2,
+    )
 
     loop = RegenerativeLoop(
         ara=ara_extended, etr=etr_extended, itr=itr_extended,
