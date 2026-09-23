@@ -103,13 +103,15 @@ class ERU_Engine:
         snapshot_name = f"CHECKPOINT::{cycle_id}::{phase}::{name}"
         state_hash = self.freeze(snapshot_name, state)
         record = {
-            "name": name,
+            "name": snapshot_name,
+            "logical_name": name,
             "snapshot_name": snapshot_name,
             "cycle_id": cycle_id,
             "phase": phase,
             "hash": state_hash,
             "source": source,
             "status": "REAL",
+            "verified": self.verify_snapshot(snapshot_name),
             "reversible": self.has_snapshot(snapshot_name),
         }
         if self._temporal is not None:
@@ -133,16 +135,20 @@ class ERU_Engine:
         if diff.lost == ["__missing_snapshot__"]:
             return {
                 "status": "UNMEASURABLE",
-                "has_loss": False,
+                "loss_detected": False,
                 "lost_paths": [],
+                "recoverable": [],
                 "reason": "missing_snapshot",
                 "older": older,
                 "newer": newer,
             }
+        recovery = self.recover(older, newer)
+        recoverable = list(recovery.get("recovered_paths", []))
         return {
             "status": "REAL",
-            "has_loss": bool(diff.lost),
+            "loss_detected": bool(diff.lost),
             "lost_paths": list(diff.lost),
+            "recoverable": recoverable,
             "changed_paths": list(diff.changed),
             "added_paths": list(diff.added),
             "older": older,
@@ -166,6 +172,7 @@ class ERU_Engine:
         reconstructible = lost.issubset(recovered)
         return {
             "status": "REAL",
+            "reconstructable": reconstructible,
             "reconstructible": reconstructible,
             "lost_paths": sorted(lost),
             "recovered_paths": sorted(recovered),
