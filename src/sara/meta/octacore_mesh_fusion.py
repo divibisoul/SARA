@@ -270,7 +270,8 @@ class OctaCoreMeshFusion:
         ]
 
         redundant_inheritance_dependencies: list[str] = []
-        for name, entry in self._registry.items():
+        for entry in self._registry.items():
+            name = entry.name
             instance = entry.instance
             for dependency in entry.dependencies:
                 try:
