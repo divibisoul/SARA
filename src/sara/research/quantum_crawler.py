@@ -137,7 +137,7 @@ class HTTPJSONBackend:
 
 class QuantumCrawler:
     NAME = "QuantumCrawler"
-    VERSION = "1.0"
+    VERSION = "1.1"
     STATUS = ModuleStatus.PENDING_INFRASTRUCTURE
     ROLE = CycleRole.RESEARCH
     DEPENDENCIES = ()
@@ -153,6 +153,7 @@ class QuantumCrawler:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "backends_configured": len(self._backends),
+            "external_scan_ready": self.is_backends_ready(),
             "is_backends_ready": self.is_backends_ready(),
             "backends": [backend.describe() for backend in self._backends if hasattr(backend, "describe")],
         }
@@ -200,7 +201,11 @@ class QuantumCrawler:
         }
 
     def list_sources(self) -> list[str]:
-        return ["NVIDIA", "Tesla", "Google", "OpenAI", "HuggingFace"]
+        """Lista apenas fontes realmente configuradas neste runtime."""
+        return sorted({
+            str(getattr(backend, "source", type(backend).__name__))
+            for backend in self._backends
+        })
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
@@ -214,4 +219,5 @@ class QuantumCrawler:
                     if active else "PENDING_INFRASTRUCTURE"
                 ),
                 backends_configured=len(self._backends),
+                sources=self.list_sources(),
             )
