@@ -252,7 +252,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 ):
                     raise SaraAPIError(422, "INVALID_VAGUS_TYPE", f"Tipo Vagus não suportado: {event_type}")
                 status = str(body.get("status", "EXECUTE")).strip() or "EXECUTE"
-                event = await system.components["vagus_bus"].publish(
+                event = system.components["vagus_bus"].publish_sync(
                     source, target, event_type, payload, status,
                     correlation_id=correlation_id,
                     message_id=message_id,
