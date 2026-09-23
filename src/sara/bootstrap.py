@@ -148,7 +148,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
     trinity_self_optimizer = TrinitySelfOptimizer(
         ara_extended, etr_extended, itr_extended,
-        synergy=trinity_eru._trinity,
+        synergy=trinity,
         max_passes=2,
     )
 
