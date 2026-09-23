@@ -216,6 +216,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             self._authorized(path)
+            self._rate_limit()
             system = self._runtime()
             body = self._body()
             if not system.ready:
