@@ -192,3 +192,59 @@ def test_vagus_endpoint_publishes_to_existing_bus():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_g0_vagus_signals_control_kernel_without_replacing_bus():
+    server, _ = _start_server()
+    try:
+        system = server.sara_system
+        kernel = system.components["octacore_g0"]
+        bus = system.components["vagus_bus"]
+
+        bus.publish_sync(
+            "G7", "G0", "signal.throttle", {"level": 2},
+            correlation_id="corr-g0-signal-001", message_id="msg-g0-signal-001",
+            priority=100, ttl=5000,
+        )
+        assert kernel.health()["throttle_level"] == 2
+
+        bus.publish_sync(
+            "G7", "G0", "signal.halt", {},
+            correlation_id="corr-g0-signal-002", message_id="msg-g0-signal-002",
+            priority=100, ttl=5000,
+        )
+        assert kernel.health()["status"] == "HALTED"
+
+        bus.publish_sync(
+            "G7", "G0", "signal.resume", {},
+            correlation_id="corr-g0-signal-003", message_id="msg-g0-signal-003",
+            priority=100, ttl=5000,
+        )
+        assert kernel.health()["status"] == "READY"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_g0_cycle_emits_real_health_report_with_correlation():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={"input": "preservar autonomia e validar resultado"},
+            token="test-token-123456789",
+            correlation_id="corr-g0-cycle-health-001",
+        )
+        assert status == 200
+        assert payload["correlation_id"] == "corr-g0-cycle-health-001"
+        history = server.sara_system.components["vagus_bus"].get_history()
+        reports = [event for event in history if event["event_type"] == "health.report"]
+        assert reports
+        assert reports[-1]["correlation_id"] == "corr-g0-cycle-health-001"
+        assert reports[-1]["payload"]["queue_depth"] == 0
+        assert isinstance(reports[-1]["payload"]["latency_ms"], int)
+    finally:
+        server.shutdown()
+        server.server_close()
