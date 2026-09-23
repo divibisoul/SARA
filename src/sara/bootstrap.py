@@ -52,6 +52,7 @@ from sara.research.quantum_scanner import QuantumScanner
 from sara.audit.cycle_auditor import CycleAuditor
 from sara.omega import SoulETROmegaSystem
 from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment, transystem_adapters_from_environment
+from sara.infra.vagus_bus import VagusNerveBus
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
 
@@ -234,5 +235,6 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "connected_runtime": connected_runtime,
             "aeternum_chimera": aeternum_chimera,
             "omega": omega,
+            "vagus_bus": vagus_bus,
         },
     )
