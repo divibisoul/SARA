@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from queue import Full, Queue
 from threading import Event, Lock, Thread
 from time import monotonic
+import uuid
 from typing import Any
 
 from sara.contracts.base import CyclePhase, CycleRole, ModuleStatus
@@ -156,7 +157,7 @@ class OctaCoreG0Kernel:
         request = _CycleRequest(
             input_text=str(input_text),
             cycle_id=cycle_id,
-            correlation_id=correlation_id or cycle_id,
+            correlation_id=correlation_id or cycle_id or f"g0-{uuid.uuid4()}",
             context=dict(context) if isinstance(context, dict) else context,
             done=Event(),
         )
