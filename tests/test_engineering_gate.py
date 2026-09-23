@@ -19,7 +19,7 @@ def test_bootstrap_exposes_current_integrated_components():
     for name in (
         "ara_extended", "etr_extended", "itr_extended",
         "eru", "eru_bridge", "trinity_eru",
-        "working_memory", "omega", "aeternum_chimera",
+        "working_memory", "omega", "aeternum_chimera", "trinity_self_optimizer",
     ):
         assert name in system.components
 
