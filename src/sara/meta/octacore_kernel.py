@@ -189,22 +189,23 @@ class OctaCoreG0Kernel(SaraModule):
         return request.result
 
     def audit(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
-        base = list(ara_extended.detect(input_text))
-        semantic = list(getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text))
-        structural = list(getattr(ara_extended, "detect_structural", lambda _t: [])(input_text))
-        relational = list(getattr(ara_extended, "detect_relational", lambda _t: [])(input_text))
-        flaws = [*base, *semantic, *structural, *relational]
-        ethical = etr_extended.validate_multi_framework(input_text)
-        return {
-            "operation": "audit",
-            "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
-            "count": len(flaws),
-            "semantic": [getattr(item, "__dict__", str(item)) for item in semantic],
-            "structural": [getattr(item, "__dict__", str(item)) for item in structural],
-            "relational": [getattr(item, "__dict__", str(item)) for item in relational],
-            "ethical": getattr(ethical, "__dict__", str(ethical)),
-            "provenance": getattr(ara_extended, "meta_audit_complete", lambda: {})(),
-        }
+            with self._serial_lock:
+            base = list(ara_extended.detect(input_text))
+            semantic = list(getattr(ara_extended, "detect_semantic", lambda _t: [])(input_text))
+            structural = list(getattr(ara_extended, "detect_structural", lambda _t: [])(input_text))
+            relational = list(getattr(ara_extended, "detect_relational", lambda _t: [])(input_text))
+            flaws = [*base, *semantic, *structural, *relational]
+            ethical = etr_extended.validate_multi_framework(input_text)
+            return {
+                "operation": "audit",
+                "flaws": [getattr(item, "__dict__", str(item)) for item in flaws],
+                "count": len(flaws),
+                "semantic": [getattr(item, "__dict__", str(item)) for item in semantic],
+                "structural": [getattr(item, "__dict__", str(item)) for item in structural],
+                "relational": [getattr(item, "__dict__", str(item)) for item in relational],
+                "ethical": getattr(ethical, "__dict__", str(ethical)),
+                "provenance": getattr(ara_extended, "meta_audit_complete", lambda: {})(),
+            }
 
     def regenerate(self, ara_extended: Any, etr_extended: Any, input_text: str) -> dict[str, Any]:
         flaws = [
