@@ -96,3 +96,20 @@ def test_fusion_mesh_status_endpoint_does_not_claim_connection_without_probe():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_trinity_mirror_uses_stored_fused_hash_for_verification():
+    system = build_default_system(fail_closed=True)
+    trinity = system.components["trinity"]
+
+    trinity.fuse_and_mirror(
+        "fusion-trinity-hash-001",
+        "test-target",
+        {"flaws": ["x"], "semantic_fingerprint": "a"},
+        {"approved": True, "consensus": 1.0},
+        {"plan": ["step-1"]},
+    )
+
+    result = trinity.audit_mirror("fusion-trinity-hash-001")
+    assert result["ok"] is True
+    assert result["fused_hash"] == result["calculated_hash"]
