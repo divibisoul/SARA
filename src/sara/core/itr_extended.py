@@ -66,7 +66,7 @@ class ITR_Extended(ITR):
     VERSION = "3.0"
     STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.NUCLEAR
-    DEPENDENCIES = ITR.DEPENDENCIES + ("ITR",)
+    DEPENDENCIES = ITR.DEPENDENCIES + ("ITR", "ETR_Extended")
     CYCLE_PHASES = ITR.CYCLE_PHASES
 
     # Passos adicionais
@@ -77,16 +77,18 @@ class ITR_Extended(ITR):
             f"METADADOS: len={len(t)}"
         ),
         "ethical_align": lambda t: (
-            t + "\n[ITR_Extended: alinhamento ético verificado]"
+            t + "\n[ITR_Extended: alinhamento ético solicitado — validação ETR requerida]"
         ),
         "resilience_check": lambda t: (
-            t + "\n[ITR_Extended: resiliência — fallback disponível]"
+            t + "\n[ITR_Extended: resiliência — rollback por snapshot habilitado]"
         ),
     }
 
-    def __init__(self, provenance: ProvenanceTracker, safe_sandbox=None) -> None:
+    def __init__(self, provenance: ProvenanceTracker, safe_sandbox=None,
+                 ethical_validator=None) -> None:
         super().__init__(provenance, safe_sandbox)
         self._semantic = SemanticEngine()
+        self._ethical_validator = ethical_validator
         # Registra os passos extras no registry central
         for name, fn in self.EXTRA_STEPS.items():
             _STEP_REGISTRY.setdefault(name, fn)
@@ -241,8 +243,27 @@ class ITR_Extended(ITR):
                         ]
                         continue
 
+                    if step_name == "ethical_align":
+                        if self._ethical_validator is None:
+                            phase_metrics["ethical_status"] = "UNMEASURABLE"
+                            text = fn(text)
+                        else:
+                            ethical = self._ethical_validator.validate_multi_framework(text)
+                            phase_metrics["ethical_status"] = (
+                                "VERIFIED" if ethical.approved else "BLOCKED"
+                            )
+                            phase_metrics["ethical_consensus"] = ethical.consensus_score
+                            phase_metrics["ethical_dissent"] = list(ethical.dissenting_frameworks)
+                            if not ethical.approved:
+                                raise RuntimeError(
+                                    f"ETR_REJECTED: consensus={ethical.consensus_score}"
+                                )
+                            text = text + "\n[ITR_Extended: alinhamento ético verificado pelo ETR_Extended]"
+                        continue
+
                     text = fn(text)
 
+                phase_metrics["rollback_available"] = True
                 semantic_delta = self._semantic.compare(plan.objective, text)
                 phase_metrics["semantic_relations_lost"] = len(semantic_delta["relations_lost"])
                 phase_metrics["semantic_entities_lost"] = len(semantic_delta["entity_loss"])
