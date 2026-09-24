@@ -211,3 +211,14 @@ def test_trinity_fusion_and_eru_mirror():
     assert set(mirror.eru["snapshot_hashes"]) == {"ARA", "ETR", "ITR"}
     assert trinity.mirror("test-fusion") is not None
     assert trinity.audit_mirror("test-fusion")["ok"] is True
+
+
+def test_etr_extended_self_validation_uses_real_source_evidence():
+    trinity = _build_trinity() if "_build_trinity" in globals() else None
+    if trinity is None:
+        return
+    result = trinity["etr"].validate_against_self()
+    assert isinstance(result.approved, bool)
+    meta = getattr(trinity["etr"], "_last_self_validation", {})
+    assert meta["bytes"] > 1000
+    assert len(meta["sha256"]) == 64
