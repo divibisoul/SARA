@@ -71,7 +71,7 @@ class SaraSystem:
 
 def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     registry = ModuleRegistry()
-    report = {"registered": [], "failed": [], "pending": [], "memory_loaded": False, "temporal_loaded": False}
+    report = {"registered": [], "failed": [], "pending": [], "memory_loaded": False, "temporal_loaded": False, "vagus_binding": {}}
     vagus_bus = VagusNerveBus()
 
     prov = ProvenanceTracker()
@@ -215,6 +215,16 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "reason": str(exc),
         })
 
+    # Fechamento da fase de inventário: todos os módulos efetivamente registrados
+    # passam a possuir uma ligação explícita com o plano de controle Vagus.
+    try:
+        report["vagus_binding"] = vagus_bus.bind_registry(registry)
+        report["vagus_forensic_audit"] = vagus_bus.forensic_audit(registry)
+    except Exception as exc:
+        logger.error("[bootstrap] auditoria transversal Vagus falhou: %s", exc)
+        report["vagus_binding"] = {"status": "BLOCKED", "reason": str(exc)}
+        report["vagus_forensic_audit"] = {"status": "BLOCKED", "reason": str(exc)}
+
     invariant_report = InvariantValidator().validate_registry(registry).as_dict()
     if fail_closed and (report["failed"] or not invariant_report["ok"]):
         raise RuntimeError({
@@ -252,6 +262,8 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "aeternum_chimera": aeternum_chimera,
             "omega": omega,
             "vagus_bus": vagus_bus,
+            "vagus_bindings": vagus_bus.module_bindings(),
+            "vagus_forensic_audit": report.get("vagus_forensic_audit", {}),
             "octacore_g0": octacore_g0,
             "octacore_fusion": octacore_fusion,
         },
