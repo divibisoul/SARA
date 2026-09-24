@@ -60,6 +60,7 @@ def test_v1_capabilities_requires_bearer_and_exposes_operations():
         assert "sara.health@1.0.0" in payload["operations"]
         assert "sara.cycle@1.0.0" in payload["operations"]
         assert "sara.audit@1.0.0" in payload["operations"]
+        assert "sara.hortacore.assess@1.0.0" in payload["operations"]
     finally:
         server.shutdown()
         server.server_close()
@@ -127,6 +128,34 @@ def test_cycle_propagates_correlation_id():
         assert payload["request_id"] == "corr-http-test-001"
         assert payload["correlation_id"] == "corr-http-test-001"
         assert payload["final_state"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+def test_hortacore_assessment_uses_real_registered_bridge():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/hortacore/assess",
+            method="POST",
+            body={
+                "proposal": {
+                    "name": "http-hortacore-test",
+                    "description": "autonomia transparência integridade",
+                    "license": "MIT",
+                }
+            },
+            token="test-token-123456789",
+            correlation_id="corr-hortacore-test-001",
+        )
+        assert status == 200
+        assert payload["operation"] == "hortacore_assess"
+        assert payload["authority"] == "AeternumChimeraBridge"
+        assert payload["correlation_id"] == "corr-hortacore-test-001"
+        assert payload["assessment"]["status"] == "FUSED_REAL"
+        assert payload["assessment"]["eru_snapshot"]["hash"]
+        assert payload["assessment"]["quantum_compute"]["status"] == "BLOCKED_INFRASTRUCTURE"
     finally:
         server.shutdown()
         server.server_close()

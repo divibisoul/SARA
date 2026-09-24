@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 from sara.meta.soul_federation import federation_manifest, SARA_OPERATIONS
+from sara.probabilistic import ProbabilisticReasoningError
 
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
@@ -131,6 +132,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/regenerate",
                         ("audit", "regeneration", "ethics", "validation"),
                     ),
+                    "sara.hortacore.assess@1.0.0": (
+                        "/v1/hortacore/assess",
+                        ("governance", "persistence", "monitoring"),
+                    ),
                     "sara.state@1.0.0": (
                         "/v1/state",
                         (),
@@ -164,6 +169,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.cycle@1.0.0",
                         "sara.audit@1.0.0",
                         "sara.regenerate@1.0.0",
+                        "sara.hortacore.assess@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
                     ],
@@ -180,6 +186,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
                     "soul_federation": federation_manifest(),
+                    "probabilistic": system.sistema_vivo.describe().get("probabilistic", {}),
                 })
                 return
             if path == "/v1/state":
@@ -204,6 +211,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             raise SaraAPIError(404, "NOT_FOUND", f"Endpointo não existe: {path}")
         except SaraAPIError as exc:
             self._error(exc)
+        except ProbabilisticReasoningError as exc:
+            self._error(SaraAPIError(422, "INVALID_PROBABILISTIC_CONTEXT", str(exc)))
         except Exception as exc:
             self._error(SaraAPIError(500, "INTERNAL_ERROR", str(exc)))
 
@@ -215,6 +224,22 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/hortacore/assess":
+                proposal = body.get("proposal")
+                if not isinstance(proposal, dict):
+                    raise SaraAPIError(422, "INVALID_PROPOSAL", "'proposal' deve ser objeto.")
+                bridge = system.components["aeternum_chimera"]
+                result = bridge.fuse_assessment(proposal)
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+                self._json(200, {
+                    "request_id": correlation,
+                    "correlation_id": correlation,
+                    "operation": "hortacore_assess",
+                    "authority": "AeternumChimeraBridge",
+                    "assessment": result,
+                })
+                return
 
             if path == "/v1/cycle":
                 text = body.get("input")
@@ -228,7 +253,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     not isinstance(cycle_id, str) or not cycle_id.strip()
                 ):
                     raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
-                result = system.sistema_vivo.process(text, cycle_id=cycle_id)
+                raw_context = body.get("context")
+                context = raw_context if isinstance(raw_context, dict) else None
+                result = system.sistema_vivo.process(text, cycle_id=cycle_id, context=context)
                 correlation_id = correlation or result.cycle_id
                 self._json(200, {
                     "request_id": correlation_id,
@@ -240,6 +267,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
+                    **({"probabilistic": result.probabilistic} if result.probabilistic is not None else {}),
                 })
                 return
 
@@ -247,6 +275,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 text = body.get("input")
                 if not isinstance(text, str) or not text.strip():
                     raise SaraAPIError(422, "INVALID_INPUT", "'input' deve ser string não vazia.")
+                raw_context = body.get("context")
+                context = raw_context if isinstance(raw_context, dict) else None
+                probabilistic = system.sistema_vivo.prepare_context(context)
                 ara = system.components["ara_extended"]
                 etr = system.components["etr_extended"]
                 flaws = ara.detect(text)
@@ -266,6 +297,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "semantic": [getattr(f, "__dict__", str(f)) for f in semantic],
                         "ethical": getattr(ethical, "__dict__", str(ethical)),
                         "provenance": ara.meta_audit_complete(),
+                        **({"probabilistic": probabilistic} if probabilistic is not None else {}),
                     })
                     return
                 regenerated = ara.regenerate_semantic(text, all_flaws)

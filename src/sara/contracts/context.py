@@ -32,6 +32,7 @@ class CycleContext:
     flags: dict[str, Any] = field(default_factory=dict)
     aborted: bool = False
     abort_reason: str = ""
+    external_context: dict[str, Any] = field(default_factory=dict)
 
     def record(self, phase: str, module: str, success: bool | None = None, **info: Any) -> None:
         """Registra uma etapa aceitando ok como metadado sem colisão."""

@@ -120,10 +120,39 @@ class RegenerativeLoop:
             if not self._prov.verify_integrity():
                 raise _Aborted("PREFLIGHT", "provenance_integrity_failed")
 
-    def run(self, input_text: str, cycle_id: str | None = None) -> LoopReport:
+    def run(
+        self,
+        input_text: str,
+        cycle_id: str | None = None,
+        context_data: dict[str, Any] | None = None,
+    ) -> LoopReport:
         cid = cycle_id or f"cycle-{now_iso()}"
         sink = TraceSink(self._trace, self._temporal, self._prov)
         ctx = CycleContext(cid, str(input_text), str(input_text), sink)
+        if context_data:
+            ctx.external_context = dict(context_data)
+            probabilistic = context_data.get("probabilistic")
+            if isinstance(probabilistic, dict):
+                ctx.register_artifact("probabilistic", probabilistic)
+                ctx.emit_decision({
+                    "event": "probabilistic_context_attached",
+                    "cycle_id": cid,
+                    "nodes": [
+                        {
+                            "name": node.get("name"),
+                            "source": node.get("source"),
+                            "confidence": node.get("confidence"),
+                            "entropy": node.get("entropy"),
+                            "provenance": node.get("provenance"),
+                        }
+                        for node in probabilistic.get("nodes", [])
+                    ],
+                })
+            feedback_refs = context_data.get("user_feedback_refs")
+            if isinstance(feedback_refs, list):
+                refs = [str(ref) for ref in feedback_refs if str(ref).strip()]
+                if refs:
+                    ctx.register_artifact("feedback_evidence_refs", refs)
         if self._working_memory is not None:
             self._working_memory.put("cycle_context", {
                 "cycle_id": cid,
@@ -352,6 +381,21 @@ class RegenerativeLoop:
             "structural": [f.kind for f in structural],
             "relational": [f.kind for f in relational],
         }
+        probabilistic = ctx.artifacts.get("probabilistic")
+        if isinstance(probabilistic, dict):
+            cycle["phases"]["audit"]["probabilistic"] = [
+                {
+                    "name": node.get("name"),
+                    "posterior": node.get("posterior"),
+                    "dirichlet_posterior": node.get("dirichlet_posterior"),
+                    "neural_posterior": node.get("neural_posterior"),
+                    "confidence": node.get("confidence"),
+                    "entropy": node.get("entropy"),
+                    "source": node.get("source"),
+                    "provenance": node.get("provenance"),
+                }
+                for node in probabilistic.get("nodes", [])
+            ]
         self._record(ctx, CyclePhase.AUDIT, "ARA", True, **cycle["phases"]["audit"])
 
     def _phase_regeneration(self, ctx, cycle):
@@ -504,14 +548,22 @@ class RegenerativeLoop:
             raise _Aborted("VALIDATION", reason)
 
     def _phase_persistence(self, ctx, cycle, idx, result):
+        feedback_refs = ctx.external_context.get("user_feedback_refs")
+        probabilistic = ctx.artifacts.get("probabilistic")
+        evidence = {
+            "feedback_refs": list(feedback_refs) if isinstance(feedback_refs, list) else [],
+            "probabilistic": probabilistic if isinstance(probabilistic, dict) else None,
+        }
         rid = self._temporal.insert({
             "cycle_id": ctx.cycle_id, "iteration": idx,
             "input": ctx.input, "state": ctx.current,
             "execution": getattr(result, "metrics", {}),
+            "evidence": evidence,
         })
         self._memory.store({
             "cycle_id": ctx.cycle_id, "iteration": idx,
             "state": ctx.current, "temporal_id": rid,
+            "evidence": evidence,
         }, label=f"{ctx.cycle_id}::iteration::{idx}")
         memory_persisted = self._memory.persist_if_configured()
         temporal_persisted = self._temporal.persist_if_configured()
@@ -540,6 +592,25 @@ class RegenerativeLoop:
         cycle["phases"]["monitoring"] = {
             "trace_valid": self._trace.verify() if self._trace is not None else False,
         }
+        probabilistic = ctx.artifacts.get("probabilistic")
+        if isinstance(probabilistic, dict):
+            nodes = list(probabilistic.get("nodes", []))
+            cycle["phases"]["monitoring"]["probabilistic"] = {
+                "node_count": len(nodes),
+                "mean_confidence": (
+                    sum(float(node.get("confidence", 0.0)) for node in nodes) / len(nodes)
+                    if nodes else None
+                ),
+                "mean_entropy": (
+                    sum(float(node.get("entropy", 0.0)) for node in nodes) / len(nodes)
+                    if nodes else None
+                ),
+            }
+            ctx.emit_decision({
+                "event": "probabilistic_monitoring",
+                "cycle_id": ctx.cycle_id,
+                "nodes": nodes,
+            })
         if self._gov_backend is not None and hasattr(self._gov_backend, "register_decision"):
             self._gov_backend.register_decision({
                 "event": "cycle_monitoring",
