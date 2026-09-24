@@ -143,7 +143,7 @@ class VagusNerveBus:
             "external_broker": "UNMEASURABLE",
         }
 
-    def publish(
+    async def publish(
         self,
         source: str,
         target: str,
@@ -160,12 +160,14 @@ class VagusNerveBus:
         phase: str | None = None,
         provenance: str | None = None,
     ) -> dict[str, Any]:
-        return self._publish(
+        event = self._publish(
             source, target, event_type, payload, status,
             correlation_id=correlation_id, message_id=message_id,
             priority=priority, ttl=ttl, trace_id=trace_id,
             causation_id=causation_id, phase=phase, provenance=provenance,
         )
+        await self._dispatch_async(event)
+        return dict(event)
 
     async def publish_async(
         self, source: str, target: str, event_type: str, payload: dict[str, Any],
