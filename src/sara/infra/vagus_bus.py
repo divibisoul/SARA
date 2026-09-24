@@ -56,6 +56,13 @@ class VagusNerveBus:
                 for phase in getattr(module, "CYCLE_PHASES", ())
             ],
         }
+        try:
+            setattr(module, "_vagus_bus", self)
+            binding["runtime_bound"] = getattr(module, "_vagus_bus", None) is self
+            binding["runtime_binding_error"] = None
+        except Exception as exc:
+            binding["runtime_bound"] = False
+            binding["runtime_binding_error"] = f"{type(exc).__name__}: {exc}"
         with self._history_lock:
             self._modules[name] = dict(binding)
         if emit:
@@ -64,12 +71,46 @@ class VagusNerveBus:
                 name,
                 "module.registered",
                 {"module": binding},
-                status="CONNECTED",
+                status="CONNECTED" if binding["runtime_bound"] else "BLOCKED",
                 correlation_id=f"module:{name}",
                 priority=100,
                 ttl=0,
             )
         return dict(binding)
+
+    def emit_module_event(
+        self,
+        module: Any,
+        event_type: str,
+        payload: dict[str, Any],
+        *,
+        target: str | None = None,
+        status: str = "EXECUTE",
+        correlation_id: str | None = None,
+        trace_id: str | None = None,
+        causation_id: str | None = None,
+        phase: str | None = None,
+        provenance: str | None = None,
+        priority: int | None = None,
+        ttl: int | None = None,
+    ) -> dict[str, Any]:
+        """Emit an event using an already-bound SARA module identity."""
+        source = str(getattr(module, "NAME", type(module).__name__))
+        destination = target or source
+        return self.publish_sync(
+            source,
+            destination,
+            event_type,
+            payload,
+            status=status,
+            correlation_id=correlation_id,
+            trace_id=trace_id,
+            causation_id=causation_id,
+            phase=phase,
+            provenance=provenance,
+            priority=priority,
+            ttl=ttl,
+        )
 
     def bind_registry(self, registry: Any) -> dict[str, Any]:
         """Bind every registered SARA module to the Vagus control plane.
@@ -127,9 +168,12 @@ class VagusNerveBus:
             }
 
         unbound = sorted(set(inventory["names"]) - bound_names)
+        runtime_unbound = sorted(
+            name for name, binding in self._modules.items()
+            if not bool(binding.get("runtime_bound"))
+        )
         missing_evidence = sorted(set(inventory["names"]) - registration_events)
-        structural_ok = not contract_failures and not dependency_failures and not unbound and not missing_evidence and not dependency_cycle
-
+        structural_ok = (not contract_failures and not dependency_failures and not unbound\n                         and not missing_evidence and not dependency_cycle and not runtime_unbound)\n
         return {
             "status": "VERIFIED" if structural_ok else "BLOCKED",
             "scope": "STRUCTURAL_TRANSVERSAL",
@@ -138,8 +182,7 @@ class VagusNerveBus:
             "dependency_failures": dependency_failures,
             "dependency_order": dependency_order,
             "vagus_unbound_modules": unbound,
-            "vagus_missing_registration_evidence": missing_evidence,
-            "functional_execution": "UNMEASURABLE",
+            "vagus_missing_registration_evidence": missing_evidence,\n            "vagus_runtime_unbound_modules": runtime_unbound,\n            "functional_execution": "UNMEASURABLE",
             "external_broker": "UNMEASURABLE",
         }
 
