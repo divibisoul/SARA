@@ -181,6 +181,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "invariants": system.invariant_report,
                     "soul_federation": federation_manifest(),
+                    "probabilistic": system.sistema_vivo.describe().get("probabilistic", {}),
                 })
                 return
             if path == "/v1/state":
