@@ -29,6 +29,8 @@ class GovernanceBackend:
         self._modules = dict(module_status)
         self._decisions: list[dict] = []
         self._decision_chain: list[str] = []
+        self._overrides: dict[int, dict] = {}
+        self._override_chain: list[str] = []
 
     def describe(self) -> dict:
         return {
@@ -66,9 +68,22 @@ class GovernanceBackend:
         return True
 
     def decisions(self, since: str | None = None) -> list[dict]:
-        if since is None:
-            return list(self._decisions)
-        return [d for d in self._decisions if d["ts"] >= since]
+        selected = (
+            self._decisions
+            if since is None
+            else [d for d in self._decisions if d["ts"] >= since]
+        )
+        return [
+            {
+                **decision,
+                **(
+                    {"override": dict(self._overrides[index])}
+                    if index in self._overrides else {}
+                ),
+            }
+            for index, decision in enumerate(self._decisions)
+            if decision in selected
+        ]
 
     def override(self, decision_id: int, action: str) -> dict:
         if decision_id < 0 or decision_id >= len(self._decisions):
@@ -76,16 +91,38 @@ class GovernanceBackend:
         action = str(action).strip()
         if not action:
             return {"ok": False, "reason": "action_required"}
-        decision = self._decisions[decision_id]
-        decision["override"] = {
+        override = {
+            "decision_id": decision_id,
             "action": action,
             "ts": now_iso(),
         }
+        previous = self._override_chain[-1] if self._override_chain else "GENESIS"
+        current = chain_hash(previous, override)
+        self._overrides[decision_id] = {**override, "integrity": current}
+        self._override_chain.append(current)
         return {
             "ok": True,
             "decision_id": decision_id,
-            "override": dict(decision["override"]),
+            "override": dict(self._overrides[decision_id]),
+            "decision_integrity_preserved": self.verify_integrity(),
+            "override_chain_integrity": self.verify_override_integrity(),
         }
+
+    def verify_override_integrity(self) -> bool:
+        if len(self._override_chain) != len(self._overrides):
+            return False
+        previous = "GENESIS"
+        for override in self._overrides.values():
+            payload = {
+                "decision_id": override["decision_id"],
+                "action": override["action"],
+                "ts": override["ts"],
+            }
+            expected = chain_hash(previous, payload)
+            if expected != override.get("integrity"):
+                return False
+            previous = override["integrity"]
+        return previous == (self._override_chain[-1] if self._override_chain else "GENESIS")
 
     def is_ui_ready(self) -> bool:
         return True
@@ -99,6 +136,7 @@ class GovernanceBackend:
             "modules": snapshot.modules,
             "decision_count": snapshot.last_decisions,
             "chain_integrity": self.verify_integrity(),
+            "override_chain_integrity": self.verify_override_integrity(),
             "decisions": decisions,
         }
         serialized = html.escape(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -118,4 +156,5 @@ h1{{margin-bottom:.25rem}}</style></head>
         if hasattr(ctx, "record"):
             ctx.record("governance", self.NAME, True,
                        decisions_count=len(self._decisions),
-                       chain_integrity=self.verify_integrity())
+                       chain_integrity=self.verify_integrity(),
+                       override_chain_integrity=self.verify_override_integrity())
