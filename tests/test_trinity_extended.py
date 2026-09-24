@@ -74,6 +74,10 @@ def test_ara_extended_applied_to_self(trinity):
     assert "audit" in result
     assert "proposals" in result
 
+    assert result["source_evidence"]["kind"] == "SOURCE_FILE"
+    assert len(result["source_evidence"]["sha256"]) == 64
+    assert result["source_evidence"]["bytes"] > 1000
+
 
 # --- ETR_Extended ---
 
