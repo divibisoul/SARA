@@ -71,6 +71,24 @@ Retorna estado observável do SistemaVivo, histórico, trace, registry e proveni
 
 Retorna entradas encadeadas do DecisionTrace daquele ciclo, registros temporais relacionados e integridade de trace/proveniência.
 
+## Contexto probabilístico opcional
+
+`POST /v1/cycle` e `POST /v1/audit` aceitam `context` sem alterar o contrato
+existente. Quando `PROBABILISTIC_LAYER=true`, o bloco
+`context.probabilistic` é validado pelo `ProbabilisticReasoningLayer`.
+
+O bloco pode conter nós discretos com `states`, `prior`, `prior_type`,
+`pseudo_counts`, `evidence`, `posterior`, `dirichlet_posterior`,
+`neural_posterior`, `confidence`, `entropy`, `source` e `provenance`,
+estrutura DAG e referências de intervenção.
+
+Defaults: `pseudo_counts=1.0`, `alpha_dirichlet=0.5`,
+`beta_neural=0.5`, `temperature=1.0`.
+
+A camada neural é determinística no ciclo e não treina pesos online. O SARA
+continua sendo a autoridade ARA/ETR/ITR; Bayes/neural somente enriquecem contexto,
+auditoria, monitoramento e evidência.
+
 ## Erros
 
 Formato único:
