@@ -208,6 +208,8 @@ class ConnectedRuntime:
                 facts={
                     "parent_cycle_id": parent_cycle_id,
                     "current_input_length": len(state["current"]),
+                    "probabilistic": getattr(ctx, "artifacts", {}).get("probabilistic"),
+                    "user_feedback_refs": getattr(ctx, "external_context", {}).get("user_feedback_refs"),
                 },
             )
             return {
