@@ -14,6 +14,7 @@ import asyncio
 import inspect
 import threading
 import uuid
+from functools import wraps
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -58,10 +59,13 @@ class VagusNerveBus:
         }
         try:
             setattr(module, "_vagus_bus", self)
+            self.instrument_module(module)
             binding["runtime_bound"] = getattr(module, "_vagus_bus", None) is self
+            binding["instrumented"] = True
             binding["runtime_binding_error"] = None
         except Exception as exc:
             binding["runtime_bound"] = False
+            binding["instrumented"] = False
             binding["runtime_binding_error"] = f"{type(exc).__name__}: {exc}"
         with self._history_lock:
             self._modules[name] = dict(binding)
@@ -77,6 +81,112 @@ class VagusNerveBus:
                 ttl=0,
             )
         return dict(binding)
+
+    _INSTRUMENTATION_EXCLUDE = frozenset({
+        "describe", "emit_trace", "provenance", "module_bindings",
+        "get_history", "last_actions",
+    })
+
+    def instrument_module(self, module: Any) -> None:
+        """Instrument public operational methods without replacing their bodies."""
+        if getattr(module, "_vagus_instrumented", False):
+            return
+        instrumented: set[str] = set()
+        for name in dir(module):
+            if name.startswith("_") or name in self._INSTRUMENTATION_EXCLUDE:
+                continue
+            try:
+                original = getattr(module, name)
+            except Exception:
+                continue
+            if not callable(original) or getattr(original, "_vagus_wrapper", False):
+                continue
+
+            if inspect.iscoroutinefunction(original):
+                @wraps(original)
+                async def async_wrapper(*args: Any, __original=original, __name=name, **kwargs: Any) -> Any:
+                    correlation = self._correlation_from(args, kwargs)
+                    self.publish_sync(
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        "module.method.start",
+                        {"method": __name},
+                        status="EXECUTE",
+                        correlation_id=correlation,
+                    )
+                    try:
+                        result = await __original(*args, **kwargs)
+                    except Exception as exc:
+                        self.publish_sync(
+                            str(getattr(module, "NAME", type(module).__name__)),
+                            str(getattr(module, "NAME", type(module).__name__)),
+                            "module.method.error",
+                            {"method": __name, "error": type(exc).__name__},
+                            status="ERROR",
+                            correlation_id=correlation,
+                        )
+                        raise
+                    self.publish_sync(
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        "module.method.complete",
+                        {"method": __name, "result_type": type(result).__name__},
+                        status="RESULT",
+                        correlation_id=correlation,
+                    )
+                    return result
+                async_wrapper._vagus_wrapper = True  # type: ignore[attr-defined]
+                setattr(module, name, async_wrapper)
+            else:
+                @wraps(original)
+                def sync_wrapper(*args: Any, __original=original, __name=name, **kwargs: Any) -> Any:
+                    correlation = self._correlation_from(args, kwargs)
+                    self.publish_sync(
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        "module.method.start",
+                        {"method": __name},
+                        status="EXECUTE",
+                        correlation_id=correlation,
+                    )
+                    try:
+                        result = __original(*args, **kwargs)
+                    except Exception as exc:
+                        self.publish_sync(
+                            str(getattr(module, "NAME", type(module).__name__)),
+                            str(getattr(module, "NAME", type(module).__name__)),
+                            "module.method.error",
+                            {"method": __name, "error": type(exc).__name__},
+                            status="ERROR",
+                            correlation_id=correlation,
+                        )
+                        raise
+                    self.publish_sync(
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        str(getattr(module, "NAME", type(module).__name__)),
+                        "module.method.complete",
+                        {"method": __name, "result_type": type(result).__name__},
+                        status="RESULT",
+                        correlation_id=correlation,
+                    )
+                    return result
+                sync_wrapper._vagus_wrapper = True  # type: ignore[attr-defined]
+                setattr(module, name, sync_wrapper)
+            instrumented.add(name)
+        setattr(module, "_vagus_instrumented", True)
+        setattr(module, "_vagus_instrumented_methods", tuple(sorted(instrumented)))
+
+    @staticmethod
+    def _correlation_from(args: tuple[Any, ...], kwargs: dict[str, Any]) -> str | None:
+        for value in (*args, *kwargs.values()):
+            candidate = getattr(value, "cycle_id", None)
+            if candidate:
+                return str(candidate)
+        for key in ("correlation_id", "cycle_id", "trace_id"):
+            value = kwargs.get(key)
+            if value:
+                return str(value)
+        return None
 
     def emit_module_event(
         self,
@@ -204,7 +314,7 @@ class VagusNerveBus:
         missing_evidence = sorted(set(inventory["names"]) - registration_events)
         structural_ok = (not contract_failures and not description_mismatches
                          and not dependency_failures and not unbound
-                         and not missing_evidence and not dependency_cycle and not runtime_unbound)
+                         and not missing_evidence and not dependency_cycle and not runtime_unbound\n                         and not any(not b.get("instrumented") for b in self._modules.values()))
 
         return {
             "status": "VERIFIED" if structural_ok else "BLOCKED",
@@ -217,6 +327,7 @@ class VagusNerveBus:
             "vagus_unbound_modules": unbound,
             "vagus_missing_registration_evidence": missing_evidence,
             "vagus_runtime_unbound_modules": runtime_unbound,
+            "vagus_non_instrumented_modules": sorted(name for name, binding in self._modules.items() if not binding.get("instrumented")),
             "functional_execution": "UNMEASURABLE",
             "external_broker": "UNMEASURABLE",
         }
