@@ -16,7 +16,9 @@ Aplica-se sobre qualquer alvo — inclusive sobre a própria Trindade.
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from sara.core.ara_extended import ARA_Extended
@@ -411,27 +413,55 @@ class TrinitySynergy:
     # -----------------------------------------------------------------
 
     def apply_to_self(self) -> TrinityReport:
-        """Aplica a Trindade sobre a própria Trindade."""
-        self_repr = (
-            f"TrinitySynergy v{self.VERSION} orquestrando "
-            f"ARA_Extended + ETR_Extended + ITR_Extended. "
-            f"Max iterations: {self._max_iterations}. "
-            f"Frameworks: {list(self._etr.FRAMEWORKS)}. "
-            f"Promove autonomia, transparência e cuidado com a comunidade."
-        )
-        report = self.apply_to(self_repr)
-        # Adiciona meta-auditoria
-        report.self_audit = {
-            "ara_audit": self._ara.meta_audit_complete(),
+        """Executa autoauditoria sobre o código-fonte real da Trindade."""
+        source_path = Path(__file__).resolve()
+        source_text = source_path.read_text(encoding="utf-8")
+        source_hash = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
+
+        ara_audit = self._ara.meta_audit_complete()
+        ara_proposals = self._ara.propose_rule_upgrade()
+        etr_validation = self._etr.validate_against_self()
+        etr_proposals = self._etr.propose_ethical_upgrade()
+        itr_optimization = self._itr.optimize_registry()
+        itr_proposals = self._itr.propose_trinity_evolution()
+
+        source_ok = len(source_text.encode("utf-8")) > 1000 and len(source_hash) == 64
+        etr_ok = bool(etr_validation.approved)
+        self_audit = {
+            "source_evidence": {
+                "kind": "SOURCE_FILE",
+                "path": str(source_path),
+                "sha256": source_hash,
+                "bytes": len(source_text.encode("utf-8")),
+            },
+            "ara_audit": ara_audit,
             "ara_proposals": [
                 {"rule": p.rule, "proposed": p.proposed_state}
-                for p in self._ara.propose_rule_upgrade()
+                for p in ara_proposals
             ],
-            "etr_upgrade_proposals": self._etr.propose_ethical_upgrade(),
-            "itr_registry_optimization": {
-                "new_steps": list(self._itr.optimize_registry().new_steps),
-                "improvements": list(self._itr.optimize_registry().improvements),
+            "etr_self_validation": {
+                "approved": etr_validation.approved,
+                "consensus_score": etr_validation.consensus_score,
+                "dissenting": list(etr_validation.dissenting_frameworks),
+                "evidence": getattr(self._etr, "_last_self_validation", {}),
             },
-            "itr_trinity_proposals": self._itr.propose_trinity_evolution(),
+            "etr_upgrade_proposals": etr_proposals,
+            "itr_registry_optimization": {
+                "new_steps": list(itr_optimization.new_steps),
+                "improvements": list(itr_optimization.improvements),
+            },
+            "itr_trinity_proposals": itr_proposals,
+            "convergence_basis": {
+                "source_evidence_ok": source_ok,
+                "etr_self_validation_ok": etr_ok,
+            },
         }
-        return report
+        converged = source_ok and etr_ok and bool(ara_audit) and bool(itr_optimization)
+        return TrinityReport(
+            target=str(source_path),
+            iterations=[],
+            final_text=source_text,
+            converged=converged,
+            total_iterations=1,
+            self_audit=self_audit,
+        )
