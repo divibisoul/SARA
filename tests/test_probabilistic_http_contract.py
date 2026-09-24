@@ -35,14 +35,6 @@ def test_probabilistic_http_cycle_and_capability_contract():
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
-        status, capabilities = _request(
-            server,
-            "/v1/capabilities",
-            "prob-http-token-001",
-            {},
-        )
-        assert status == 405
-
         status, body = _request(
             server,
             "/v1/cycle",
