@@ -98,7 +98,9 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     if safe_sandbox_backend is not None:
         safe_sandbox.STATUS = ModuleStatus.IMPLEMENTED
     itr = ITR(prov, safe_sandbox=safe_sandbox)
-    itr_extended = ITR_Extended(prov, safe_sandbox=safe_sandbox)
+    itr_extended = ITR_Extended(
+        prov, safe_sandbox=safe_sandbox, ethical_validator=etr_extended
+    )
 
     filters = EthicalFilterChain()
     filters.register(ubuntu)
