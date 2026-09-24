@@ -215,7 +215,9 @@ class VagusNerveBus:
             "dependency_failures": dependency_failures,
             "dependency_order": dependency_order,
             "vagus_unbound_modules": unbound,
-            "vagus_missing_registration_evidence": missing_evidence,\n            "vagus_runtime_unbound_modules": runtime_unbound,\n            "functional_execution": "UNMEASURABLE",
+            "vagus_missing_registration_evidence": missing_evidence,
+            "vagus_runtime_unbound_modules": runtime_unbound,
+            "functional_execution": "UNMEASURABLE",
             "external_broker": "UNMEASURABLE",
         }
 
