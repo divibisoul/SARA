@@ -67,13 +67,12 @@ class GovernanceBackend:
         return True
 
     def decisions(self, since: str | None = None) -> list[dict]:
-        source = self._decisions if since is None else [
-            d for d in self._decisions if d["ts"] >= since
-        ]
         out: list[dict] = []
-        for index, decision in enumerate(source):
+        for index, decision in enumerate(self._decisions):
+            if since is not None and decision["ts"] < since:
+                continue
             item = dict(decision)
-            if since is None and index in self._overrides:
+            if index in self._overrides:
                 item["override"] = dict(self._overrides[index])
             out.append(item)
         return out
