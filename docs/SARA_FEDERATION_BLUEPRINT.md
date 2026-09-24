@@ -176,8 +176,11 @@ Operações N07:
 - sara.regenerate@1.0.0
 - sara.state@1.0.0
 - sara.capabilities@1.0.0
+- sara.octacore@1.0.0
+- sara.mesh.status@1.0.0
+- sara.mesh.probe@1.0.0
 
-O resultado estruturado completo do SARA é preservado em `Result.Metadata["sara_result_json"]` no N07 e propagado no gateway Mesh.
+Além das operações base, N07 pode consumir `sara.octacore`, `sara.mesh.status` e `sara.mesh.probe`; essas rotas preservam a propriedade SARA e exigem correlação/erro explícito. O resultado estruturado completo do SARA é preservado em `Result.Metadata["sara_result_json"]` no N07 e propagado no gateway Mesh.
 
 O gateway Mesh aceita payload estruturado para capacidades `sara.*`, sem alterar o contrato numérico das capacidades neurais/compute existentes.
 
