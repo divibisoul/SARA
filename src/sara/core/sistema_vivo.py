@@ -110,6 +110,29 @@ class SistemaVivo:
             loop_context["probabilistic"] = probabilistic
         report = self._loop.run(input_text, cycle_id=cid, context_data=loop_context or None)
 
+        # Guarda de integridade: a evidência probabilística deve permanecer
+        # recuperável pelo DecisionTrace mesmo quando um caminho de execução
+        # auxiliar não a propaga até o final do ciclo.
+        if probabilistic is not None and not self._trace.query({
+            "cycle_id": cid,
+            "event": "probabilistic_monitoring",
+        }):
+            self._trace.log({
+                "event": "probabilistic_monitoring",
+                "cycle_id": cid,
+                "nodes": [
+                    {
+                        "name": node.get("name"),
+                        "source": node.get("source"),
+                        "confidence": node.get("confidence"),
+                        "entropy": node.get("entropy"),
+                        "provenance": node.get("provenance"),
+                    }
+                    for node in probabilistic.get("nodes", [])
+                ],
+                "source": "SistemaVivo.integrity_guard",
+            })
+
         monitoring_id = None
         if monitor_hours > 0:
             monitoring_id = self._monitor.start(cid, monitor_hours)
