@@ -184,6 +184,9 @@ def test_trinity_synergy_apply_to_self(trinity):
     assert "ara_audit" in report.self_audit
     assert "etr_upgrade_proposals" in report.self_audit
     assert "itr_registry_optimization" in report.self_audit
+    assert report.self_audit["source_evidence"]["kind"] == "SOURCE_FILE"
+    assert len(report.self_audit["source_evidence"]["sha256"]) == 64
+    assert report.self_audit["source_evidence"]["bytes"] > 1000
 
 
 def test_trinity_synergy_iteracoes_registradas(trinity):
