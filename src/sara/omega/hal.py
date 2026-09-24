@@ -1,4 +1,5 @@
 from __future__ import annotations
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
@@ -12,7 +13,7 @@ class DeviceCapabilities:
     source: str
 
 
-class DeviceAdapter:
+class DeviceAdapter(ABC):
     """Contrato HAL agnóstico de fabricante.
 
     O adapter não promete privilégios Android. Capacidades externas precisam
@@ -20,10 +21,14 @@ class DeviceAdapter:
     """
     NAME = "DeviceAdapter"
 
+    @abstractmethod
     def capabilities(self) -> DeviceCapabilities:
+        """Return capabilities actually provided by the concrete adapter."""
         raise NotImplementedError
 
+    @abstractmethod
     def collect_metrics(self) -> dict[str, float]:
+        """Return metrics actually observable by the concrete adapter."""
         raise NotImplementedError
 
 
