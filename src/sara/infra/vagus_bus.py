@@ -202,12 +202,17 @@ class VagusNerveBus:
             if not bool(binding.get("runtime_bound"))
         )
         missing_evidence = sorted(set(inventory["names"]) - registration_events)
-        structural_ok = (not contract_failures and not dependency_failures and not unbound\n                         and not missing_evidence and not dependency_cycle and not runtime_unbound)\n
+        structural_ok = (not contract_failures and not description_mismatches
+                         and not dependency_failures and not unbound
+                         and not missing_evidence and not dependency_cycle and not runtime_unbound)
+
         return {
             "status": "VERIFIED" if structural_ok else "BLOCKED",
             "scope": "STRUCTURAL_TRANSVERSAL",
             "inventory": inventory,
-            "contract_failures": contract_failures,\n            "description_mismatches": description_mismatches,\n            "dependency_failures": dependency_failures,
+            "contract_failures": contract_failures,
+            "description_mismatches": description_mismatches,
+            "dependency_failures": dependency_failures,
             "dependency_order": dependency_order,
             "vagus_unbound_modules": unbound,
             "vagus_missing_registration_evidence": missing_evidence,\n            "vagus_runtime_unbound_modules": runtime_unbound,\n            "functional_execution": "UNMEASURABLE",
