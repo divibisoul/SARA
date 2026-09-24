@@ -145,6 +145,17 @@ def test_itr_extended_execute_composed(trinity):
     assert len(result.phase_results) == 4
 
 
+def test_itr_extended_ethical_alignment_uses_real_etr(trinity):
+    itr = ITR_Extended(trinity["prov"], ethical_validator=trinity["etr"])
+    plan = itr.generate_strategic("promover autonomia comunitária e transparência")
+    result = itr.execute_composed(plan)
+    assert result.rollback_triggered is False
+    guard = next(item for item in result.phase_results if item["name"] == "guard")
+    assert guard["ethical_status"] == "VERIFIED"
+    assert guard["ethical_consensus"] >= 0.75
+    assert guard["rollback_available"] is True
+
+
 def test_itr_extended_analyze_patterns(trinity):
     patterns = trinity["itr"].analyze_patterns([
         "promover autonomia",
