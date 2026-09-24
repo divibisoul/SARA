@@ -142,10 +142,11 @@ class ERU_Engine:
             except (TypeError, ValueError):
                 signature = "UNAVAILABLE"
             source_text = None
+            source_error = None
             try:
                 source_text = inspect.getsource(member)
-            except (OSError, TypeError):
-                pass
+            except (OSError, TypeError) as exc:
+                source_error = f"{type(exc).__name__}: {exc}"
             methods[attr_name] = {
                 "signature": signature,
                 "source_hash": (
@@ -154,6 +155,7 @@ class ERU_Engine:
                 ),
                 "source_text": source_text,
                 "source_available": source_text is not None,
+                "source_error": source_error,
             }
 
         state = {
