@@ -32,6 +32,19 @@ Operações:
 - `sara.regenerate@1.0.0`
 - `sara.state@1.0.0`
 - `sara.trace@1.0.0`
+- `sara.hortacore.assess@1.0.0`
+
+### POST /v1/hortacore/assess
+
+Request:
+
+```json
+{"proposal":{"name":"nome","description":"proposta a avaliar","license":"MIT"}}
+```
+
+Executa o método real `AeternumChimeraBridge.fuse_assessment()`. A avaliação passa por
+`GovernedSARA` e pelo snapshot reversível do `ERU_Engine`; o estado de compute quântico
+continua explicitamente `BLOCKED_INFRASTRUCTURE` quando não houver backend verificado.
 
 ### POST /v1/cycle
 
