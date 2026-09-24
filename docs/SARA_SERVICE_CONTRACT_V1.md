@@ -123,3 +123,20 @@ Os frontends consomem principalmente `/v1/cycle`, podendo consultar `/v1/audit`,
 ## Estado de infraestrutura externa
 
 IPFS, sandbox isolado, crawlers/scanners externos, APIs jurídicas externas e Transystem externo não são fingidos como ativos. Seus contratos permanecem no inventário e a ativação é bloqueante/explicitamente reportada quando necessária.
+
+## Topologia federada e nomes legados
+
+A auditoria do código atual não encontrou módulos executáveis com os nomes literais
+`OctaCore` ou `Nervobus`. Para preservar a intenção sem inventar infraestrutura,
+a equivalência operacional é:
+
+- **OctaCore**: topologia lógica de oito autoridades, formada por N01–N07 + SARA.
+  N07 permanece dono da orquestração/federação/compute SuperGPU; SARA permanece dono
+  da regeneração, auditoria, ética, memória, proveniência e governança interna.
+- **Nervobus**: função de barramento/fabric já realizada pelo **Soul Mesh**, com
+  descoberta, correlação, autenticação HMAC e anti-replay; não é um segundo transporte.
+- **HortaCore**: ponte meta real `AeternumChimeraBridge`, registrada no bootstrap SARA.
+  A operação federada `sara.hortacore.assess@1.0.0` chama o
+  `fuse_assessment()` existente e preserva GovernedSARA + ERU_Engine como autoridades.
+- **SuperGPU + Orquestrador**: continuam centralizados no N07. N02/N03/N04 possuem
+  apenas adaptadores de chamada pelo Soul Mesh; não criam um quarto executor de compute.
