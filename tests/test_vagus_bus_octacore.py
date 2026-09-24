@@ -77,9 +77,11 @@ def test_vagus_registry_binding_and_forensic_structural_audit():
     audit = system.components["vagus_forensic_audit"]
     assert audit["status"] == "VERIFIED"
     assert audit["vagus_unbound_modules"] == []
+    assert audit["vagus_runtime_unbound_modules"] == []
     assert audit["vagus_missing_registration_evidence"] == []
     assert audit["contract_failures"] == []
     assert audit["dependency_failures"] == []
     assert audit["functional_execution"] == "UNMEASURABLE"
     assert audit["inventory"]["count"] == len(system.registry.items())
     assert len(system.components["vagus_bindings"]) == audit["inventory"]["count"]
+    assert all(binding["runtime_bound"] for binding in system.components["vagus_bindings"].values())
