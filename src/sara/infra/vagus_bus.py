@@ -314,7 +314,9 @@ class VagusNerveBus:
         missing_evidence = sorted(set(inventory["names"]) - registration_events)
         structural_ok = (not contract_failures and not description_mismatches
                          and not dependency_failures and not unbound
-                         and not missing_evidence and not dependency_cycle and not runtime_unbound\n                         and not any(not b.get("instrumented") for b in self._modules.values()))
+                         and not missing_evidence and not dependency_cycle
+                         and not runtime_unbound
+                         and not any(not b.get("instrumented") for b in self._modules.values()))
 
         return {
             "status": "VERIFIED" if structural_ok else "BLOCKED",
