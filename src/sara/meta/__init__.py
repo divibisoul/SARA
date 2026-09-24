@@ -6,6 +6,7 @@ from .transystem_sara import TransystemSARA
 from .eru_trinity_bridge import ERUTrinityBridge
 from .eru_drift_detector import ERUDriftDetector
 from .eru_recovery_advisor import ERURecoveryAdvisor
+from .aeternum_modules import AETERNUM_8_BINDINGS, AeternumBinding, AeternumModuleAdapter
 from .soul_federation import (
     SARA_FEDERATION_CONTRACT_VERSION,
     SARA_OPERATIONS,
@@ -22,6 +23,7 @@ __all__ = [
     "ERU_Engine", "AuditReport", "FrozenState", "DiffReport",
     "TransystemSARA",
     "ERUTrinityBridge", "ERUDriftDetector", "ERURecoveryAdvisor",
+    "AETERNUM_8_BINDINGS", "AeternumBinding", "AeternumModuleAdapter",
     "SARA_FEDERATION_CONTRACT_VERSION", "SARA_OPERATIONS",
     "SOUL_NUCLEUS_AFFINITIES", "NucleusAffinity", "affinity_for", "federation_manifest",
 ]

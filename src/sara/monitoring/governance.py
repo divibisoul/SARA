@@ -29,6 +29,7 @@ class GovernanceBackend:
         self._modules = dict(module_status)
         self._decisions: list[dict] = []
         self._decision_chain: list[str] = []
+        self._overrides: dict[int, dict] = {}
 
     def describe(self) -> dict:
         return {
@@ -66,9 +67,15 @@ class GovernanceBackend:
         return True
 
     def decisions(self, since: str | None = None) -> list[dict]:
-        if since is None:
-            return list(self._decisions)
-        return [d for d in self._decisions if d["ts"] >= since]
+        out: list[dict] = []
+        for index, decision in enumerate(self._decisions):
+            if since is not None and decision["ts"] < since:
+                continue
+            item = dict(decision)
+            if index in self._overrides:
+                item["override"] = dict(self._overrides[index])
+            out.append(item)
+        return out
 
     def override(self, decision_id: int, action: str) -> dict:
         if decision_id < 0 or decision_id >= len(self._decisions):
@@ -76,15 +83,23 @@ class GovernanceBackend:
         action = str(action).strip()
         if not action:
             return {"ok": False, "reason": "action_required"}
-        decision = self._decisions[decision_id]
-        decision["override"] = {
+
+        override = {
             "action": action,
             "ts": now_iso(),
         }
+        self._overrides[decision_id] = override
+        self.register_decision({
+            "event": "decision_override",
+            "decision_id": decision_id,
+            "action": action,
+            "override_ts": override["ts"],
+        })
         return {
             "ok": True,
             "decision_id": decision_id,
-            "override": dict(decision["override"]),
+            "override": dict(override),
+            "chain_integrity": self.verify_integrity(),
         }
 
     def is_ui_ready(self) -> bool:

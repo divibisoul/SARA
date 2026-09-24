@@ -13,11 +13,11 @@ from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 class QuantumScanner:
     NAME = "QuantumScanner"
-    VERSION = "1.0"
-    STATUS = ModuleStatus.PENDING_INFRASTRUCTURE
+    VERSION = "1.1"
+    STATUS = ModuleStatus.IMPLEMENTED
     ROLE = CycleRole.RESEARCH
     DEPENDENCIES = ()
-    CYCLE_PHASES = ()
+    CYCLE_PHASES = (CyclePhase.GOVERNANCE,)
 
     def describe(self) -> dict:
         return {
@@ -25,11 +25,15 @@ class QuantumScanner:
             "status": self.STATUS.value, "role": self.ROLE.value,
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
-            "target_access_ready": self.is_target_access_ready(),
+            "local_scan_ready": True,
+            "file_probe_ready": shutil.which("file") is not None,
+            "objdump_ready": shutil.which("objdump") is not None,
         }
 
-    def is_target_access_ready(self) -> bool:
-        return shutil.which("file") is not None
+    def is_target_access_ready(self, target: str | None = None) -> bool:
+        if target is None:
+            return True
+        return pathlib.Path(target).is_file()
 
     def scan_source_file(self, target: str) -> dict:
         path = pathlib.Path(target)
@@ -87,7 +91,7 @@ class QuantumScanner:
             result["depth"] = depth
             result["backend"] = "local_source_parser"
             return result
-        if path.is_file() and self.is_target_access_ready():
+        if path.is_file():
             result = {
                 "target": str(path),
                 "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
@@ -124,9 +128,11 @@ class QuantumScanner:
                     "message": "objdump não encontrado; análise de formato permanece disponível via file",
                 })
             return result
-        raise FileNotFoundError(f"target não encontrado ou toolchain indisponível: {target}")
+        raise FileNotFoundError(f"target não encontrado: {target}")
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
-            ctx.record("governance", self.NAME, False,
-                       reason="PENDING_INFRASTRUCTURE")
+            ctx.record("governance", self.NAME, True,
+                       local_scan_ready=True,
+                       file_probe_ready=shutil.which("file") is not None,
+                       objdump_ready=shutil.which("objdump") is not None)

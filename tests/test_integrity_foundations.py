@@ -65,3 +65,23 @@ def test_decision_trace_ipfs_path_requires_real_endpoint():
     assert trace.verify() is True
     with __import__("pytest").raises(RuntimeError, match="IPFS_NOT_CONFIGURED"):
         trace.publish_to_ipfs(entry)
+
+def test_governance_override_preserves_chain_integrity():
+    governance = GovernanceBackend({"SARA": "IMPLEMENTED"})
+    governance.register_decision({"event": "decision", "accepted": True})
+    result = governance.override(0, "revalidate")
+    assert result["chain_integrity"] is True
+    assert governance.verify_integrity() is True
+    assert governance.decisions()[0]["override"]["action"] == "revalidate"
+    assert governance.decisions()[-1]["event"] == "decision_override"
+
+def test_governance_filtered_decisions_preserve_original_override_index():
+    governance = GovernanceBackend({"SARA": "IMPLEMENTED"})
+    governance.register_decision({"event": "first"})
+    governance.register_decision({"event": "second"})
+    governance.override(1, "revalidate-second")
+    since = governance.decisions()[1]["ts"]
+    filtered = governance.decisions(since=since)
+    assert filtered[0]["event"] in {"second", "decision_override"}
+    second = next(item for item in filtered if item.get("event") == "second")
+    assert second["override"]["action"] == "revalidate-second"

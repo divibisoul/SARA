@@ -66,11 +66,11 @@ class HTTPSystemAdapter:
 
 class TransystemSARA:
     NAME = "TransystemSARA"
-    VERSION = "1.1"
+    VERSION = "1.2"
     STATUS = ModuleStatus.PENDING_INFRASTRUCTURE
     ROLE = CycleRole.META
     DEPENDENCIES = ("QuantumCrawler", "NeuralLens", "NeuroIntegrator")
-    CYCLE_PHASES = ()
+    CYCLE_PHASES = (CyclePhase.GOVERNANCE,)
 
     def __init__(self, adapters: dict[str, SystemAdapter] | None = None) -> None:
         self._adapters = dict(adapters or {})
@@ -83,6 +83,8 @@ class TransystemSARA:
             "phases": [p.value for p in self.CYCLE_PHASES],
             "credentials_ready": self.is_credentials_ready(),
             "configured_systems": sorted(self._adapters),
+            "adapter_count": len(self._adapters),
+            "external_integration_ready": self.is_credentials_ready(),
         }
 
     def is_credentials_ready(self) -> bool:
@@ -109,7 +111,8 @@ class TransystemSARA:
         )
 
     def list_sources(self) -> list[str]:
-        return ["NVIDIA", "Tesla", "Google", "OpenAI", "HuggingFace"]
+        """Lista somente sistemas realmente configurados neste runtime."""
+        return sorted(self._adapters)
 
     def emit_trace(self, ctx) -> None:
         if hasattr(ctx, "record"):
