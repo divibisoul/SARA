@@ -546,8 +546,9 @@ class OctaCoreMeshFusion:
                     },
                     correlation_id=probe.correlation_id,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("[vagus] mesh.probe event emission failed: %s", exc)
 
     def emit_trace(self, ctx: Any) -> None:
         if hasattr(ctx, "record"):

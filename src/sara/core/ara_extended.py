@@ -12,8 +12,10 @@ Adiciona:
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from sara.core.ara import ARA, Flaw, RegeneratedText
@@ -401,17 +403,24 @@ class ARA_Extended(ARA):
     # -----------------------------------------------------------------
 
     def applied_to_self(self) -> dict:
-        """Aplica ARA ao próprio ARA: audita, regenera, propõe."""
-        # Cria um snapshot textual do próprio código (representação)
-        self_repr = f"ARA v{self.VERSION} | regras={len(self._prov.all())} | "                     f"detectores=5 | regeneradores=2 | meta=meta_audit_complete"
+        """Audita o próprio arquivo-fonte real, sem representação sintética."""
+        source_path = Path(__file__).resolve()
+        source_text = source_path.read_text(encoding="utf-8")
+        source_hash = hashlib.sha256(source_text.encode("utf-8")).hexdigest()
 
-        flaws = self.detect(self_repr)
-        structural = self.detect_structural(self_repr)
-        relational = self.detect_relational(self_repr)
+        flaws = self.detect(source_text)
+        structural = self.detect_structural(source_text)
+        relational = self.detect_relational(source_text)
         audit = self.meta_audit_complete()
         proposals = self.propose_rule_upgrade()
 
         return {
+            "source_evidence": {
+                "kind": "SOURCE_FILE",
+                "path": str(source_path),
+                "sha256": source_hash,
+                "bytes": len(source_text.encode("utf-8")),
+            },
             "flaws": [f.kind for f in flaws],
             "structural_flaws": [f.kind for f in structural],
             "relational_flaws": [f.kind for f in relational],

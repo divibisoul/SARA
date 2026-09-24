@@ -39,3 +39,10 @@ def test_registry_invariants_are_checked_before_cycle():
     system = build_default_system()
     report = InvariantValidator().validate_registry(system.registry)
     assert report.ok is True
+
+
+def test_module_status_contract_contains_evidence_lifecycle_states():
+    from sara.contracts.base import ModuleStatus
+    expected = {"IMPLEMENTED", "IN_PROGRESS", "PENDING_INFRASTRUCTURE",
+                "EXECUTED", "VALIDATED", "VERIFIED", "BLOCKED", "UNMEASURABLE"}
+    assert expected.issubset({status.value for status in ModuleStatus})

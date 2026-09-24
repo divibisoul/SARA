@@ -39,6 +39,17 @@ def test_governance_override_changes_decision_record():
     assert result["ok"] is True
     assert governance.decisions()[0]["override"]["action"] == "revalidate"
 
+    assert result["decision_integrity_preserved"] is True
+    assert result["override_chain_integrity"] is True
+    assert governance.verify_integrity() is True
+    assert governance.verify_override_integrity() is True
+    second = governance.override(0, "recheck")
+    assert second["ok"] is True
+    assert governance.decisions()[0]["override"]["action"] == "recheck"
+    assert governance.verify_integrity() is True
+    assert governance.verify_override_integrity() is True
+    assert len(governance.override_history()) == 2
+
 
 def test_dna_tags_violation_chain_is_verifiable():
     from sara.memory.dna_tags import DNA_Tags

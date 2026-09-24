@@ -83,5 +83,6 @@ A conexão com o SOUL é aditiva: SARA continua autoridade de ARA/ETR/ITR, ERU, 
 | N04 | ferramentas, documentos, artefatos | sara.audit, sara.regenerate, sara.cycle, sara.trace | ARA_Extended, ETR_Extended, LegalAI, ProvenanceTracker |
 | N05 | orquestração, despacho, execução | sara.cycle, sara.audit, sara.regenerate, sara.trace | TrinityERUUnified, ConnectedRuntime, CycleAuditor |
 | N06 | cognição, síntese, auditoria, governança | sara.audit, sara.state, sara.trace, sara.regenerate, sara.cycle | ERU_Engine, GovernedSARA, DecisionTrace, ProvenanceTracker |
+| N07 | processamento neural, prefrontal, orquestração e compute distribuído | neural.forward, neural.learn, mesh discovery/delegation e composição final | Soul Mesh, N07 neural fabric, SuperGPU/SuperCompute |
 
 **Prova de conexão:** manifesto = contrato; configuração = URL + credencial; conexão = requisição HTTP real + resposta válida + correlação; falha = erro explícito. Declaração de afinidade não conta como execução.

@@ -94,8 +94,9 @@ class AeternumChimeraBridge:
                     priority=80,
                     ttl=5_000,
                 )
-            except Exception:
-                pass
+            except Exception as exc:
+                logger = __import__('logging').getLogger(__name__)
+                logger.warning("[vagus] hortacore.assessment event emission failed: %s", exc)
 
         if ctx is not None and hasattr(ctx, "record"):
             ctx.record(

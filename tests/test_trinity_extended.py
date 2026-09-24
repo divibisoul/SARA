@@ -74,6 +74,10 @@ def test_ara_extended_applied_to_self(trinity):
     assert "audit" in result
     assert "proposals" in result
 
+    assert result["source_evidence"]["kind"] == "SOURCE_FILE"
+    assert len(result["source_evidence"]["sha256"]) == 64
+    assert result["source_evidence"]["bytes"] > 1000
+
 
 # --- ETR_Extended ---
 
@@ -141,6 +145,17 @@ def test_itr_extended_execute_composed(trinity):
     assert len(result.phase_results) == 4
 
 
+def test_itr_extended_ethical_alignment_uses_real_etr(trinity):
+    itr = ITR_Extended(trinity["prov"], ethical_validator=trinity["etr"])
+    plan = itr.generate_strategic("promover autonomia comunitária e transparência")
+    result = itr.execute_composed(plan)
+    assert result.rollback_triggered is False
+    guard = next(item for item in result.phase_results if item["name"] == "guard")
+    assert guard["ethical_status"] == "VERIFIED"
+    assert guard["ethical_consensus"] >= 0.75
+    assert guard["rollback_available"] is True
+
+
 def test_itr_extended_analyze_patterns(trinity):
     patterns = trinity["itr"].analyze_patterns([
         "promover autonomia",
@@ -180,6 +195,9 @@ def test_trinity_synergy_apply_to_self(trinity):
     assert "ara_audit" in report.self_audit
     assert "etr_upgrade_proposals" in report.self_audit
     assert "itr_registry_optimization" in report.self_audit
+    assert report.self_audit["source_evidence"]["kind"] == "SOURCE_FILE"
+    assert len(report.self_audit["source_evidence"]["sha256"]) == 64
+    assert report.self_audit["source_evidence"]["bytes"] > 1000
 
 
 def test_trinity_synergy_iteracoes_registradas(trinity):
@@ -207,3 +225,11 @@ def test_trinity_fusion_and_eru_mirror():
     assert set(mirror.eru["snapshot_hashes"]) == {"ARA", "ETR", "ITR"}
     assert trinity.mirror("test-fusion") is not None
     assert trinity.audit_mirror("test-fusion")["ok"] is True
+
+
+def test_etr_extended_self_validation_uses_real_source_evidence(trinity):
+    result = trinity["etr"].validate_against_self()
+    assert isinstance(result.approved, bool)
+    meta = getattr(trinity["etr"], "_last_self_validation", {})
+    assert meta["bytes"] > 1000
+    assert len(meta["sha256"]) == 64

@@ -156,9 +156,15 @@ class ETR:
 
     def rewrite(self, text: str) -> str:
         s = str(text)
-        if "🔒ETR" not in s:
-            s += "\n\n🔒ETR: Certificado de Conformidade Ética"
-        return s
+        if "🔒ETR" in s:
+            return s
+        result = self.validate(s)
+        status = "VERIFIED" if result.approved else "BLOCKED"
+        reason = result.reason
+        return (
+            f"{s}\n\n🔒ETR: Validação ética executada — "
+            f"status={status}; reason={reason}"
+        )
 
     def cultural_alignment(self, text: str) -> dict:
         return {

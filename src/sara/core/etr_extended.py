@@ -11,7 +11,10 @@ Adiciona:
 """
 from __future__ import annotations
 
+import ast
+import hashlib
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 from sara.core.etr import ETR, ValidationResult, Evidence
@@ -222,13 +225,78 @@ class ETR_Extended(ETR):
     # -----------------------------------------------------------------
 
     def validate_against_self(self) -> MultiFrameworkResult:
-        """ETR aplica-se a si mesmo: valida sua própria configuração."""
-        self_description = (
-            f"ETR_Extended v{self.VERSION} com frameworks={list(self.FRAMEWORKS)} "
-            f"validação em 5 camadas, respeitando autonomia, transparência, "
-            f"dignidade e promovendo o cuidado com a comunidade e as gerações futuras."
+        """Audita a implementação ética real do módulo por estrutura e evidência de código."""
+        source_path = Path(__file__).resolve()
+        source_text = source_path.read_text(encoding="utf-8")
+        tree = ast.parse(source_text)
+
+        method_names = {
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        source_lower = source_text.lower()
+        required_methods = {
+            "validate_multi_framework",
+            "validate_semantic_frame",
+            "validate_transformation",
+            "validate_trinity",
+            "explain_decision",
+            "propose_ethical_upgrade",
+        }
+
+        framework_checks = {
+            "utilitarista": {
+                "ok": "benefício" in source_lower and "_assess_utilitarian" in method_names,
+                "reason": "avaliação explícita de benefício/dano e método utilitarista presente",
+            },
+            "deontologico": {
+                "ok": "PROHIBITED_TERMS" in source_text and "_assess_deontological" in method_names,
+                "reason": "proibições e validação deontológica estão implementadas no código",
+            },
+            "virtude": {
+                "ok": "virtues" in source_lower and "_assess_virtue" in method_names,
+                "reason": "vocabulário de virtudes e avaliador de virtude presentes",
+            },
+            "cuidado": {
+                "ok": "_assess_care" in method_names and "UbuntuEthics" in source_text and "BuenVivir" in source_text,
+                "reason": "framework de cuidado integra UbuntuEthics e BuenVivir",
+            },
+        }
+
+        assessments = tuple(
+            FrameworkAssessment(
+                framework=name,
+                approved=bool(check["ok"]),
+                score=1.0 if check["ok"] else 0.0,
+                reasoning=str(check["reason"]),
+            )
+            for name, check in framework_checks.items()
         )
-        return self.validate_multi_framework(self_description)
+        required_methods_ok = required_methods.issubset(method_names)
+        votes_for = sum(1 for assessment in assessments if assessment.approved)
+        consensus = votes_for / len(assessments)
+        approved = required_methods_ok and consensus == 1.0
+
+        self._last_self_validation = {
+            "path": str(source_path),
+            "sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
+            "bytes": len(source_text.encode("utf-8")),
+            "ast_nodes": sum(1 for _ in ast.walk(tree)),
+            "required_methods_ok": required_methods_ok,
+            "required_methods": sorted(required_methods),
+            "present_methods": sorted(required_methods.intersection(method_names)),
+            "approved": approved,
+            "consensus_score": round(consensus, 4),
+        }
+        return MultiFrameworkResult(
+            approved=approved,
+            assessments=assessments,
+            consensus_score=round(consensus, 4),
+            dissenting_frameworks=tuple(
+                assessment.framework for assessment in assessments if not assessment.approved
+            ),
+        )
 
     # -----------------------------------------------------------------
     # 3. ETR VALIDA A TRINDADE

@@ -81,7 +81,7 @@ def _add_guardrails(text: str) -> str:
         "\nGUARDRAILS:"
         "\n- preservar conteúdo original"
         "\n- registrar cada passo"
-        "\n- rollback disponível em falha"
+        "\n- rollback deve ser fornecido e validado pelo runtime"
     )
 
 
