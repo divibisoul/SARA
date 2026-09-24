@@ -1,3 +1,592 @@
+"""SARA — Regeneração: núcleo operacional fail-closed.
+Status: IMPLEMENTED.
+"""
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Any
+from sara.contracts import ModuleRegistry, CyclePhase, CycleContext, TraceSink
+from sara.contracts.base import ModuleStatus, CycleRole
+from sara.contracts.invariants import InvariantValidator
+from sara.core.ara import ARA
+from sara.core.etr import ETR
+from sara.core.itr import ITR
+from sara.security.identity_core import IdentityCore
+from sara.security.emergency_rollback import EmergencyRollback
+from sara.security.ethical_filter_chain import EthicalFilterChain
+from sara.memory.regenerative_memory import RegenerativeMemory
+from sara.memory.temporal_vector_db import TemporalVectorDB
+from sara.memory.dna_tags import DNA_Tags
+from sara.memory.working_memory import WorkingMemory
+from sara.infra.clock import now_iso
+from sara.monitoring.execution_report import ExecutionReport, PhaseEvidence
+from sara.regeneration.regenerative_state import CycleState, RegenerativeState
+from sara.core.connected_runtime import ConnectedRuntime
+
+
+@dataclass
+class LoopReport:
+    cycle_id: str
+    input: str
+    cycles: list[dict]
+    final_state: Any
+    rollback_performed: bool
+    converged: bool
+    filter_classification: list = field(default_factory=list)
+    temporal_ids: list = field(default_factory=list)
+    context_steps: list = field(default_factory=list)
+    invariants: list = field(default_factory=list)
+    execution_report: dict = field(default_factory=dict)
+
+
+class _PhaseTraceProxy:
+    def __init__(self, ctx: CycleContext, phase: CyclePhase) -> None:
+        self._ctx = ctx
+        self.cycle_id = ctx.cycle_id
+        self.current = ctx.current
+        self.sink = ctx.sink
+        self.phase = phase
+
+    def record(self, _phase: str, module: str, success: bool, **info: Any) -> None:
+        self._ctx.record(self.phase.value, module, success, **info)
+
+    def emit_decision(self, decision: dict) -> None:
+        self._ctx.emit_decision(decision)
+
+
+class _Aborted(Exception):
+    def __init__(self, phase: str, reason: str) -> None:
+        self.phase = phase
+        self.reason = reason
+        super().__init__(f"{phase}:{reason}")
+
+
+class RegenerativeLoop:
+    NAME = "RegenerativeLoop"
+    VERSION = "5.0"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.REGENERATION
+    DEPENDENCIES = (
+        "ARA", "ETR", "ITR", "IdentityCore", "RegenerativeMemory",
+        "TemporalVectorDB", "DNA_Tags", "EthicalFilterChain",
+        "EmergencyRollback", "DecisionTrace", "ProvenanceTracker",
+        "ModuleRegistry", "GovernanceBackend", "CycleAuditor",
+    )
+    CYCLE_PHASES = tuple(CyclePhase)
+
+    def __init__(
+        self, ara: ARA, etr: ETR, itr: ITR, identity: IdentityCore,
+        memory: RegenerativeMemory, temporal: TemporalVectorDB, dna: DNA_Tags,
+        filters: EthicalFilterChain, rollback: EmergencyRollback,
+        decision_trace: Any = None, provenance: Any = None,
+        registry: ModuleRegistry | None = None, governance_backend: Any = None,
+        cycle_auditor: Any = None, max_cycles: int = 3,
+        connected_runtime: ConnectedRuntime | None = None,
+        trinity: Any = None,
+        working_memory: WorkingMemory | None = None,
+    ) -> None:
+        self._ara, self._etr, self._itr = ara, etr, itr
+        self._identity, self._memory = identity, memory
+        self._temporal, self._dna = temporal, dna
+        self._filters, self._rollback = filters, rollback
+        self._trace, self._prov = decision_trace, provenance
+        self._registry, self._gov_backend = registry, governance_backend
+        self._auditor, self._max_cycles = cycle_auditor, max(1, max_cycles)
+        self._connected_runtime = connected_runtime
+        self._trinity = trinity
+        self._working_memory = working_memory
+        self._history: list[LoopReport] = []
+        self._invariants = InvariantValidator()
+
+    def describe(self) -> dict:
+        return {
+            "name": self.NAME, "version": self.VERSION,
+            "status": self.STATUS.value, "role": self.ROLE.value,
+            "dependencies": list(self.DEPENDENCIES),
+            "phases": [p.value for p in self.CYCLE_PHASES],
+            "max_cycles": self._max_cycles,
+        }
+
+    def _preflight(self, ctx: CycleContext) -> None:
+        report = self._invariants.validate_context_pre_execution(ctx)
+        if not report.ok:
+            raise _Aborted("PREFLIGHT", ";".join(report.blocking_failures))
+        if self._registry is not None:
+            registry_report = self._invariants.validate_registry(self._registry)
+            if not registry_report.ok:
+                raise _Aborted("PREFLIGHT", ";".join(registry_report.blocking_failures))
+        if self._trace is not None and not self._trace.verify():
+            raise _Aborted("PREFLIGHT", "decision_trace_integrity_failed")
+        if self._prov is not None and hasattr(self._prov, "verify_integrity"):
+            if not self._prov.verify_integrity():
+                raise _Aborted("PREFLIGHT", "provenance_integrity_failed")
+
+    def run(
+        self,
+        input_text: str,
+        cycle_id: str | None = None,
+        context_data: dict[str, Any] | None = None,
+    ) -> LoopReport:
+        cid = cycle_id or f"cycle-{now_iso()}"
+        sink = TraceSink(self._trace, self._temporal, self._prov)
+        ctx = CycleContext(cid, str(input_text), str(input_text), sink)
+        if context_data:
+            ctx.external_context = dict(context_data)
+            probabilistic = context_data.get("probabilistic")
+            if isinstance(probabilistic, dict):
+                ctx.register_artifact("probabilistic", probabilistic)
+                ctx.emit_decision({
+                    "event": "probabilistic_context_attached",
+                    "cycle_id": cid,
+                    "nodes": [
+                        {
+                            "name": node.get("name"),
+                            "source": node.get("source"),
+                            "confidence": node.get("confidence"),
+                            "entropy": node.get("entropy"),
+                            "provenance": node.get("provenance"),
+                        }
+                        for node in probabilistic.get("nodes", [])
+                    ],
+                })
+            feedback_refs = context_data.get("user_feedback_refs")
+            if isinstance(feedback_refs, list):
+                refs = [str(ref) for ref in feedback_refs if str(ref).strip()]
+                if refs:
+                    ctx.register_artifact("feedback_evidence_refs", refs)
+        if self._working_memory is not None:
+            self._working_memory.put("cycle_context", {
+                "cycle_id": cid,
+                "input": str(input_text),
+                "stage": "preflight",
+            })
+        self._preflight(ctx)
+
+        report = LoopReport(
+            cycle_id=cid, input=str(input_text)[:200], cycles=[],
+            final_state=str(input_text), rollback_performed=False, converged=False,
+        )
+        report.filter_classification = [r.__dict__ for r in self._filters.classify(ctx.current)]
+
+        state = RegenerativeState(cid)
+        state.transition(CycleState.PREFLIGHT, "invariants_ok", now_iso())
+
+        for idx in range(1, self._max_cycles + 1):
+            state.iteration = idx
+            state.transition(CycleState.RUNNING, f"iteration_{idx}", now_iso())
+            if self._working_memory is not None:
+                self._working_memory.put("iteration_context", {
+                    "cycle_id": cid,
+                    "iteration": idx,
+                    "current_state": ctx.current,
+                })
+            cycle = {"idx": idx, "phases": {}}
+            pre_state = {"cycle": idx, "input": ctx.current, "ts": now_iso()}
+            pre_hash = self._rollback.capture(f"{cid}::{idx}::pre", pre_state, scope="cycle")
+            cycle["pre_hash"] = pre_hash
+
+            # Ponte ERU: o ciclo operacional também é observado pela memória
+            # histórica. A Trindade continua operando normalmente; a ERU apenas
+            # congela os limites do estado para detectar drift posteriormente.
+            eru_bridge = (
+                self._trinity.bridge()
+                if self._trinity is not None and hasattr(self._trinity, "bridge")
+                else None
+            )
+            if eru_bridge is not None:
+                eru_bridge.observe(
+                    cid, f"LOOP_{idx}_INPUT",
+                    {"iteration": idx, "state": ctx.current},
+                )
+                eru_bridge.observe_capabilities(cid, f"LOOP_{idx}_INPUT")
+
+            try:
+                self._run_phases_canonical(ctx, cycle, idx)
+                if self._auditor is not None and hasattr(self._auditor, "check"):
+                    audit_results = self._auditor.check(ctx, cycle)
+                    cycle["cycle_audit"] = audit_results
+                    audit_failures = [r for r in audit_results if not r.get("ok", False)]
+                    if audit_failures:
+                        raise _Aborted(
+                            "VALIDATION",
+                            "cycle_auditor_failure:" + ";".join(
+                                r.get("name", "unknown") for r in audit_failures
+                            ),
+                        )
+                if eru_bridge is not None:
+                    eru_bridge.observe(
+                        cid, f"LOOP_{idx}_FINAL",
+                        {
+                            "iteration": idx,
+                            "state": ctx.current,
+                            "phases": list(cycle.get("phases", {}).keys()),
+                        },
+                    )
+                    eru_bridge.observe_capabilities(cid, f"LOOP_{idx}_FINAL")
+                    cycle["eru_audit"] = eru_bridge.audit_cycle(cid)
+
+                invariant_report = self._invariants.validate_cycle(ctx, cycle)
+                cycle["invariants"] = invariant_report.as_dict()
+                if not invariant_report.ok:
+                    raise _Aborted("VALIDATION", ";".join(invariant_report.blocking_failures))
+
+                post_etr = self._etr.validate(ctx.current, mode="default")
+                post_flaws = self._collect_flaws(ctx.current)
+                cycle["post_validation"] = {
+                    "approved": post_etr.approved,
+                    "reason": post_etr.reason,
+                    "flaws": [f.kind for f in post_flaws],
+                }
+
+                converged = (
+                    post_etr.approved
+                    and not post_flaws
+                    and bool(
+                        ctx.flags.get(
+                            "execution_ok",
+                            ctx.artifacts.get("execution_ok", False),
+                        )
+                    )
+                    and invariant_report.ok
+                )
+                cycle["converged"] = converged
+                if self._working_memory is not None:
+                    self._working_memory.put("last_cycle_result", {
+                        "cycle_id": cid,
+                        "iteration": idx,
+                        "converged": converged,
+                        "state": ctx.current,
+                    })
+                report.cycles.append(cycle)
+
+                if converged:
+                    state.transition(CycleState.CONVERGED, "all_criteria_satisfied", now_iso())
+                    report.converged = True
+                    report.final_state = ctx.current
+                    break
+
+                state.transition(CycleState.REGENERATING, "residual_flaws", now_iso())
+                if idx == self._max_cycles:
+                    restored = self._rollback.restore(pre_hash)
+                    report.rollback_performed = restored.restored
+                    if restored.restored:
+                        ctx.current = restored.state.get("input", ctx.input)
+                        state.transition(CycleState.ROLLED_BACK, "max_iterations_without_convergence", now_iso())
+            except _Aborted as exc:
+                ctx.abort(f"{exc.phase}:{exc.reason}")
+                cycle["aborted_at"], cycle["abort_reason"] = exc.phase, exc.reason
+                restored = self._rollback.restore(pre_hash)
+                report.rollback_performed = restored.restored
+                if restored.restored:
+                    ctx.current = restored.state.get("input", ctx.input)
+                state.transition(CycleState.ROLLED_BACK if restored.restored else CycleState.ABORTED,
+                                 exc.reason, now_iso())
+                report.cycles.append(cycle)
+                break
+            except Exception as exc:
+                ctx.abort(f"UNEXPECTED:{type(exc).__name__}:{exc}")
+                cycle["aborted_at"], cycle["abort_reason"] = "UNEXPECTED", str(exc)
+                restored = self._rollback.restore(pre_hash)
+                report.rollback_performed = restored.restored
+                if restored.restored:
+                    ctx.current = restored.state.get("input", ctx.input)
+                state.transition(CycleState.ROLLED_BACK if restored.restored else CycleState.ABORTED,
+                                 str(exc), now_iso())
+                report.cycles.append(cycle)
+                break
+
+        state.transition(CycleState.COMPLETED, "cycle_finished", now_iso())
+        report.final_state = ctx.current
+        if self._working_memory is not None:
+            self._working_memory.put("last_final_state", {
+                "cycle_id": cid,
+                "state": ctx.current,
+                "converged": report.converged,
+                "rollback_performed": report.rollback_performed,
+            })
+        report.invariants = [
+            x for c in report.cycles for x in c.get("invariants", {}).get("checks", [])
+        ]
+        report.temporal_ids = [
+            s.info["temporal_id"] for s in ctx.steps if "temporal_id" in s.info
+        ]
+        report.context_steps = [
+            {"phase": s.phase, "module": s.module, "ok": s.ok, "info": s.info, "ts": s.ts}
+            for s in ctx.steps
+        ]
+
+        er = ExecutionReport(
+            cycle_id=cid,
+            status="CONVERGED" if report.converged else ("ROLLED_BACK" if report.rollback_performed else "ABORTED"),
+            invariants=report.invariants,
+            artifacts={**ctx.artifacts, "state": state.state.value,
+                       "transitions": [t.__dict__ for t in state.transitions]},
+            trace_integrity=self._trace.verify() if self._trace is not None else False,
+        )
+        er.phases = [
+            PhaseEvidence(s.phase, s.module, s.ok, s.info, s.ts) for s in ctx.steps
+        ]
+        report.execution_report = er.finalize().as_dict()
+        self._history.append(report)
+        return report
+
+    def _collect_flaws(self, text: str) -> list[Any]:
+        flaws = list(self._ara.detect(text))
+        structural = getattr(self._ara, "detect_structural", lambda _t: [])(text)
+        relational = getattr(self._ara, "detect_relational", lambda _t: [])(text)
+        return flaws + list(relational) + list(structural)
+
+    def _run_phases_canonical(self, ctx: CycleContext, cycle: dict, idx: int, pre_hash: str | None = None) -> None:
+        self._phase_ingestion(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.INGESTION)
+        self._phase_audit(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.AUDIT)
+        self._phase_regeneration(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.REGENERATION)
+        self._phase_identity(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.IDENTITY)
+        etr_result = self._phase_ethics(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.ETHICS)
+        strategy = self._phase_strategy(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.STRATEGY)
+        result = self._phase_execution(ctx, cycle, strategy)
+        self._dispatch_emit_trace(ctx, CyclePhase.EXECUTION)
+        self._phase_validation(ctx, cycle, etr_result)
+        self._dispatch_emit_trace(ctx, CyclePhase.VALIDATION)
+        self._phase_persistence(ctx, cycle, idx, result)
+        self._dispatch_emit_trace(ctx, CyclePhase.PERSISTENCE)
+        self._phase_snapshot(ctx, cycle, idx)
+        self._dispatch_emit_trace(ctx, CyclePhase.SNAPSHOT)
+        self._phase_monitoring(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.MONITORING)
+        self._phase_governance(ctx, cycle)
+        self._dispatch_emit_trace(ctx, CyclePhase.GOVERNANCE)
+
+    def _phase_ingestion(self, ctx, cycle, idx):
+        guard = self._dna.guard(f"cycle_{idx}", ctx.current)
+        self._record(ctx, CyclePhase.INGESTION, "DNA_Tags", not guard.blocked,
+                     tags=list(guard.tags), blocked=guard.blocked)
+        cycle["phases"]["ingestion"] = {"blocked": guard.blocked, "tags": list(guard.tags)}
+        if guard.blocked:
+            raise _Aborted("INGESTION", "dna_block")
+
+    def _phase_audit(self, ctx, cycle):
+        lexical = list(self._ara.detect(ctx.current))
+        semantic = list(getattr(self._ara, "detect_semantic", lambda _t: [])(ctx.current))
+        structural = list(getattr(self._ara, "detect_structural", lambda _t: [])(ctx.current))
+        relational = list(getattr(self._ara, "detect_relational", lambda _t: [])(ctx.current))
+        cycle["_flaws"] = lexical + semantic + relational + structural
+        cycle["phases"]["audit"] = {
+            "lexical": [f.kind for f in lexical],
+            "semantic": [f.kind for f in semantic],
+            "structural": [f.kind for f in structural],
+            "relational": [f.kind for f in relational],
+        }
+        probabilistic = ctx.artifacts.get("probabilistic")
+        if isinstance(probabilistic, dict):
+            cycle["phases"]["audit"]["probabilistic"] = [
+                {
+                    "name": node.get("name"),
+                    "posterior": node.get("posterior"),
+                    "dirichlet_posterior": node.get("dirichlet_posterior"),
+                    "neural_posterior": node.get("neural_posterior"),
+                    "confidence": node.get("confidence"),
+                    "entropy": node.get("entropy"),
+                    "source": node.get("source"),
+                    "provenance": node.get("provenance"),
+                }
+                for node in probabilistic.get("nodes", [])
+            ]
+        self._record(ctx, CyclePhase.AUDIT, "ARA", True, **cycle["phases"]["audit"])
+
+    def _phase_regeneration(self, ctx, cycle):
+        flaws = cycle.get("_flaws", [])
+        if not flaws:
+            self._record(ctx, CyclePhase.REGENERATION, "ARA", True, applied="not_needed")
+            cycle["phases"]["regeneration"] = {"applied": "not_needed"}
+            return
+        if hasattr(self._ara, "regenerate_semantic"):
+            regen = self._ara.regenerate_semantic(ctx.current, flaws)
+        else:
+            regen = self._ara.regenerate(ctx.current, flaws)
+        before = ctx.current
+        ctx.current = regen.transformed
+        ctx.register_artifact("regeneration_integrity", regen.integrity_hash)
+        cycle["phases"]["regeneration"] = {
+            "applied": list(regen.plan_steps),
+            "preserved_length": regen.preserved_length,
+            "changed": before != ctx.current,
+            "integrity": regen.integrity_hash,
+        }
+        self._record(ctx, CyclePhase.REGENERATION, "ARA", True, **cycle["phases"]["regeneration"])
+
+    def _phase_identity(self, ctx, cycle, idx):
+        ident = self._identity.participate(f"cycle_{idx}", ctx.current)
+        structured = (
+            self._identity.validate_structured(ctx.current)
+            if hasattr(self._identity, "validate_structured")
+            else {"approved": ident.identity_approved, "violations": ident.violations}
+        )
+        approved = ident.identity_approved and bool(structured.get("approved", True))
+        cycle["phases"]["identity"] = {
+            "approved": approved,
+            "violations": list(ident.violations),
+            "structured_approved": bool(structured.get("approved", True)),
+            "structured_violations": list(structured.get("violations", ())),
+            "semantic_fingerprint": structured.get("fingerprint"),
+            "semantic_relations": structured.get("relations"),
+        }
+        ctx.register_artifact("identity_semantic_fingerprint", structured.get("fingerprint"))
+        self._record(ctx, CyclePhase.IDENTITY, "IdentityCore", approved,
+                     **cycle["phases"]["identity"])
+        if not approved:
+            raise _Aborted("IDENTITY", "identity_block")
+
+    def _phase_ethics(self, ctx, cycle):
+        base = self._etr.validate(ctx.current, mode="default")
+        multi = getattr(self._etr, "validate_multi_framework", None)
+        multi_result = multi(ctx.current) if multi else None
+        approved = base.approved and (multi_result.approved if multi_result else True)
+        cycle["phases"]["ethics"] = {
+            "approved": approved,
+            "base_reason": base.reason,
+            "consensus": multi_result.consensus_score if multi_result else None,
+            "dissenting": list(multi_result.dissenting_frameworks) if multi_result else [],
+        }
+        self._record(ctx, CyclePhase.ETHICS, "ETR", approved, **cycle["phases"]["ethics"])
+        if not approved:
+            raise _Aborted("ETHICS", base.reason if not base.approved else "multi_framework_rejected")
+        return base
+
+    def _phase_strategy(self, ctx, cycle, idx):
+        if hasattr(self._itr, "generate_strategic"):
+            strategy = self._itr.generate_strategic(
+                ctx.current,
+                {
+                    "cycle": idx,
+                    "clean_state": not bool(cycle.get("_flaws", [])),
+                },
+            )
+            cycle["phases"]["strategy"] = {
+                "type": "StrategicPlan",
+                "phases": len(strategy.phases),
+                "criteria": list(strategy.convergence_criteria),
+            }
+        else:
+            strategy = self._itr.generate(
+                ctx.current,
+                context={
+                    "cycle": idx,
+                    "force_variant": "conservadora"
+                    if not cycle.get("_flaws", []) else None,
+                },
+            )
+            cycle["phases"]["strategy"] = {"type": "Strategy", "variant": strategy.variant}
+        self._record(ctx, CyclePhase.STRATEGY, "ITR", True, **cycle["phases"]["strategy"])
+        return strategy
+
+    def _phase_execution(self, ctx, cycle, strategy):
+        if hasattr(strategy, "phases") and hasattr(self._itr, "execute_composed"):
+            result = self._itr.execute_composed(strategy)
+            transformed = result.transformed
+            ok = not result.rollback_triggered
+            info = {"composed": True, "metrics": result.metrics,
+                    "rollback_triggered": result.rollback_triggered}
+        else:
+            result = self._itr.execute(strategy)
+            transformed = result.transformed
+            ok = True
+            info = {"steps": list(result.steps_applied), "metrics": result.metrics}
+        ctx.current = transformed
+        ctx.register_artifact("final_output", transformed)
+        ctx.flags["execution_ok"] = ok
+        # Mantém a evidência de execução também no inventário de artefatos,
+        # preservando consumidores que ainda leem o formato anterior.
+        ctx.register_artifact("execution_ok", ok)
+        cycle["phases"]["execution"] = {"ok": ok, **info}
+        self._record(ctx, CyclePhase.EXECUTION, "ITR", ok, **cycle["phases"]["execution"])
+        if not ok:
+            raise _Aborted("EXECUTION", "execution_rollback_triggered")
+        return result
+
+    def _phase_validation(self, ctx, cycle, etr_result):
+        result = self._etr.validate(ctx.current, mode="default")
+        semantic_validation = (
+            self._etr.validate_semantic_frame(ctx.current)
+            if hasattr(self._etr, "validate_semantic_frame")
+            else {"ok": result.approved, "fingerprint": None}
+        )
+        filter_validation = (
+            self._filters.evaluate_structured(ctx.current)
+            if hasattr(self._filters, "evaluate_structured")
+            else {"ok": True, "results": [], "failures": []}
+        )
+        approved = (
+            result.approved
+            and bool(semantic_validation.get("ok", True))
+            and bool(filter_validation.get("ok", True))
+        )
+        cycle["phases"]["validation"] = {
+            "approved": approved,
+            "reason": result.reason,
+            "previous_ethics_approved": etr_result.approved,
+            "semantic_approved": bool(semantic_validation.get("ok", True)),
+            "semantic_fingerprint": semantic_validation.get("fingerprint"),
+            "semantic_findings": semantic_validation.get("findings", []),
+            "filter_chain_ok": bool(filter_validation.get("ok", True)),
+            "filter_chain_results": filter_validation.get("results", []),
+            "filter_chain_failures": filter_validation.get("failures", []),
+        }
+        self._record(ctx, CyclePhase.VALIDATION, "ETR", approved,
+                     **cycle["phases"]["validation"])
+        if not approved:
+            if not result.approved:
+                reason = result.reason
+            elif not semantic_validation.get("ok", True):
+                reason = "semantic_validation_rejected"
+            else:
+                reason = "ethical_filter_chain_failure"
+            raise _Aborted("VALIDATION", reason)
+
+    def _phase_persistence(self, ctx, cycle, idx, result):
+        feedback_refs = ctx.external_context.get("user_feedback_refs")
+        probabilistic = ctx.artifacts.get("probabilistic")
+        evidence = {
+            "feedback_refs": list(feedback_refs) if isinstance(feedback_refs, list) else [],
+            "probabilistic": probabilistic if isinstance(probabilistic, dict) else None,
+        }
+        rid = self._temporal.insert({
+            "cycle_id": ctx.cycle_id, "iteration": idx,
+            "input": ctx.input, "state": ctx.current,
+            "execution": getattr(result, "metrics", {}),
+            "evidence": evidence,
+        })
+        self._memory.store({
+            "cycle_id": ctx.cycle_id, "iteration": idx,
+            "state": ctx.current, "temporal_id": rid,
+            "evidence": evidence,
+        }, label=f"{ctx.cycle_id}::iteration::{idx}")
+        memory_persisted = self._memory.persist_if_configured()
+        temporal_persisted = self._temporal.persist_if_configured()
+        cycle["phases"]["persistence"] = {
+            "temporal_id": rid,
+            "memory_persisted": memory_persisted,
+            "temporal_persisted": temporal_persisted,
+        }
+        self._record(ctx, CyclePhase.PERSISTENCE, "RegenerativeMemory", True,
+                     temporal_id=rid,
+                     memory_persisted=memory_persisted,
+                     temporal_persisted=temporal_persisted)
+
+    def _phase_snapshot(self, ctx, cycle, idx):
+        snap = self._rollback.capture(
+            f"{ctx.cycle_id}::{idx}::post",
+            {"cycle_id": ctx.cycle_id, "iteration": idx, "state": ctx.current},
+            scope="full",
+        )
+        cycle["phases"]["snapshot"] = {"snapshot_hash": snap}
+        self._record(ctx, CyclePhase.SNAPSHOT, "EmergencyRollback", True,
+                     snapshot_hash=snap)
+
     def _phase_monitoring(self, ctx, cycle):
         # Registra a fase canônica antes das integrações auxiliares.
         cycle["phases"]["monitoring"] = {
@@ -24,3 +613,105 @@
             })
         if self._gov_backend is not None and hasattr(self._gov_backend, "register_decision"):
             self._gov_backend.register_decision({
+                "event": "cycle_monitoring",
+                "cycle_id": ctx.cycle_id,
+                "phases": list(cycle["phases"].keys()),
+            })
+        self._record(ctx, CyclePhase.MONITORING, "RegenerativeLoop", True,
+                     trace_valid=self._trace.verify() if self._trace is not None else False)
+
+    def _phase_governance(self, ctx, cycle):
+        meta = None
+        if self._trinity is not None and hasattr(self._trinity, "assess"):
+            meta = self._trinity.assess(ctx.current)
+            self._record(
+                ctx, CyclePhase.GOVERNANCE, "TrinitySynergy", True,
+                trinity_assessment=meta,
+            )
+
+        connected_actions = []
+        if self._connected_runtime is not None:
+            connected_actions = [
+                action for action in self._connected_runtime.last_actions()
+                if action.phase == CyclePhase.GOVERNANCE.value
+            ]
+
+        cycle["phases"]["governance"] = {
+            "connected_runtime_active": self._connected_runtime is not None,
+            "connected_actions": [
+                {
+                    "module": action.module,
+                    "operation": action.operation,
+                    "executed": action.executed,
+                    "ok": action.ok,
+                }
+                for action in connected_actions
+            ],
+            "pending_infrastructure": [
+                action.module
+                for action in connected_actions
+                if action.operation == "pending_infrastructure"
+            ],
+            "trinity_assessment": meta,
+        }
+        self._record(
+            ctx,
+            CyclePhase.GOVERNANCE,
+            "RegenerativeLoop",
+            True,
+            connected_runtime_active=self._connected_runtime is not None,
+            connected_actions=len(connected_actions),
+            pending_infrastructure=cycle["phases"]["governance"]["pending_infrastructure"],
+            trinity_assessment_attached=meta is not None,
+        )
+    
+    def _dispatch_emit_trace(self, ctx: CycleContext, phase: CyclePhase) -> None:
+        if self._registry is None:
+            return
+
+        # Primeiro executa a camada de conexão operacional. Ela trata módulos
+        # não-nucleares e não duplica as operações do núcleo do loop.
+        if self._connected_runtime is not None:
+            actions = self._connected_runtime.dispatch_phase(ctx, phase)
+            blocking = [
+                a for a in actions
+                if getattr(a, "blocking", False) and not a.ok
+            ]
+            if blocking:
+                detail = "; ".join(
+                    f"{a.module}:{a.operation}:{a.detail.get('error', 'failed')}"
+                    for a in blocking
+                )
+                raise _Aborted(phase.value.upper(), f"connected_module_failure:{detail}")
+
+        for registered in self._registry.modules_for_phase(phase):
+            if (
+                self._connected_runtime is not None
+                and registered.name not in self._connected_runtime.CORE_HANDLED
+            ):
+                continue
+            status = getattr(registered.instance, "STATUS", None)
+            if status is not None and status.value == "PENDING_INFRASTRUCTURE":
+                ctx.record(phase.value, registered.name, True,
+                           skipped=True, reason="PENDING_INFRASTRUCTURE")
+                continue
+            emitter = getattr(registered.instance, "emit_trace", None)
+            if emitter is None:
+                continue
+            try:
+                emitter(_PhaseTraceProxy(ctx, phase))
+            except Exception as exc:
+                ctx.record(phase.value, registered.name, False, error=str(exc))
+
+    def _record(self, ctx: CycleContext, phase: CyclePhase,
+                module: str, success: bool, **info: Any) -> None:
+        """Registra evidência sem colidir com um campo de informação chamado ok."""
+        info.setdefault("canonical_phase", True)
+        ctx.record(phase.value, module, success, **info)
+
+    def history(self) -> list[LoopReport]:
+        return list(self._history)
+
+    def emit_trace(self, ctx) -> None:
+        if hasattr(ctx, "record"):
+            ctx.record("regeneration", self.NAME, True, version=self.VERSION)
