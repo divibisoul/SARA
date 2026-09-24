@@ -30,6 +30,7 @@ class GovernanceBackend:
         self._decisions: list[dict] = []
         self._decision_chain: list[str] = []
         self._overrides: dict[int, dict] = {}
+        self._override_records: list[dict] = []
         self._override_chain: list[str] = []
 
     def describe(self) -> dict:
@@ -68,11 +69,6 @@ class GovernanceBackend:
         return True
 
     def decisions(self, since: str | None = None) -> list[dict]:
-        selected = (
-            self._decisions
-            if since is None
-            else [d for d in self._decisions if d["ts"] >= since]
-        )
         return [
             {
                 **decision,
@@ -82,7 +78,7 @@ class GovernanceBackend:
                 ),
             }
             for index, decision in enumerate(self._decisions)
-            if decision in selected
+            if since is None or decision["ts"] >= since
         ]
 
     def override(self, decision_id: int, action: str) -> dict:
@@ -98,7 +94,9 @@ class GovernanceBackend:
         }
         previous = self._override_chain[-1] if self._override_chain else "GENESIS"
         current = chain_hash(previous, override)
-        self._overrides[decision_id] = {**override, "integrity": current}
+        record = {**override, "integrity": current}
+        self._override_records.append(record)
+        self._overrides[decision_id] = dict(record)
         self._override_chain.append(current)
         return {
             "ok": True,
@@ -109,10 +107,10 @@ class GovernanceBackend:
         }
 
     def verify_override_integrity(self) -> bool:
-        if len(self._override_chain) != len(self._overrides):
+        if len(self._override_chain) != len(self._override_records):
             return False
         previous = "GENESIS"
-        for override in self._overrides.values():
+        for override in self._override_records:
             payload = {
                 "decision_id": override["decision_id"],
                 "action": override["action"],
@@ -123,6 +121,9 @@ class GovernanceBackend:
                 return False
             previous = override["integrity"]
         return previous == (self._override_chain[-1] if self._override_chain else "GENESIS")
+
+    def override_history(self) -> list[dict]:
+        return [dict(item) for item in self._override_records]
 
     def is_ui_ready(self) -> bool:
         return True
