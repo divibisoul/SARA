@@ -26,13 +26,19 @@ def silent_except_lines(text: str) -> list[int]:
         tree = ast.parse(text)
     except SyntaxError:
         return []
-    return [
-        node.lineno
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ExceptHandler)
-        and len(node.body) == 1
-        and isinstance(node.body[0], ast.Pass)
-    ]
+    allowed_interrupts = {"KeyboardInterrupt", "SystemExit"}
+    lines: list[int] = []
+    for node in ast.walk(tree):
+        if not (
+            isinstance(node, ast.ExceptHandler)
+            and len(node.body) == 1
+            and isinstance(node.body[0], ast.Pass)
+        ):
+            continue
+        if isinstance(node.type, ast.Name) and node.type.id in allowed_interrupts:
+            continue
+        lines.append(node.lineno)
+    return lines
 
 
 def main() -> int:
