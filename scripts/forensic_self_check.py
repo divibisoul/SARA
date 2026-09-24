@@ -8,6 +8,7 @@ infrastructure gates without treating them as failures.
 from __future__ import annotations
 
 from pathlib import Path
+import ast
 import re
 import sys
 
@@ -17,6 +18,21 @@ TEXT_SUFFIXES = {".py", ".toml", ".yml", ".yaml", ".md"}
 
 UNFINISHED = re.compile(r"\b(?:TODO|FIXME|XXX)\b")
 UNSAFE = re.compile(r"#\s*type:\s*ignore\b|\bcontinue-on-error\s*:\s*true\b")
+
+
+def silent_except_lines(text: str) -> list[int]:
+    """Find exception handlers that silently suppress every failure."""
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ExceptHandler)
+        and len(node.body) == 1
+        and isinstance(node.body[0], ast.Pass)
+    ]
 
 
 def main() -> int:
@@ -40,6 +56,9 @@ def main() -> int:
                     findings.append({"kind": "unfinished_marker", "path": str(path.relative_to(ROOT)), "line": line_no})
                 if UNSAFE.search(line):
                     findings.append({"kind": "unsafe_suppression", "path": str(path.relative_to(ROOT)), "line": line_no})
+            if path.suffix.lower() == ".py":
+                for line_no in silent_except_lines(text):
+                    findings.append({"kind": "silent_exception_suppression", "path": str(path.relative_to(ROOT)), "line": line_no})
 
     if findings:
         print("FORENSIC_SELF_CHECK=FAIL")
@@ -50,6 +69,7 @@ def main() -> int:
     print("FORENSIC_SELF_CHECK=PASS")
     print("unfinished_markers=0")
     print("unsafe_suppressions=0")
+    print("silent_exception_suppressions=0")
     return 0
 
 
