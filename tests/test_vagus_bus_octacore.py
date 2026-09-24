@@ -86,3 +86,25 @@ def test_vagus_registry_binding_and_forensic_structural_audit():
     assert audit["inventory"]["count"] == len(system.registry.items())
     assert len(system.components["vagus_bindings"]) == audit["inventory"]["count"]
     assert all(binding["runtime_bound"] for binding in system.components["vagus_bindings"].values())
+
+
+def test_vagus_instruments_real_module_method_without_replacing_logic():
+    from sara.core.ara import ARA
+    from sara.core.provenance import ProvenanceTracker
+    from sara.memory.dna_tags import DNA_Tags
+    from sara.memory.temporal_vector_db import TemporalVectorDB
+
+    bus = VagusNerveBus()
+    observed = []
+    bus.subscribe("module.method.start", lambda event: observed.append(event))
+    bus.subscribe("module.method.complete", lambda event: observed.append(event))
+    ara = ARA(DNA_Tags(), TemporalVectorDB(), ProvenanceTracker())
+    bus.register_module(ara, emit=False)
+
+    result = ara.detect("texto comum")
+    assert isinstance(result, list)
+    event_types = [event["event_type"] for event in observed]
+    assert event_types == ["module.method.start", "module.method.complete"]
+    assert "detect" == observed[0]["payload"]["method"]
+    assert observed[1]["payload"]["result_type"] == "list"
+    assert getattr(ara, "_vagus_bus", None) is bus
