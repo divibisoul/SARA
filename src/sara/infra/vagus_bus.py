@@ -135,7 +135,7 @@ class VagusNerveBus:
                         correlation_id=correlation,
                     )
                     return result
-                async_wrapper._vagus_wrapper = True  # type: ignore[attr-defined]
+                setattr(async_wrapper, "_vagus_wrapper", True)
                 setattr(module, name, async_wrapper)
             else:
                 @wraps(original)
@@ -170,7 +170,7 @@ class VagusNerveBus:
                         correlation_id=correlation,
                     )
                     return result
-                sync_wrapper._vagus_wrapper = True  # type: ignore[attr-defined]
+                setattr(sync_wrapper, "_vagus_wrapper", True)
                 setattr(module, name, sync_wrapper)
             instrumented.add(name)
         setattr(module, "_vagus_instrumented", True)
