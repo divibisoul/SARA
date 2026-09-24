@@ -150,6 +150,35 @@ class VagusNerveBus:
                     "reason": f"describe() falhou: {type(exc).__name__}: {exc}",
                 })
 
+        description_mismatches: list[dict[str, Any]] = []
+        for entry in entries:
+            module = entry.instance
+            try:
+                description = module.describe()
+                expected = {
+                    "name": str(getattr(module, "NAME")),
+                    "version": str(getattr(module, "VERSION")),
+                    "status": getattr(getattr(module, "STATUS"), "value", str(getattr(module, "STATUS"))),
+                    "role": getattr(getattr(module, "ROLE"), "value", str(getattr(module, "ROLE"))),
+                    "dependencies": list(getattr(module, "DEPENDENCIES")),
+                    "phases": [
+                        getattr(phase, "value", str(phase))
+                        for phase in getattr(module, "CYCLE_PHASES")
+                    ],
+                }
+                for key, expected_value in expected.items():
+                    if key in description and description[key] != expected_value:
+                        description_mismatches.append({
+                            "module": entry.name,
+                            "field": key,
+                            "expected": expected_value,
+                            "reported": description[key],
+                        })
+            except Exception:
+                # A contract failure was already recorded above; avoid duplicating
+                # the same exception in the consistency section.
+                continue
+
         dependency_failures = list(registry.validate_dependencies())
         try:
             dependency_order = registry.dependency_order()
@@ -178,8 +207,7 @@ class VagusNerveBus:
             "status": "VERIFIED" if structural_ok else "BLOCKED",
             "scope": "STRUCTURAL_TRANSVERSAL",
             "inventory": inventory,
-            "contract_failures": contract_failures,
-            "dependency_failures": dependency_failures,
+            "contract_failures": contract_failures,\n            "description_mismatches": description_mismatches,\n            "dependency_failures": dependency_failures,
             "dependency_order": dependency_order,
             "vagus_unbound_modules": unbound,
             "vagus_missing_registration_evidence": missing_evidence,\n            "vagus_runtime_unbound_modules": runtime_unbound,\n            "functional_execution": "UNMEASURABLE",
