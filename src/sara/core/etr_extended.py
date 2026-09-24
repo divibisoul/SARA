@@ -222,13 +222,18 @@ class ETR_Extended(ETR):
     # -----------------------------------------------------------------
 
     def validate_against_self(self) -> MultiFrameworkResult:
-        """ETR aplica-se a si mesmo: valida sua própria configuração."""
-        self_description = (
-            f"ETR_Extended v{self.VERSION} com frameworks={list(self.FRAMEWORKS)} "
-            f"validação em 5 camadas, respeitando autonomia, transparência, "
-            f"dignidade e promovendo o cuidado com a comunidade e as gerações futuras."
-        )
-        return self.validate_multi_framework(self_description)
+        """ETR valida o próprio código-fonte real, sem descrição sintética."""
+        source_path = Path(__file__).resolve()
+        source_text = source_path.read_text(encoding="utf-8")
+        result = self.validate_multi_framework(source_text)
+        self._last_self_validation = {
+            "path": str(source_path),
+            "sha256": hashlib.sha256(source_text.encode("utf-8")).hexdigest(),
+            "bytes": len(source_text.encode("utf-8")),
+            "approved": result.approved,
+            "consensus_score": result.consensus_score,
+        }
+        return result
 
     # -----------------------------------------------------------------
     # 3. ETR VALIDA A TRINDADE
