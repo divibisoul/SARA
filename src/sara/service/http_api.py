@@ -132,6 +132,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/regenerate",
                         ("audit", "regeneration", "ethics", "validation"),
                     ),
+                    "sara.hortacore.assess@1.0.0": (
+                        "/v1/hortacore/assess",
+                        ("governance", "persistence", "monitoring"),
+                    ),
                     "sara.state@1.0.0": (
                         "/v1/state",
                         (),
@@ -165,6 +169,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.cycle@1.0.0",
                         "sara.audit@1.0.0",
                         "sara.regenerate@1.0.0",
+                        "sara.hortacore.assess@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
                     ],
@@ -219,6 +224,22 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/hortacore/assess":
+                proposal = body.get("proposal")
+                if not isinstance(proposal, dict):
+                    raise SaraAPIError(422, "INVALID_PROPOSAL", "'proposal' deve ser objeto.")
+                bridge = system.components["aeternum_chimera"]
+                result = bridge.fuse_assessment(proposal)
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+                self._json(200, {
+                    "request_id": correlation,
+                    "correlation_id": correlation,
+                    "operation": "hortacore_assess",
+                    "authority": "AeternumChimeraBridge",
+                    "assessment": result,
+                })
+                return
 
             if path == "/v1/cycle":
                 text = body.get("input")
