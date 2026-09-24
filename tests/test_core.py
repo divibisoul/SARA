@@ -163,6 +163,22 @@ def test_itr_execute_metrics(components):
     assert r.metrics["steps_count"] == len(r.steps_applied)
 
 
+def test_itr_guardrails_do_not_claim_unproven_rollback(components):
+    result = components["itr"].execute(
+        components["itr"].generate("analisar sistema complexo com múltiplas partes")
+    )
+    assert "rollback deve ser fornecido e validado pelo runtime" in result.transformed
+    assert "rollback disponível em falha" not in result.transformed
+
+
+def test_etr_rewrite_runs_real_validation_before_status_marker(components):
+    approved = components["etr"].rewrite("promover autonomia humana")
+    assert "status=VERIFIED" in approved
+    blocked = components["etr"].rewrite("desenvolver tecnologia militar")
+    assert "status=BLOCKED" in blocked
+    assert "Certificado de Conformidade Ética" not in blocked
+
+
 def _loop(components):
     return RegenerativeLoop(
         components["ara"], components["etr"], components["itr"],
