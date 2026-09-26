@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections import deque
 from time import time
 from typing import Any
-from shared.clareira_contract import ClareiraPacket, packet_to_dict, validate_clareira_packet
+from .clareira_contract import ClareiraPacket, packet_to_dict, validate_clareira_packet
 
 class ClareiraBridge:
     CONTRACT_VERSION = "1.0.0"
