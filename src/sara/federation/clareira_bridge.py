@@ -40,7 +40,7 @@ class ClareiraBridge:
     def complete(self, started_ms: int) -> None:
         self.processed += 1
         self.in_flight = max(0, self.in_flight - 1)
-        self.latencies_ms.append(max(0.0, float(int(time() * 1000) - started_ms))
+        self.latencies_ms.append(max(0.0, float(int(time() * 1000) - started_ms)))
 
     def fail(self) -> None:
         self.errored += 1
