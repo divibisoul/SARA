@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 from sara.meta.soul_federation import federation_manifest, SARA_OPERATIONS
+from sara.federation.clareira_bridge import clareira_bridge
 
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
@@ -118,6 +119,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if path == "/v1/capabilities":
                 modules = system.registry.snapshot()["modules"]
                 operation_specs = {
+                    "clareira.metrics@1.0.0": ("/v1/clareira/metrics", ("monitoring", "federation")),
+                    "clareira.ingest@1.0.0": ("/v1/clareira/ingest", ("ingestion", "federation")),
                     "sara.health@1.0.0": ("/health", ("monitoring",)),
                     "sara.cycle@1.0.0": (
                         "/v1/cycle",
@@ -166,6 +169,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "clareira.metrics@1.0.0",
+                        "clareira.ingest@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -181,6 +186,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "invariants": system.invariant_report,
                     "soul_federation": federation_manifest(),
                 })
+                return
+            if path == "/v1/clareira/metrics":
+                self._json(200, clareira_bridge.metrics())
                 return
             if path == "/v1/state":
                 self._json(200, system.sistema_vivo.state())
@@ -215,6 +223,38 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/clareira/ingest":
+                packet = body.get("packet")
+                if not isinstance(packet, dict):
+                    raise SaraAPIError(422, "INVALID_CLAREIRA_PACKET", "'packet' deve ser objeto.")
+                try:
+                    accepted = clareira_bridge.ingest(packet)
+                except ValueError as exc:
+                    clareira_bridge.fail()
+                    raise SaraAPIError(422, "INVALID_CLAREIRA_PACKET", str(exc)) from exc
+                completed = False
+                regeneration_requested = bool(packet.get("metadata", {}).get("regenerationRequested")) if isinstance(packet.get("metadata", {}), dict) else False
+                sara_result = None
+                started_ms = int(time.time() * 1000)
+                if regeneration_requested:
+                    sara_result = system.sistema_vivo.process(
+                        packet["data"],
+                        cycle_id=packet["correlationId"],
+                    )
+                    clareira_bridge.complete(started_ms)
+                    completed = True
+                return_payload = {"accepted": True, "contractVersion": clareira_bridge.CONTRACT_VERSION, "packet": accepted, "processed": completed}
+                if sara_result is not None:
+                    return_payload["sara"] = {
+                        "cycle_id": sara_result.cycle_id,
+                        "final_state": sara_result.loop_report.final_state,
+                        "converged": sara_result.loop_report.converged,
+                        "rollback_performed": sara_result.loop_report.rollback_performed,
+                        "trace_hash": sara_result.trace_hash,
+                    }
+                self._json(200, return_payload)
+                return
 
             if path == "/v1/cycle":
                 text = body.get("input")
