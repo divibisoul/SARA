@@ -238,12 +238,16 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 sara_result = None
                 started_ms = int(time.time() * 1000)
                 if regeneration_requested:
-                    sara_result = system.sistema_vivo.process(
-                        packet["data"],
-                        cycle_id=packet["correlationId"],
-                    )
-                    clareira_bridge.complete(started_ms)
-                    completed = True
+                    try:
+                        sara_result = system.sistema_vivo.process(
+                            packet["data"],
+                            cycle_id=packet["correlationId"],
+                        )
+                        clareira_bridge.complete(started_ms)
+                        completed = True
+                    except Exception:
+                        clareira_bridge.fail()
+                        raise
                 return_payload = {"accepted": True, "contractVersion": clareira_bridge.CONTRACT_VERSION, "packet": accepted, "processed": completed}
                 if sara_result is not None:
                     return_payload["sara"] = {
