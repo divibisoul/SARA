@@ -12,6 +12,8 @@ from threading import Event, Lock, Thread
 from time import monotonic
 from typing import Any
 
+from sara.contracts.base import CyclePhase, CycleRole, ModuleStatus
+
 
 @dataclass
 class _CycleRequest:
@@ -28,8 +30,9 @@ class _CycleRequest:
 class OctacoreG0Kernel:
     NAME = "OctacoreG0Kernel"
     VERSION = "1.0"
-    STATUS = "IMPLEMENTED"
-    ROLE = "meta"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.META
+    CYCLE_PHASES = tuple(CyclePhase)
     DEPENDENCIES = (
         "SistemaVivo",
         "RegenerativeLoop",
