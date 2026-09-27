@@ -171,7 +171,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
-        aeternum_chimera, omega,
+        aeternum_chimera, omega, vagus_bus,
     ]
 
     for module in candidates:
