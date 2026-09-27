@@ -59,3 +59,20 @@ def test_working_memory_is_first_class_in_sara_bootstrap():
     assert working.describe()["layer"] == "working_memory"
     assert working.describe()["storage_scope"] == "process_ram_bounded"
 
+
+
+def test_eru_runtime_can_share_one_canonical_vagus_bus():
+    bus = VagusNerveBus()
+    runtime = ERURuntime(bus=bus)
+
+    async def runner():
+        await runtime.bus.publish(
+            "ERU_RUNTIME",
+            "SYSTEM",
+            "TEST_SHARED_BUS",
+            {"shared": True},
+        )
+
+    asyncio.run(runner())
+    assert runtime.bus is bus
+    assert bus.get_history()[0]["event_type"] == "TEST_SHARED_BUS"
