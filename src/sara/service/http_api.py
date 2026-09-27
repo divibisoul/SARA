@@ -139,6 +139,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
                     ),
+                    "octacore.g0@1.0.0": (
+                        "existing sara.* kernel boundary",
+                        ("audit", "regeneration", "monitoring", "persistence"),
+                    ),
                 }
                 descriptors = [
                     CapabilityDescriptor(
