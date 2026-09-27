@@ -9,14 +9,20 @@ import asyncio
 import inspect
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from typing import Any, Callable
+
+from sara.contracts.base import CyclePhase, CycleRole, ModuleStatus
 
 Subscriber = Callable[[dict[str, Any]], Any]
 
 
 class VagusNerveBus:
     NAME = "VagusNerveBus"
-    VERSION = "1.0"
+    VERSION = "1.1"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.MONITORING
+    DEPENDENCIES = ()
+    CYCLE_PHASES = tuple(CyclePhase)
 
     def __init__(self) -> None:
         self._subscribers: dict[str, list[Subscriber]] = {}
@@ -31,15 +37,23 @@ class VagusNerveBus:
     async def publish(
         self, source: str, target: str, event_type: str, payload: dict[str, Any],
         status: str = "EXECUTE",
+        *,
+        correlation_id: str | None = None,
+        message_id: str | None = None,
+        priority: int | None = None,
+        ttl: int | None = None,
     ) -> dict[str, Any]:
         event = {
-            "event_id": str(uuid.uuid4()),
+            "event_id": message_id or str(uuid.uuid4()),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "source_module": source,
             "target_module": target,
             "event_type": event_type,
             "payload": payload,
             "status": status,
+            "correlation_id": correlation_id,
+            "priority": priority,
+            "ttl": ttl,
         }
         async with self._lock:
             self._history.append(event)
@@ -63,3 +77,26 @@ class VagusNerveBus:
             "history_events": len(self._history),
             "external_broker": False,
         }
+
+    def publish_sync(
+        self, source: str, target: str, event_type: str, payload: dict[str, Any],
+        status: str = "EXECUTE",
+        *,
+        correlation_id: str | None = None,
+        message_id: str | None = None,
+        priority: int | None = None,
+        ttl: int | None = None,
+    ) -> dict[str, Any]:
+        return asyncio.run(
+            self.publish(
+                source,
+                target,
+                event_type,
+                payload,
+                status,
+                correlation_id=correlation_id,
+                message_id=message_id,
+                priority=priority,
+                ttl=ttl,
+            )
+        )
