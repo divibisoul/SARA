@@ -60,8 +60,7 @@ class OctacoreG0Kernel:
         self._completed = 0
         self._failed = 0
         self._last_latency_ms = 0.0
-        self._worker = Thread(target=self._run, name="sara-octacore-g0", daemon=True)
-        self._worker.start()
+        self._worker: Thread | None = None
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -144,6 +143,10 @@ class OctacoreG0Kernel:
             done=Event(),
             queued_at=monotonic(),
         )
+        with self._lock:
+            if self._worker is None or not self._worker.is_alive():
+                self._worker = Thread(target=self._run, name="sara-octacore-g0", daemon=True)
+                self._worker.start()
         try:
             self._queue.put_nowait(request)
         except Full as exc:
@@ -228,3 +231,14 @@ class OctacoreG0Kernel:
                     self._last_latency_ms = (monotonic() - started) * 1000
                 request.done.set()
                 self._queue.task_done()
+
+    def shutdown(self) -> None:
+        with self._lock:
+            worker = self._worker
+            self._worker = None
+        if worker is not None and worker.is_alive():
+            try:
+                self._queue.put_nowait(None)
+            except Full:
+                return
+            worker.join(timeout=2.0)
