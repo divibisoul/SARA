@@ -80,6 +80,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     loaded_memory = memory.load_if_configured()
     loaded_temporal = temporal.load_if_configured()
     rollback = EmergencyRollback()
+    vagus_bus = VagusNerveBus()
     report["memory_loaded"] = loaded_memory
     report["temporal_loaded"] = loaded_temporal
     trace = DecisionTrace()
