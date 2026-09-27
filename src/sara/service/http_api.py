@@ -241,6 +241,9 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Kernel G0 não está registrado.")
                 result = kernel.cycle(system.sistema_vivo, text, cycle_id=cycle_id, context=context)
                 correlation_id = correlation or result.cycle_id
+                context_summary = None
+                if isinstance(context, dict):
+                    context_summary = {"present": True, "keys": sorted(str(k) for k in context)}
                 self._json(200, {
                     "request_id": correlation_id,
                     "correlation_id": correlation_id,
@@ -251,6 +254,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
+                    "octacore_context": context_summary,
                 })
                 return
 
