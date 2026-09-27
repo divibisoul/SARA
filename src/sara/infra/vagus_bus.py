@@ -11,12 +11,18 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from sara.contracts.base import CyclePhase, CycleRole, ModuleStatus
+
 Subscriber = Callable[[dict[str, Any]], Any]
 
 
 class VagusNerveBus:
     NAME = "VagusNerveBus"
-    VERSION = "1.0"
+    VERSION = "1.1"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.MONITORING
+    DEPENDENCIES = ()
+    CYCLE_PHASES = tuple(CyclePhase)
 
     def __init__(self) -> None:
         self._subscribers: dict[str, list[Subscriber]] = {}
