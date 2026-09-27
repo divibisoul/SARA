@@ -76,3 +76,14 @@ def test_eru_runtime_can_share_one_canonical_vagus_bus():
     asyncio.run(runner())
     assert runtime.bus is bus
     assert bus.get_history()[0]["event_type"] == "TEST_SHARED_BUS"
+
+
+def test_bootstrap_registers_one_canonical_vagus_bus():
+    from sara.bootstrap import build_default_system
+
+    system = build_default_system(fail_closed=False)
+    bus = system.components["vagus_bus"]
+    assert system.registry.get("VagusNerveBus") is bus
+    assert bus.describe()["control_metadata"] == [
+        "message_id", "correlation_id", "priority", "ttl"
+    ]
