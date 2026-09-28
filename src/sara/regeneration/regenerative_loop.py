@@ -120,15 +120,28 @@ class RegenerativeLoop:
             if not self._prov.verify_integrity():
                 raise _Aborted("PREFLIGHT", "provenance_integrity_failed")
 
-    def run(self, input_text: str, cycle_id: str | None = None) -> LoopReport:
+    def run(
+        self,
+        input_text: str,
+        cycle_id: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> LoopReport:
+        if context is not None and not isinstance(context, dict):
+            raise TypeError("context must be an object")
         cid = cycle_id or f"cycle-{now_iso()}"
         sink = TraceSink(self._trace, self._temporal, self._prov)
         ctx = CycleContext(cid, str(input_text), str(input_text), sink)
+        if context:
+            # Context is an input artifact for the real regenerative cycle; it
+            # never becomes a second authority or bypasses the canonical phases.
+            ctx.register_artifact("federated_context", dict(context))
+            ctx.flags["federated_context_present"] = True
         if self._working_memory is not None:
             self._working_memory.put("cycle_context", {
                 "cycle_id": cid,
                 "input": str(input_text),
                 "stage": "preflight",
+                "federated_context_present": bool(context),
             })
         self._preflight(ctx)
 
