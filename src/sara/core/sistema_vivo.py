@@ -53,7 +53,7 @@ class SistemaVivo:
             "connected_runtime": self._connected_runtime is not None,
         }
 
-    def process(self, input_text, cycle_id=None, monitor_hours=0.0) -> CycleResult:
+    def process(self, input_text, cycle_id=None, monitor_hours=0.0, context=None) -> CycleResult:
         self._cycle_count += 1
         if self._connected_runtime is not None:
             connection = self._connected_runtime.validate_connection()
@@ -67,7 +67,7 @@ class SistemaVivo:
             "event": "cycle_start", "cycle_id": cid,
             "input_len": len(str(input_text)),
         })
-        report = self._loop.run(input_text, cycle_id=cid)
+        report = self._loop.run(input_text, cycle_id=cid, context=context)
 
         monitoring_id = None
         if monitor_hours > 0:
