@@ -4,9 +4,10 @@ from dataclasses import dataclass
 import threading
 from typing import Any
 
-from sara.contracts.base import ModuleStatus
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.hashing import chain_hash
 from sara.rgo.contracts import RGOEnvelope, RGOValidationError, DualStatus
+from sara.core.provenance import Provenance
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,9 @@ class RGOEngine:
     NAME = "RGOEngine"
     VERSION = "1.0"
     STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.META
+    DEPENDENCIES = ("ProvenanceTracker",)
+    CYCLE_PHASES = (CyclePhase.GOVERNANCE, CyclePhase.PERSISTENCE, CyclePhase.MONITORING)
 
     def __init__(self, *, provenance: Any, vagus_bus: Any | None = None) -> None:
         self._provenance = provenance
@@ -50,7 +54,7 @@ class RGOEngine:
             self._chain.append(chain_value)
         self._provenance.register(
             entity=f"RGO:{env.finding_id}",
-            provenance="INFERRED" if env.epistemic_mode.value == "INFERENCE" else "HISTORICAL",
+            provenance=Provenance.INFERRED if env.epistemic_mode.value == "INFERENCE" else Provenance.HISTORICAL,
             evidence=digest,
             source=env.provenance_origin,
         )
@@ -87,9 +91,11 @@ class RGOEngine:
         )
         if asyncio.iscoroutine(result):
             try:
-                asyncio.run(result)
+                asyncio.get_running_loop()
             except RuntimeError:
-                pass
+                asyncio.run(result)
+            else:
+                asyncio.create_task(result)
 
     def state(self) -> RGOState:
         with self._lock:
