@@ -88,6 +88,7 @@ class RGOEnvelope:
     actionability_reason: str = ""
     failure_cause: str = ""
     failure_impact: str = ""
+    extensions: dict[str, Any] = field(default_factory=dict)
     schema_version: str = SCHEMA_VERSION
 
     @classmethod
@@ -145,6 +146,7 @@ class RGOEnvelope:
             actionability_reason=str(actionability.get("reason", "")),
             failure_cause=str(failure.get("cause", "")),
             failure_impact=str(failure.get("impact", "")),
+            extensions=dict(value.get("extensions") or {}),
             schema_version=str(value.get("schema_version", "")),
         )
         env.validate()
@@ -204,6 +206,7 @@ class RGOEnvelope:
             "dual": {"status": self.dual_status.value, "property": self.dual_property, "evidence_refs": list(self.dual_evidence_refs)},
             "capability": {"id": self.capability_id, "state": self.capability_state.value if self.capability_state else ""},
             "evidence": [{"id": x.id, "kind": x.kind, "ref": x.ref} for x in self.evidence],
+            "extensions": self.extensions,
             "provenance": {"origin": self.provenance_origin, "parent_ids": list(self.parent_ids), "input_hash": self.input_hash},
         }
         raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
