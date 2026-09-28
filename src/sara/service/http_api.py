@@ -271,7 +271,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
 
                 kernel = system.components.get("octacore_g0")
-                if event_type == "signal.throttle":
+                if event_type in {"signal.throttle", "signal.degrade"}:
                     level = payload.get("level")
                     if not isinstance(level, int):
                         raise SaraAPIError(422, "INVALID_THROTTLE_LEVEL", "'level' deve ser inteiro.")
