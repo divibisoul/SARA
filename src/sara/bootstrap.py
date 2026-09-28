@@ -41,7 +41,7 @@ from sara.meta.assimilation_committee import AssimilationReviewCommittee
 from sara.meta.quantum_snapshot import QuantumSnapshotSystem
 from sara.meta.eru_engine import ERU_Engine
 from sara.meta.eru_trinity_bridge import ERUTrinityBridge
-from sara.meta.trinity_eru_unified import TrinityERUUnified
+from sara.core.trinity_eru_unified import TrinityERUUnified
 from sara.meta.eru_runtime import ERURuntime
 from sara.meta.transystem_sara import TransystemSARA
 from sara.meta.aeternum_chimera import AeternumChimeraBridge
