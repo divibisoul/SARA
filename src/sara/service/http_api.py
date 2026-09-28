@@ -182,6 +182,38 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "soul_federation": federation_manifest(),
                 })
                 return
+            if path == "/v1/octacore":
+                fusion = system.components.get("octacore_fusion")
+                if fusion is None:
+                    raise SaraAPIError(503, "OCTACORE_FUSION_UNAVAILABLE", "OctaCore fusion fabric indisponível.")
+                self._json(200, {
+                    "service": "SARA",
+                    "operation": "octacore",
+                    "identity": "G0",
+                    "manifest": fusion.describe(),
+                    "health": fusion.health(),
+                    "audit": fusion.audit(),
+                })
+                return
+            if path == "/v1/mesh/status":
+                fusion = system.components.get("octacore_fusion")
+                if fusion is None:
+                    raise SaraAPIError(503, "MESH_FUSION_UNAVAILABLE", "Mesh fusion fabric indisponível.")
+                health = fusion.health()
+                self._json(200, {
+                    "service": "SARA",
+                    "operation": "mesh.status",
+                    "mesh": fusion.describe().get("mesh", {}),
+                    "health": health,
+                    "last_probe": health.get("mesh_last_probe"),
+                    "proof": {
+                        "configured": bool(os.getenv("SOUL_MESH_N01_URL", "").strip()),
+                        "connected": bool(health.get("mesh_last_probe") and health["mesh_last_probe"].get("status") in {"CONNECTED", "VERIFIED"}),
+                        "verified": bool(health.get("mesh_last_probe") and health["mesh_last_probe"].get("status") == "VERIFIED"),
+                        "unmeasurable_without_probe": health.get("mesh_last_probe") is None,
+                    },
+                })
+                return
             if path == "/v1/state":
                 self._json(200, system.sistema_vivo.state())
                 return
@@ -215,6 +247,59 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/mesh/probe":
+                fusion = system.components.get("octacore_fusion")
+                if fusion is None:
+                    raise SaraAPIError(503, "MESH_FUSION_UNAVAILABLE", "Mesh fusion fabric indisponível.")
+                target = str(body.get("mediator", "N01")).strip().upper()
+                try:
+                    probe = fusion.probe_mesh(mediator=target)
+                except ValueError as exc:
+                    raise SaraAPIError(422, "INVALID_MESH_MEDIATOR", str(exc)) from exc
+                status_code = 200 if probe.status in {"CONNECTED", "VERIFIED", "UNMEASURABLE"} else 502
+                self._json(status_code, {"operation": "mesh.probe", "probe": probe.as_dict()})
+                return
+
+            if path == "/v1/vagus":
+                bus = system.components.get("vagus_bus")
+                if bus is None:
+                    raise SaraAPIError(503, "VAGUS_BUS_UNAVAILABLE", "Vagus control plane indisponível.")
+                required = ("vagus_version", "message_id", "correlation_id", "source", "target", "priority", "ttl", "type", "payload")
+                missing = [key for key in required if key not in body]
+                if missing:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Campos obrigatórios ausentes.", {"missing": missing})
+                try:
+                    vagus_version = str(body["vagus_version"]).strip()
+                    message_id = str(body["message_id"]).strip()
+                    correlation_id = str(body["correlation_id"]).strip()
+                    source = str(body["source"]).strip()
+                    target = str(body["target"]).strip()
+                    event_type = str(body["type"]).strip()
+                    priority = int(body["priority"])
+                    ttl = int(body["ttl"])
+                except (TypeError, ValueError) as exc:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Envelope Vagus inválido.") from exc
+                payload = body["payload"]
+                if not isinstance(payload, dict):
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
+                if vagus_version != "1.0":
+                    raise SaraAPIError(422, "INVALID_VAGUS_VERSION", "Vagus version não suportada.")
+                if not message_id or not correlation_id or not source or not target or not event_type or not 0 <= priority <= 100 or ttl <= 0:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Envelope Vagus incompleto.")
+                event = bus.publish_sync(
+                    source,
+                    target,
+                    event_type,
+                    payload,
+                    status=str(body.get("status", "EXECUTE")).strip() or "EXECUTE",
+                    correlation_id=correlation_id,
+                    message_id=message_id,
+                    priority=priority,
+                    ttl=ttl,
+                )
+                self._json(200, {"operation": "vagus", "event": event})
+                return
 
             if path == "/v1/cycle":
                 text = body.get("input")
