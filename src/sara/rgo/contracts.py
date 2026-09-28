@@ -129,7 +129,7 @@ class RGOEnvelope:
             epistemic_mode=epistemic_mode,
             verification_state=verification_state,
             actionability=actionability_status,
-                        failure_type=str(failure.get("type", "")),
+            failure_type=str(failure.get("type", "")),
             failure_description=str(failure.get("description", "")),
             failure_nature=str(failure.get("nature", "")),
             correction_problem=str(boundary.get("problem_to_resolve", "")),
