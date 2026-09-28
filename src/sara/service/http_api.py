@@ -228,7 +228,13 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     not isinstance(cycle_id, str) or not cycle_id.strip()
                 ):
                     raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
-                result = system.sistema_vivo.process(text, cycle_id=cycle_id)
+                context = body.get("context")
+                if context is not None and not isinstance(context, dict):
+                    raise SaraAPIError(422, "INVALID_CONTEXT", "'context' deve ser objeto JSON.")
+                kernel = system.components.get("octacore_g0")
+                if kernel is None:
+                    raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Octacore G0 não está disponível.")
+                result = kernel.cycle(text, cycle_id=cycle_id, context=context)
                 correlation_id = correlation or result.cycle_id
                 self._json(200, {
                     "request_id": correlation_id,
@@ -240,6 +246,11 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
+                    "octacore_context": {
+                        "present": bool(context),
+                        "keys": sorted(str(k) for k in context.keys()) if isinstance(context, dict) else [],
+                    },
+                    "kernel": "G0",
                 })
                 return
 
@@ -254,34 +265,39 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 structural = ara.detect_structural(text)
                 relational = ara.detect_relational(text)
                 all_flaws = [*flaws, *semantic, *structural, *relational]
+                kernel = system.components.get("octacore_g0")
+                if kernel is None:
+                    raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "Octacore G0 não está disponível.")
                 if path == "/v1/audit":
-                    ethical = etr.validate_multi_framework(text)
+                    audit = kernel.audit(ara, etr, text)
+                    ethical = audit["ethical"]
                     request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                     self._json(200, {
                         "request_id": request_id,
                         "correlation_id": request_id,
                         "operation": "audit",
-                        "flaws": [getattr(f, "__dict__", str(f)) for f in all_flaws],
-                        "count": len(all_flaws),
+                        "flaws": audit["flaws"],
+                        "count": audit["count"],
                         "semantic": [getattr(f, "__dict__", str(f)) for f in semantic],
-                        "ethical": getattr(ethical, "__dict__", str(ethical)),
+                        "ethical": audit["ethical"],
                         "provenance": ara.meta_audit_complete(),
+                        "kernel": "G0",
                     })
                     return
-                regenerated = ara.regenerate_semantic(text, all_flaws)
-                ethical = etr.validate_multi_framework(regenerated.transformed)
+                regenerated = kernel.regenerate(ara, etr, text)
+                ethical = regenerated["ethical"]
                 request_id = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
                 self._json(200, {
                     "request_id": request_id,
                     "correlation_id": request_id,
                     "operation": "regenerate",
-                    "original": regenerated.original,
-                    "transformed": regenerated.transformed,
-                    "applied_rules": list(regenerated.applied_rules),
-                    "plan_steps": list(regenerated.plan_steps),
-                    "integrity_hash": regenerated.integrity_hash,
-                    "preserved_length": regenerated.preserved_length,
-                    "ethical": getattr(ethical, "__dict__", str(ethical)),
+                    "original": regenerated["original"],
+                    "transformed": regenerated["transformed"],
+                    "applied_rules": regenerated["applied_rules"],
+                    "plan_steps": regenerated["plan_steps"],
+                    "integrity_hash": regenerated["integrity_hash"],
+                    "ethical": regenerated["ethical"],
+                    "kernel": "G0",
                 })
                 return
 
