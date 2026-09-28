@@ -53,6 +53,7 @@ from sara.research.quantum_scanner import QuantumScanner
 from sara.audit.cycle_auditor import CycleAuditor
 from sara.omega import SoulETROmegaSystem
 from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment, transystem_adapters_from_environment
+from sara.infra.vagus_bus import VagusNerveBus
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
 
@@ -147,6 +148,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler)
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
     octacore_g0 = OctacoreG0Kernel()
+    vagus_bus = VagusNerveBus()
 
     loop = RegenerativeLoop(
         ara=ara_extended, etr=etr_extended, itr=itr_extended,
@@ -172,7 +174,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
-        aeternum_chimera, omega, octacore_g0,
+        aeternum_chimera, omega, octacore_g0, vagus_bus,
     ]
 
     for module in candidates:
@@ -238,5 +240,6 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "aeternum_chimera": aeternum_chimera,
             "omega": omega,
             "octacore_g0": octacore_g0,
+            "vagus_bus": vagus_bus,
         },
     )
