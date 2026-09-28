@@ -5,6 +5,7 @@ runtime. External Redis/Qdrant/DB transports remain explicit adapters.
 """
 from __future__ import annotations
 from typing import Any
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.vagus_bus import VagusNerveBus
 from sara.meta.bayesian_uncertainty import BayesianMetaLearner
 from sara.memory.working_memory import WorkingMemory
@@ -13,6 +14,18 @@ from sara.memory.working_memory import WorkingMemory
 class ERURuntime:
     NAME = "ERURuntime"
     VERSION = "1.1"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.META
+    # VagusNerveBus/WorkingMemory are embedded runtime collaborators, not
+    # registry modules; keeping DEPENDENCIES empty avoids inventing external
+    # registry nodes while still making this object a valid SaraModule.
+    DEPENDENCIES = ()
+    CYCLE_PHASES = (
+        CyclePhase.AUDIT,
+        CyclePhase.STRATEGY,
+        CyclePhase.EXECUTION,
+        CyclePhase.VALIDATION,
+    )
 
     def __init__(
         self,
@@ -51,6 +64,10 @@ class ERURuntime:
         return {
             "name": self.NAME,
             "version": self.VERSION,
+            "status": self.STATUS.value,
+            "role": self.ROLE.value,
+            "dependencies": list(self.DEPENDENCIES),
+            "phases": [p.value for p in self.CYCLE_PHASES],
             "active": self._active,
             "bus": self.bus.describe(),
             "meta_learner": self.meta_learner.describe(),
