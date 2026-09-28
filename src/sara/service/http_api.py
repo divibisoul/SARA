@@ -113,6 +113,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
                     "module_count": system.registry.snapshot()["count"],
                     "pending_infrastructure": system.registry.by_status().get("PENDING_INFRASTRUCTURE", []),
+                    "octacore_g0": system.components["octacore_g0"].health()
+                    if "octacore_g0" in system.components else {"status": "UNAVAILABLE"},
+                    "vagus_bus": system.components["vagus_bus"].describe()
+                    if "vagus_bus" in system.components else {"status": "UNAVAILABLE"},
                 })
                 return
             if path == "/v1/capabilities":
@@ -138,6 +142,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "sara.trace@1.0.0": (
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
+                    ),
+                    "octacore.g0@1.0.0": (
+                        "G0 kernel boundary over existing SARA runtime",
+                        ("audit", "regeneration", "monitoring", "persistence"),
                     ),
                 }
                 descriptors = [
@@ -166,6 +174,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "octacore.g0@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -178,6 +187,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     },
                     "provenance_integrity": system.components["provenance"].verify_integrity() if "provenance" in system.components else None,
                     "rollback_chain_integrity": system.components["rollback"].verify_chain(),
+                    "octacore_g0": system.components["octacore_g0"].describe()
+                    if "octacore_g0" in system.components else {"status": "UNAVAILABLE"},
+                    "vagus_bus": system.components["vagus_bus"].describe()
+                    if "vagus_bus" in system.components else {"status": "UNAVAILABLE"},
                     "invariants": system.invariant_report,
                     "soul_federation": federation_manifest(),
                 })
@@ -215,6 +228,81 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/vagus":
+                vagus = system.components.get("vagus_bus")
+                if vagus is None:
+                    raise SaraAPIError(503, "VAGUS_BUS_UNAVAILABLE", "VagusBus não está disponível.")
+                required = (
+                    "vagus_version", "message_id", "correlation_id", "source",
+                    "target", "priority", "ttl", "type", "payload",
+                )
+                missing = [key for key in required if key not in body]
+                if missing:
+                    raise SaraAPIError(
+                        422,
+                        "INVALID_VAGUS_ENVELOPE",
+                        "Campos Vagus obrigatórios ausentes.",
+                        {"missing": missing},
+                    )
+                try:
+                    priority = int(body["priority"])
+                    ttl = int(body["ttl"])
+                except (TypeError, ValueError) as exc:
+                    raise SaraAPIError(
+                        422, "INVALID_VAGUS_ENVELOPE",
+                        "priority e ttl devem ser inteiros.",
+                    ) from exc
+                event_type = str(body["type"]).strip()
+                allowed = (
+                    event_type in {"gpu.submit", "gpu.result", "gpu.barrier"}
+                    or event_type.startswith(
+                        ("health.", "capability.", "signal.", "sara.", "session.", "research.")
+                    )
+                )
+                if body["vagus_version"] != "1.1" or not event_type:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "versão/tipo Vagus inválidos.")
+                if not (0 <= priority <= 100) or ttl <= 0:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "priority/ttl inválidos.")
+                if not allowed:
+                    raise SaraAPIError(422, "INVALID_VAGUS_TYPE", f"Tipo Vagus não suportado: {event_type}")
+                payload = body["payload"]
+                if not isinstance(payload, dict):
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
+
+                kernel = system.components.get("octacore_g0")
+                if event_type == "signal.throttle":
+                    level = payload.get("level")
+                    if not isinstance(level, int):
+                        raise SaraAPIError(422, "INVALID_THROTTLE_LEVEL", "'level' deve ser inteiro.")
+                    if kernel is None:
+                        raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "G0 não está disponível.")
+                    try:
+                        kernel.set_throttle(level)
+                    except (TypeError, ValueError) as exc:
+                        raise SaraAPIError(422, "INVALID_THROTTLE_LEVEL", str(exc)) from exc
+                elif event_type == "signal.halt":
+                    if kernel is None:
+                        raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "G0 não está disponível.")
+                    kernel.halt()
+                elif event_type == "signal.resume":
+                    if kernel is None:
+                        raise SaraAPIError(503, "G0_KERNEL_UNAVAILABLE", "G0 não está disponível.")
+                    kernel.resume()
+
+                event = vagus.publish_sync(
+                    str(body["source"]),
+                    str(body["target"]),
+                    event_type,
+                    payload,
+                    str(body.get("status", "EXECUTE")),
+                    correlation_id=str(body["correlation_id"]),
+                    message_id=str(body["message_id"]),
+                    priority=priority,
+                    ttl=ttl,
+                )
+                self._json(202, {"accepted": True, "event": event})
+                return
 
             if path == "/v1/cycle":
                 text = body.get("input")
