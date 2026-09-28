@@ -33,6 +33,33 @@ class RGOEngine:
         self._chain: list[str] = []
         self._lock = threading.RLock()
 
+    def describe(self) -> dict[str, Any]:
+        state = self.state()
+        return {
+            "name": self.NAME,
+            "version": self.VERSION,
+            "status": self.STATUS.value,
+            "role": self.ROLE.value,
+            "dependencies": list(self.DEPENDENCIES),
+            "phases": [phase.value for phase in self.CYCLE_PHASES],
+            "accepted": state.accepted,
+            "rejected": state.rejected,
+            "integrity": state.integrity,
+            "last_hash": state.last_hash,
+        }
+
+    def emit_trace(self, ctx: Any) -> None:
+        if hasattr(ctx, "record"):
+            state = self.state()
+            ctx.record(
+                "monitoring",
+                self.NAME,
+                state.integrity,
+                accepted=state.accepted,
+                rejected=state.rejected,
+                last_hash=state.last_hash,
+            )
+
     def ingest(self, payload: dict[str, Any]) -> dict[str, Any]:
         env = RGOEnvelope.from_dict(payload)
         env = env.with_derived_dual()
