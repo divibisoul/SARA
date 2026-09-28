@@ -17,7 +17,7 @@ Subscriber = Callable[[dict[str, Any]], Any]
 
 class VagusNerveBus:
     NAME = "VagusNerveBus"
-    VERSION = "1.1"
+    VERSION = "1.0"
 
     def __init__(self) -> None:
         self._subscribers: dict[str, list[Subscriber]] = {}
