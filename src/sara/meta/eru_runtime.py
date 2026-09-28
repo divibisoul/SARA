@@ -12,11 +12,21 @@ from sara.memory.working_memory import WorkingMemory
 
 class ERURuntime:
     NAME = "ERURuntime"
-    VERSION = "1.0"
+    VERSION = "1.1"
 
-    def __init__(self, *, confidence_threshold: float = 0.85) -> None:
+    def __init__(
+        self,
+        *,
+        confidence_threshold: float = 0.85,
+        prior: float = 0.50,
+        evidence_weight: float = 1.0,
+    ) -> None:
         self.bus = VagusNerveBus()
-        self.meta_learner = BayesianMetaLearner(confidence_threshold)
+        self.meta_learner = BayesianMetaLearner(
+            confidence_threshold=confidence_threshold,
+            prior=prior,
+            evidence_weight=evidence_weight,
+        )
         self.working_memory = WorkingMemory()
         self._active = True
 
