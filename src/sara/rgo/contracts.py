@@ -107,6 +107,15 @@ class RGOEnvelope:
             for x in (value.get("evidence") or [])
             if isinstance(x, dict)
         )
+        try:
+            epistemic_mode = EpistemicMode(str(epistemic.get("mode", "")))
+            verification_state = VerificationState(str(epistemic.get("verification_state", "")))
+            actionability_status = ActionabilityStatus(str(actionability.get("status", "")))
+            dual_status = DualStatus(str(dual.get("status", "UNRESOLVED")))
+            capability_state = CapabilityState(str(capability["state"])) if capability.get("state") else None
+        except ValueError as exc:
+            raise RGOValidationError("RGO_ENUM_INVALID") from exc
+
         env = cls(
             finding_id=str(value.get("finding_id", "")),
             object_id=str(value.get("object_id", "")),
@@ -116,20 +125,20 @@ class RGOEnvelope:
             source_system=str(source.get("system", "")),
             source_module=str(source.get("module", "")),
             source_version=str(source.get("version", "")),
-            epistemic_mode=EpistemicMode(str(epistemic.get("mode", ""))),
-            verification_state=VerificationState(str(epistemic.get("verification_state", ""))),
-            actionability=ActionabilityStatus(str(actionability.get("status", ""))),
-            failure_type=str(failure.get("type", "")),
+            epistemic_mode=epistemic_mode,
+            verification_state=verification_state,
+            actionability=actionability_status,
+                        failure_type=str(failure.get("type", "")),
             failure_description=str(failure.get("description", "")),
             failure_nature=str(failure.get("nature", "")),
             correction_problem=str(boundary.get("problem_to_resolve", "")),
             required_property=str(boundary.get("required_property", "")),
-            dual_status=DualStatus(str(dual.get("status", "UNRESOLVED"))),
+            dual_status=dual_status,
             dual_property=str(dual.get("property", "")),
             evidence=evidence,
             dual_evidence_refs=tuple(str(x) for x in (dual.get("evidence_refs") or [])),
             capability_id=str(capability.get("id", "")),
-            capability_state=CapabilityState(str(capability["state"])) if capability.get("state") else None,
+            capability_state=capability_state,
             provenance_origin=str(prov.get("origin", "")),
             parent_ids=tuple(str(x) for x in (prov.get("parent_ids") or [])),
             input_hash=str(prov.get("input_hash", "")),
