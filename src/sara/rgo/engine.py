@@ -31,6 +31,8 @@ class RGOEngine:
         self._vagus_bus = vagus_bus
         self._records: list[dict[str, Any]] = []
         self._chain: list[str] = []
+        self._accepted = 0
+        self._rejected = 0
         self._lock = threading.RLock()
 
     def describe(self) -> dict[str, Any]:
@@ -61,9 +63,21 @@ class RGOEngine:
             )
 
     def ingest(self, payload: dict[str, Any]) -> dict[str, Any]:
-        env = RGOEnvelope.from_dict(payload)
-        env = env.with_derived_dual()
-        digest = env.canonical_hash()
+        try:
+            env = RGOEnvelope.from_dict(payload)
+            env = env.with_derived_dual()
+            digest = env.canonical_hash()
+            self._provenance.register(
+                entity=f"RGO:{env.finding_id}",
+                provenance=Provenance.INFERRED if env.epistemic_mode.value == "INFERENCE" else Provenance.HISTORICAL,
+                evidence=digest,
+                source=env.provenance_origin,
+            )
+        except Exception:
+            with self._lock:
+                self._rejected += 1
+            raise
+
         with self._lock:
             previous = self._chain[-1] if self._chain else "GENESIS"
             chain_value = chain_hash(previous, {"finding_hash": digest, "finding_id": env.finding_id})
@@ -79,12 +93,7 @@ class RGOEngine:
             }
             self._records.append(record)
             self._chain.append(chain_value)
-        self._provenance.register(
-            entity=f"RGO:{env.finding_id}",
-            provenance=Provenance.INFERRED if env.epistemic_mode.value == "INFERENCE" else Provenance.HISTORICAL,
-            evidence=digest,
-            source=env.provenance_origin,
-        )
+            self._accepted += 1
         if self._vagus_bus is not None:
             try:
                 self._publish_vagus(env, digest)
@@ -134,4 +143,4 @@ class RGOEngine:
                     ok = False
                     break
                 previous = chain_value
-            return RGOState(len(self._records), 0, self._chain[-1] if self._chain else "GENESIS", ok)
+            return RGOState(self._accepted, self._rejected, self._chain[-1] if self._chain else "GENESIS", ok)
