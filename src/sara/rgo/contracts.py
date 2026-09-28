@@ -165,10 +165,8 @@ class RGOEnvelope:
             raise RGOValidationError("RGO_SOURCE_REQUIRED")
         if not self.failure_type or not self.failure_description or not self.failure_nature:
             raise RGOValidationError("RGO_FAILURE_REQUIRED")
-        if not self.correction_problem:
-            raise RGOValidationError("RGO_CORRECTION_BOUNDARY_REQUIRED")
         if self.dual_status == DualStatus.DERIVED_FROM_CONTRACT:
-            if not self.required_property or not self.dual_property:
+            if not self.correction_problem or not self.required_property or not self.dual_property:
                 raise RGOValidationError("RGO_DUAL_DERIVATION_REQUIRED")
         if not self.evidence:
             raise RGOValidationError("RGO_EVIDENCE_REQUIRED")
@@ -179,8 +177,8 @@ class RGOEnvelope:
             raise RGOValidationError("RGO_PROVENANCE_REQUIRED")
 
     def with_derived_dual(self) -> "RGOEnvelope":
-        if not self.required_property:
-            return self
+        if not self.correction_problem or not self.required_property:
+            return RGOEnvelope(**{**self.__dict__, "dual_status": DualStatus.UNRESOLVED, "dual_property": "", "dual_evidence_refs": ()})
         return RGOEnvelope(
             **{
                 **self.__dict__,
