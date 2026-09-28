@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 from sara.meta.soul_federation import federation_manifest, SARA_OPERATIONS
+from sara.rgo.contracts import RGOValidationError
 
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
@@ -139,6 +140,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
                     ),
+                    "rgo.ingest@1.0.0": ("/v1/rgo/ingest", ("governance", "persistence", "monitoring")),
+                    "rgo.state@1.0.0": ("/v1/rgo/state", ("monitoring", "persistence")),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -166,6 +169,8 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "rgo.ingest@1.0.0",
+                        "rgo.state@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -184,6 +189,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 return
             if path == "/v1/state":
                 self._json(200, system.sistema_vivo.state())
+                return
+            if path == "/v1/rgo/state":
+                state = system.components["rgo"].state()
+                self._json(200, state.__dict__)
                 return
             if path == "/v1/governance/ui":
                 governance = system.components["governance"]
@@ -241,6 +250,15 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
                 })
+                return
+
+            if path == "/v1/rgo/ingest":
+                try:
+                    finding = body.get("finding", body)
+                    result = system.components["rgo"].ingest(finding)
+                except RGOValidationError as exc:
+                    raise SaraAPIError(422, "RGO_INVALID", str(exc)) from exc
+                self._json(200, result)
                 return
 
             if path in ("/v1/audit", "/v1/regenerate"):
