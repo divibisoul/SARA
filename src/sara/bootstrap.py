@@ -41,7 +41,8 @@ from sara.meta.assimilation_committee import AssimilationReviewCommittee
 from sara.meta.quantum_snapshot import QuantumSnapshotSystem
 from sara.meta.eru_engine import ERU_Engine
 from sara.meta.eru_trinity_bridge import ERUTrinityBridge
-from sara.core.trinity_eru_unified import TrinityERUUnified
+from sara.meta.trinity_eru_unified import TrinityERUUnified
+from sara.meta.eru_runtime import ERURuntime
 from sara.meta.transystem_sara import TransystemSARA
 from sara.meta.aeternum_chimera import AeternumChimeraBridge
 from sara.research.innovation_radar import InnovationRadar
@@ -118,6 +119,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     ara_forge = ARAForge()
     quantum_snapshot = QuantumSnapshotSystem()
     eru = ERU_Engine(provenance=prov, temporal=temporal)
+    eru_runtime = ERURuntime()
 
     neuro = NeuroIntegrator(rollback, memory, registry=registry)
     neural_lens = NeuralLens()
@@ -165,7 +167,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
         safe_sandbox, itr, itr_extended, filters,
         legal_compliance, legal_ai, committee, radar, governed,
-        ara_forge, quantum_snapshot, eru, eru_bridge, trinity_eru,
+        ara_forge, quantum_snapshot, eru, eru_runtime, eru_bridge, trinity_eru,
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
@@ -222,7 +224,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "temporal": temporal, "dna": dna,
             "filters": filters, "rollback": rollback, "trace": trace,
             "loop": loop, "sistema_vivo": sistema, "governed": governed,
-            "radar": radar, "eru": eru, "neuro": neuro,
+            "radar": radar, "eru": eru, "eru_runtime": eru_runtime, "neuro": neuro,
             "synergy": synergy_engine, "ubuntu": ubuntu, "buen": buen,
             "legal": legal_compliance, "legal_ai": legal_ai,
             "committee": committee, "storm": storm, "governance": governance_backend,
