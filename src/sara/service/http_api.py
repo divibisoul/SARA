@@ -260,7 +260,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         ("health.", "capability.", "signal.", "sara.", "session.", "research.")
                     )
                 )
-                if body["vagus_version"] != "1.1" or not event_type:
+                if body["vagus_version"] != "1.0" or not event_type:
                     raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "versão/tipo Vagus inválidos.")
                 if not (0 <= priority <= 100) or ttl <= 0:
                     raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "priority/ttl inválidos.")
