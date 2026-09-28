@@ -139,6 +139,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "/v1/trace/{cycle_id}",
                         ("persistence", "monitoring"),
                     ),
+                    "vagus.control@1.0.0": (
+                        "/v1/vagus",
+                        ("monitoring", "orchestration"),
+                    ),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -166,6 +170,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
                         "sara.trace@1.0.0",
+                        "vagus.control@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -216,6 +221,70 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
 
+            if path == "/v1/vagus":
+                bus = system.components.get("vagus_bus")
+                if bus is None:
+                    raise SaraAPIError(503, "VAGUS_BUS_UNAVAILABLE", "VagusNerveBus não está registrado.")
+                required = (
+                    "vagus_version", "message_id", "correlation_id",
+                    "source", "target", "priority", "ttl", "type", "payload",
+                )
+                missing = [key for key in required if key not in body]
+                if missing:
+                    raise SaraAPIError(
+                        422, "INVALID_VAGUS_ENVELOPE",
+                        "Campos obrigatórios ausentes.", {"missing": missing},
+                    )
+                try:
+                    vagus_version = str(body["vagus_version"]).strip()
+                    message_id = str(body["message_id"]).strip()
+                    correlation_id = str(body["correlation_id"]).strip()
+                    source = str(body["source"]).strip()
+                    target = str(body["target"]).strip()
+                    event_type = str(body["type"]).strip()
+                    priority = int(body["priority"])
+                    ttl = int(body["ttl"])
+                except (TypeError, ValueError) as exc:
+                    raise SaraAPIError(
+                        422, "INVALID_VAGUS_ENVELOPE",
+                        "Identidade, priority e ttl possuem tipos inválidos.",
+                    ) from exc
+                payload = body["payload"]
+                if not isinstance(payload, dict):
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
+                if vagus_version != "1.0":
+                    raise SaraAPIError(422, "INVALID_VAGUS_VERSION", "Vagus version não suportada.")
+                if not message_id or not correlation_id or not source or not target or not event_type:
+                    raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "Envelope Vagus incompleto.")
+                if not 0 <= priority <= 100 or ttl <= 0:
+                    raise SaraAPIError(422, "INVALID_VAGUS_PRIORITY_TTL", "priority deve estar entre 0 e 100 e ttl deve ser positivo.")
+                valid_type = (
+                    event_type in {"gpu.submit", "gpu.result", "gpu.barrier"}
+                    or event_type.startswith((
+                        "health.", "capability.", "signal.", "sara.",
+                        "session.", "research.",
+                    ))
+                )
+                if not valid_type:
+                    raise SaraAPIError(422, "INVALID_VAGUS_TYPE", f"Tipo Vagus não suportado: {event_type}")
+                header_correlation = self.headers.get("X-Correlation-ID", "").strip()
+                if header_correlation and header_correlation != correlation_id:
+                    raise SaraAPIError(400, "CORRELATION_ID_MISMATCH", "Header e envelope correlation_id divergem.")
+                status = str(body.get("status", "EXECUTE")).strip() or "EXECUTE"
+                event = bus.publish_sync(
+                    source, target, event_type, payload, status,
+                    correlation_id=correlation_id,
+                    message_id=message_id,
+                    priority=priority,
+                    ttl=ttl,
+                )
+                self._json(202, {
+                    "accepted": True,
+                    "correlation_id": correlation_id,
+                    "event": event,
+                })
+                return
+
             if path == "/v1/cycle":
                 text = body.get("input")
                 if not isinstance(text, str) or not text.strip():
@@ -228,7 +297,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     not isinstance(cycle_id, str) or not cycle_id.strip()
                 ):
                     raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
-                result = system.sistema_vivo.process(text, cycle_id=cycle_id)
+                context = body.get("context")
+                if context is not None and not isinstance(context, dict):
+                    raise SaraAPIError(422, "INVALID_CONTEXT", "'context' deve ser objeto JSON.")
+                result = system.sistema_vivo.process(text, cycle_id=cycle_id, context=context)
                 correlation_id = correlation or result.cycle_id
                 self._json(200, {
                     "request_id": correlation_id,
@@ -240,6 +312,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
+                    "federated_context_keys": (
+                        sorted(str(key) for key in context.keys())
+                        if isinstance(context, dict) else []
+                    ),
                 })
                 return
 
