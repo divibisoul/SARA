@@ -130,3 +130,93 @@ def test_cycle_propagates_correlation_id():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_vagus_control_preserves_identity_and_reaches_existing_bus():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/vagus",
+            method="POST",
+            body={
+                "vagus_version": "1.0",
+                "message_id": "msg-vagus-http-001",
+                "correlation_id": "corr-vagus-http-001",
+                "source": "G7",
+                "target": "G6",
+                "priority": 90,
+                "ttl": 5000,
+                "type": "gpu.submit",
+                "payload": {"job_id": "octa-http-001"},
+            },
+            token="test-token-123456789",
+            correlation_id="corr-vagus-http-001",
+        )
+        assert status == 202
+        assert payload["accepted"] is True
+        assert payload["event"]["event_id"] == "msg-vagus-http-001"
+        assert payload["event"]["correlation_id"] == "corr-vagus-http-001"
+        assert payload["event"]["priority"] == 90
+        assert payload["event"]["ttl"] == 5000
+        history = server.sara_system.components["vagus_bus"].get_history()
+        assert any(item["event_id"] == "msg-vagus-http-001" for item in history)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_vagus_control_rejects_correlation_mismatch():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/vagus",
+            method="POST",
+            body={
+                "vagus_version": "1.0",
+                "message_id": "msg-vagus-http-002",
+                "correlation_id": "corr-vagus-http-002",
+                "source": "G7",
+                "target": "G6",
+                "priority": 90,
+                "ttl": 5000,
+                "type": "gpu.submit",
+                "payload": {},
+            },
+            token="test-token-123456789",
+            correlation_id="corr-other",
+        )
+        assert status == 400
+        assert payload["error"]["code"] == "CORRELATION_ID_MISMATCH"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_cycle_accepts_optional_federated_context():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={
+                "input": "preservar contexto federado",
+                "context": {
+                    "research_snippets": [{"source": "N04", "text": "evidence"}],
+                    "probabilistic": {"alpha": 0.7, "beta": 0.3},
+                    "pipeline_status": "PREP_COMPLETE",
+                },
+            },
+            token="test-token-123456789",
+            correlation_id="corr-context-001",
+        )
+        assert status == 200
+        assert payload["cycle_id"] == "corr-context-001"
+        assert payload["federated_context_keys"] == [
+            "pipeline_status", "probabilistic", "research_snippets"
+        ]
+    finally:
+        server.shutdown()
+        server.server_close()
