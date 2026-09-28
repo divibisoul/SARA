@@ -1,7 +1,8 @@
 import asyncio
+import math
 
 from sara.infra.vagus_bus import VagusNerveBus
-from sara.meta.bayesian_uncertainty import BayesianMetaLearner
+from sara.meta.bayesian_uncertainty import BayesianMetaLearner, BayesianParameters
 from sara.meta.eru_runtime import ERURuntime
 from sara.memory.working_memory import WorkingMemory
 
@@ -25,6 +26,31 @@ def test_bayesian_meta_learner_is_explicit_about_its_evidence_scope():
     result = learner.evaluate(0.95, 0.95, 0.90)
     assert 0 <= result["posterior_confidence"] <= 1
     assert result["calibration_status"] == "EXPLICIT_INPUTS_ONLY"
+    assert result["parameters"] == {
+        "prior": 0.50,
+        "evidence_weight": 1.0,
+        "confidence_threshold": 0.85,
+    }
+
+
+def test_bayesian_parameters_are_first_class_and_configurable():
+    params = BayesianParameters(prior=0.60, evidence_weight=0.5, confidence_threshold=0.80)
+    learner = BayesianMetaLearner(
+        confidence_threshold=params.confidence_threshold,
+        prior=params.prior,
+        evidence_weight=params.evidence_weight,
+    )
+    assert learner.describe()["version"] == "1.1"
+    assert learner.describe()["prior"] == 0.60
+    assert learner.describe()["evidence_weight"] == 0.5
+    assert learner.describe()["threshold"] == 0.80
+
+
+def test_bayesian_sigmoid_is_stable_for_large_negative_logit():
+    learner = BayesianMetaLearner()
+    result = learner._sigmoid(-1000.0)
+    assert math.isfinite(result)
+    assert result == 0.0
 
 
 def test_eru_runtime_does_not_fake_execution():
@@ -37,6 +63,7 @@ def test_eru_runtime_does_not_fake_execution():
         })
         assert result["status"] == "CONTEXT_REQUIRED"
         assert runtime.describe()["external_execution"] is False
+        assert runtime.describe()["meta_learner"]["version"] == "1.1"
 
     asyncio.run(runner())
 
@@ -58,4 +85,3 @@ def test_working_memory_is_first_class_in_sara_bootstrap():
     assert system.registry.get("WorkingMemory") is not None
     assert working.describe()["layer"] == "working_memory"
     assert working.describe()["storage_scope"] == "process_ram_bounded"
-
