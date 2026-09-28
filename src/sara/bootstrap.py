@@ -147,7 +147,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         ara_extended, etr_extended, itr_extended, eru=eru, bridge=eru_bridge
     )
     connected_runtime = ConnectedRuntime(registry, vagus_bus=vagus_bus)
-    aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler)
+    aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler, vagus_bus=vagus_bus)
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
     octacore_g0 = OctaCoreG0Kernel(vagus_bus=vagus_bus)
 
