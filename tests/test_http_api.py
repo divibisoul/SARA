@@ -130,3 +130,93 @@ def test_cycle_propagates_correlation_id():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_cycle_accepts_and_reports_octacore_context():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={
+                "input": "preservar contexto e validar ciclo",
+                "context": {
+                    "research_snippets": [{"source": "N04", "text": "evidence"}],
+                    "probabilistic": {"alpha": 0.7, "beta": 0.3},
+                    "pipeline_status": "pre-complete",
+                },
+            },
+            token="test-token-123456789",
+            correlation_id="corr-octacore-sara-001",
+        )
+        assert status == 200
+        assert payload["kernel"] == "G0"
+        assert payload["octacore_context"]["present"] is True
+        assert payload["correlation_id"] == "corr-octacore-sara-001"
+        assert payload["cycle_id"] == "corr-octacore-sara-001"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_vagus_control_plane_persists_correlated_gpu_event():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/vagus",
+            method="POST",
+            body={
+                "vagus_version": "1.0",
+                "message_id": "msg-octacore-001",
+                "correlation_id": "corr-octacore-001",
+                "source": "G7",
+                "target": "G0",
+                "priority": 90,
+                "ttl": 5000,
+                "type": "gpu.submit",
+                "payload": {"job_id": "job-octacore-001"},
+            },
+            token="test-token-123456789",
+            correlation_id="corr-octacore-001",
+        )
+        assert status == 202
+        assert payload["accepted"] is True
+        event = payload["event"]
+        assert event["event_id"] == "msg-octacore-001"
+        assert event["correlation_id"] == "corr-octacore-001"
+        history = server.sara_system.components["vagus_bus"].get_history()
+        assert any(item["event_id"] == "msg-octacore-001" for item in history)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_vagus_throttle_controls_real_g0_kernel():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/vagus",
+            method="POST",
+            body={
+                "vagus_version": "1.0",
+                "message_id": "msg-octacore-throttle",
+                "correlation_id": "corr-octacore-throttle",
+                "source": "G7",
+                "target": "G0",
+                "priority": 100,
+                "ttl": 5000,
+                "type": "signal.throttle",
+                "payload": {"level": 2},
+            },
+            token="test-token-123456789",
+            correlation_id="corr-octacore-throttle",
+        )
+        assert status == 202
+        health = server.sara_system.components["octacore_g0"].health()
+        assert health["throttle_level"] == 2
+    finally:
+        server.shutdown()
+        server.server_close()
