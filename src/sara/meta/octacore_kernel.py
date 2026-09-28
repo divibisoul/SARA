@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from queue import Full, Queue
-from threading import Event, Lock, Thread
+from threading import Event, Lock, RLock, Thread
 from time import monotonic
 from typing import Any
 
@@ -22,6 +22,7 @@ class _CycleRequest:
     done: Event
     result: Any = None
     error: BaseException | None = None
+    cancelled: Event | None = None
 
 
 class OctacoreG0Kernel:
@@ -58,6 +59,7 @@ class OctacoreG0Kernel:
         self._queue_capacity = queue_capacity
         self._cycle_timeout_s = cycle_timeout_s
         self._state_lock = Lock()
+        self._authority_lock = RLock()
         self._system = None
         self._halted = False
         self._throttle = 0
@@ -145,18 +147,25 @@ class OctacoreG0Kernel:
             cycle_id=cycle_id,
             context=dict(context) if context is not None else None,
             done=Event(),
+            cancelled=Event(),
         )
         try:
             self._queue.put_nowait(request)
         except Full as exc:
             raise RuntimeError("G0_BACKPRESSURE") from exc
         if not request.done.wait(timeout=self._cycle_timeout_s):
+            if request.cancelled is not None:
+                request.cancelled.set()
             raise TimeoutError("G0_CYCLE_TIMEOUT")
         if request.error is not None:
             raise request.error
         return request.result
 
     def audit(self, ara: Any, etr: Any, input_text: str) -> dict[str, Any]:
+        with self._authority_lock:
+            return self._audit_locked(ara, etr, input_text)
+
+    def _audit_locked(self, ara: Any, etr: Any, input_text: str) -> dict[str, Any]:
         flaws = [
             *ara.detect(input_text),
             *getattr(ara, "detect_semantic", lambda _text: [])(input_text),
@@ -172,6 +181,10 @@ class OctacoreG0Kernel:
         }
 
     def regenerate(self, ara: Any, etr: Any, input_text: str) -> dict[str, Any]:
+        with self._authority_lock:
+            return self._regenerate_locked(ara, etr, input_text)
+
+    def _regenerate_locked(self, ara: Any, etr: Any, input_text: str) -> dict[str, Any]:
         flaws = [
             *ara.detect(input_text),
             *getattr(ara, "detect_semantic", lambda _text: [])(input_text),
@@ -230,11 +243,14 @@ class OctacoreG0Kernel:
                     raise RuntimeError("G0_HALTED")
                 if system is None:
                     raise RuntimeError("G0_UNBOUND")
-                request.result = system.process(
-                    request.input_text,
-                    cycle_id=request.cycle_id,
-                    context=request.context,
-                )
+                if request.cancelled is not None and request.cancelled.is_set():
+                    raise RuntimeError("G0_CYCLE_CANCELLED")
+                with self._authority_lock:
+                    request.result = system.process(
+                        request.input_text,
+                        cycle_id=request.cycle_id,
+                        context=request.context,
+                    )
                 with self._state_lock:
                     self._completed += 1
             except BaseException as exc:
