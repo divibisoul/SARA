@@ -33,6 +33,8 @@ class RGOEngine:
         self._chain: list[str] = []
         self._accepted = 0
         self._rejected = 0
+        self._stage_records: list[dict[str, Any]] = []
+        self._stage_chain: list[str] = []
         self._lock = threading.RLock()
 
     def describe(self) -> dict[str, Any]:
@@ -48,6 +50,8 @@ class RGOEngine:
             "rejected": state.rejected,
             "integrity": state.integrity,
             "last_hash": state.last_hash,
+            "stage_evidence_count": len(self._stage_records),
+            "stage_evidence_integrity": self._verify_stage_integrity(),
         }
 
     def emit_trace(self, ctx: Any) -> None:
@@ -126,6 +130,81 @@ class RGOEngine:
             "history_index": len(self._records) - 1,
             "re_audit_required": True,
         }
+
+    def record_stage_evidence(
+        self,
+        finding_id: str,
+        cycle_id: str,
+        sequence_index: int,
+        stage: str,
+        parent_hash: str,
+        output_hash: str,
+        status: str,
+    ) -> dict[str, Any]:
+        if not finding_id or not cycle_id or not stage or not parent_hash or not output_hash:
+            raise ValueError("RGO_STAGE_EVIDENCE_REQUIRED")
+        with self._lock:
+            previous = self._stage_chain[-1] if self._stage_chain else "GENESIS"
+            payload = {
+                "finding_id": finding_id,
+                "cycle_id": cycle_id,
+                "sequence_index": int(sequence_index),
+                "stage": stage,
+                "parent_hash": parent_hash,
+                "output_hash": output_hash,
+                "status": status,
+            }
+            chain_value = chain_hash(previous, payload)
+            record = {**payload, "chain_hash": chain_value}
+            self._stage_records.append(record)
+            self._stage_chain.append(chain_value)
+        self._provenance.register(
+            entity=f"RGO:{finding_id}:stage:{cycle_id}:{sequence_index}:{stage}",
+            provenance=Provenance.HISTORICAL,
+            evidence=output_hash,
+            source="RGOTrinityProcessor",
+        )
+        if self._vagus_bus is not None:
+            try:
+                result = self._vagus_bus.publish(
+                    source=self.NAME,
+                    target="SARA",
+                    event_type="RGO_STAGE_EVIDENCE",
+                    payload=dict(record),
+                    status="OBSERVE",
+                )
+                import asyncio
+                if asyncio.iscoroutine(result):
+                    try:
+                        asyncio.get_running_loop()
+                    except RuntimeError:
+                        asyncio.run(result)
+                    else:
+                        asyncio.create_task(result)
+            except Exception:
+                pass
+        return dict(record)
+
+    def _verify_stage_integrity(self) -> bool:
+        with self._lock:
+            if len(self._stage_records) != len(self._stage_chain):
+                return False
+            previous = "GENESIS"
+            for record, chain_value in zip(self._stage_records, self._stage_chain):
+                payload = {
+                    "finding_id": record["finding_id"],
+                    "cycle_id": record["cycle_id"],
+                    "sequence_index": record["sequence_index"],
+                    "stage": record["stage"],
+                    "parent_hash": record["parent_hash"],
+                    "output_hash": record["output_hash"],
+                    "status": record["status"],
+                }
+                expected = chain_hash(previous, payload)
+                if expected != chain_value or record["chain_hash"] != chain_value:
+                    return False
+                previous = chain_value
+            return True
 
     def _publish_vagus(self, env: RGOEnvelope, digest: str) -> None:
         import asyncio
