@@ -153,7 +153,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     rgo = RGOEngine(provenance=prov, vagus_bus=vagus_bus)
     trinity_rgo = RGOTrinityProcessor(
         rgo=rgo, ara=ara_extended, itr=itr_extended, etr=etr_extended,
-        eru=eru, mmd=mmd, vagus_bus=vagus_bus,
+        eru=eru, mmd=mmd, vagus_bus=vagus_bus, eru_bridge=eru_bridge,
     )
 
     loop = RegenerativeLoop(
