@@ -53,3 +53,8 @@ def test_detection_only_finding_stays_unresolved_but_pipeline_remains_traceable(
     assert result.rgo_record["dual"]["status"] == "UNRESOLVED"
     assert result.final_status == "VALIDATED"
     assert all(stage.output_hash.startswith("sha256:") for stage in result.stages)
+    assert all(stage.eru_snapshot_hash.startswith("sha256:") for stage in result.stages)
+    assert all(stage.rgo_evidence_chain_hash.startswith("sha256:") for stage in result.stages)
+    assert [s.sequence_index for s in result.stages] == list(range(1, len(result.stages) + 1))
+    assert system.components["rgo"].stage_evidence_count() == len(result.stages)
+    assert system.components["rgo"].stage_evidence_integrity()
