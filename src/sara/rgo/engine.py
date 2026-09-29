@@ -63,12 +63,21 @@ class RGOEngine:
             )
 
     def prepare(self, payload: dict[str, Any]) -> RGOEnvelope:
-        env = RGOEnvelope.from_dict(payload)
-        return env.with_derived_dual()
+        return RGOEnvelope.from_dict(payload).with_derived_dual()
+
+    def ingest(self, payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            env = self.prepare(payload)
+        except Exception:
+            with self._lock:
+                self._rejected += 1
+            raise
+        return self.ingest_envelope(env)
 
     def ingest_envelope(self, env: RGOEnvelope) -> dict[str, Any]:
-        env = env.with_derived_dual()
-        digest = env.canonical_hash()
+        try:
+            env = env.with_derived_dual()
+            digest = env.canonical_hash()
             self._provenance.register(
                 entity=f"RGO:{env.finding_id}",
                 provenance=Provenance.INFERRED if env.epistemic_mode.value == "INFERENCE" else Provenance.HISTORICAL,
@@ -82,7 +91,10 @@ class RGOEngine:
 
         with self._lock:
             previous = self._chain[-1] if self._chain else "GENESIS"
-            chain_value = chain_hash(previous, {"finding_hash": digest, "finding_id": env.finding_id})
+            chain_value = chain_hash(
+                previous,
+                {"finding_hash": digest, "finding_id": env.finding_id},
+            )
             record = {
                 "finding_id": env.finding_id,
                 "object_id": env.object_id,
@@ -96,16 +108,20 @@ class RGOEngine:
             self._records.append(record)
             self._chain.append(chain_value)
             self._accepted += 1
+
         if self._vagus_bus is not None:
             try:
                 self._publish_vagus(env, digest)
             except Exception:
-                # Event publication must never rewrite or fabricate the accepted record.
                 pass
+
         return {
             "status": "ACCEPTED",
             "finding_id": env.finding_id,
-            "dual": {"status": env.dual_status.value, "property": env.dual_property},
+            "dual": {
+                "status": env.dual_status.value,
+                "property": env.dual_property,
+            },
             "canonical_hash": digest,
             "history_index": len(self._records) - 1,
             "re_audit_required": True,
