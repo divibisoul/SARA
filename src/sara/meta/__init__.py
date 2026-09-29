@@ -6,6 +6,7 @@ from .transystem_sara import TransystemSARA
 from .eru_trinity_bridge import ERUTrinityBridge
 from .eru_drift_detector import ERUDriftDetector
 from .eru_recovery_advisor import ERURecoveryAdvisor
+from .eru_runtime import ERURuntime
 from .bayesian_uncertainty import BayesianMetaLearner, BayesianParameters
 from .soul_federation import (
     SARA_FEDERATION_CONTRACT_VERSION,
@@ -22,7 +23,7 @@ __all__ = [
     "QuantumSnapshotSystem", "SnapshotMetadata",
     "ERU_Engine", "AuditReport", "FrozenState", "DiffReport",
     "TransystemSARA",
-    "ERUTrinityBridge", "ERUDriftDetector", "ERURecoveryAdvisor", "BayesianMetaLearner", "BayesianParameters",
+    "ERUTrinityBridge", "ERUDriftDetector", "ERURecoveryAdvisor", "ERURuntime", "BayesianMetaLearner", "BayesianParameters",
     "SARA_FEDERATION_CONTRACT_VERSION", "SARA_OPERATIONS",
     "SOUL_NUCLEUS_AFFINITIES", "NucleusAffinity", "affinity_for", "federation_manifest",
 ]
