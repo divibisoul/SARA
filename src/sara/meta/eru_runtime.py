@@ -5,6 +5,7 @@ runtime. External Redis/Qdrant/DB transports remain explicit adapters.
 """
 from __future__ import annotations
 from typing import Any
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.infra.vagus_bus import VagusNerveBus
 from sara.meta.bayesian_uncertainty import BayesianMetaLearner
 from sara.memory.working_memory import WorkingMemory
@@ -12,11 +13,30 @@ from sara.memory.working_memory import WorkingMemory
 
 class ERURuntime:
     NAME = "ERURuntime"
-    VERSION = "1.0"
+    VERSION = "1.1"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.META
+    DEPENDENCIES = ()
+    CYCLE_PHASES = (
+        CyclePhase.AUDIT,
+        CyclePhase.STRATEGY,
+        CyclePhase.EXECUTION,
+        CyclePhase.VALIDATION,
+    )
 
-    def __init__(self, *, confidence_threshold: float = 0.85) -> None:
+    def __init__(
+        self,
+        *,
+        confidence_threshold: float = 0.85,
+        prior: float = 0.50,
+        evidence_weight: float = 1.0,
+    ) -> None:
         self.bus = VagusNerveBus()
-        self.meta_learner = BayesianMetaLearner(confidence_threshold)
+        self.meta_learner = BayesianMetaLearner(
+            confidence_threshold=confidence_threshold,
+            prior=prior,
+            evidence_weight=evidence_weight,
+        )
         self.working_memory = WorkingMemory()
         self._active = True
 
@@ -41,6 +61,10 @@ class ERURuntime:
         return {
             "name": self.NAME,
             "version": self.VERSION,
+            "status": self.STATUS.value,
+            "role": self.ROLE.value,
+            "dependencies": list(self.DEPENDENCIES),
+            "phases": [p.value for p in self.CYCLE_PHASES],
             "active": self._active,
             "bus": self.bus.describe(),
             "meta_learner": self.meta_learner.describe(),

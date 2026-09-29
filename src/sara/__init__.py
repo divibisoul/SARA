@@ -15,6 +15,7 @@ from sara.governance import (
 from sara.meta import (
     ARAForge, AssimilationReviewCommittee,
     QuantumSnapshotSystem, ERU_Engine, TransystemSARA,
+    ERURuntime, BayesianMetaLearner, BayesianParameters,
 )
 from sara.research import (
     QuantumCrawler, NeuralLens, InnovationRadar,
