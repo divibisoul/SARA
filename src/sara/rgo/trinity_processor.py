@@ -26,6 +26,7 @@ class StageEnvelope:
     input_hash: str
     output_hash: str
     status: str
+    eru_snapshot_hash: str
     data: dict[str, Any]
 
     def as_dict(self) -> dict[str, Any]:
@@ -39,6 +40,7 @@ class StageEnvelope:
             "input_hash": self.input_hash,
             "output_hash": self.output_hash,
             "status": self.status,
+            "eru_snapshot_hash": self.eru_snapshot_hash,
             "data": self.data,
         }
 
@@ -191,6 +193,18 @@ class RGOTrinityProcessor:
             input_hash=parent.output_hash if parent else self._hash({"finding_id": finding_id}),
             output_hash=payload_hash,
             status=status,
+            eru_snapshot_hash=self._eru.freeze(
+                f"RGO_TRINITY_STAGE::{cycle_id}::{len(self._eru._snapshots)}::{stage}",
+                {
+                    "stage": stage,
+                    "finding_id": finding_id,
+                    "cycle_id": cycle_id,
+                    "parent_hash": parent.output_hash if parent else "GENESIS",
+                    "output_hash": payload_hash,
+                    "status": status,
+                    "data": data,
+                },
+            ),
             data=data,
         )
         self._emit("RGO_TRINITY_STAGE", envelope)
