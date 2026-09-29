@@ -62,11 +62,13 @@ class RGOEngine:
                 last_hash=state.last_hash,
             )
 
-    def ingest(self, payload: dict[str, Any]) -> dict[str, Any]:
-        try:
-            env = RGOEnvelope.from_dict(payload)
-            env = env.with_derived_dual()
-            digest = env.canonical_hash()
+    def prepare(self, payload: dict[str, Any]) -> RGOEnvelope:
+        env = RGOEnvelope.from_dict(payload)
+        return env.with_derived_dual()
+
+    def ingest_envelope(self, env: RGOEnvelope) -> dict[str, Any]:
+        env = env.with_derived_dual()
+        digest = env.canonical_hash()
             self._provenance.register(
                 entity=f"RGO:{env.finding_id}",
                 provenance=Provenance.INFERRED if env.epistemic_mode.value == "INFERENCE" else Provenance.HISTORICAL,
