@@ -29,8 +29,8 @@ class StageEnvelope:
     output_hash: str
     status: str
     eru_snapshot_hash: str
-    rgo_evidence_chain_hash: str
     data: dict[str, Any]
+    rgo_evidence_chain_hash: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
