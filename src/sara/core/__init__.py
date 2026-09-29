@@ -28,3 +28,4 @@ __all__ = [
     "ConnectedRuntime", "ConnectedAction",
     "AeternumChimeraBridge",
 ]
+from .trinity_self_optimization import TrinitySelfOptimizer, TrinitySelfOptimizationReport, from_sara_system
