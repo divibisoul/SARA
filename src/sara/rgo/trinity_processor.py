@@ -382,7 +382,7 @@ class RGOTrinityProcessor:
                 parent=parent,
                 data={
                     "state": self._mmd.state,
-                    "observation_count": len(self._mmd._observations),
+                    "observation_count": self._mmd.observation_count(),
                     "trinity_converged": final_report.converged,
                     "scale_policy": "explicit_evidence",
                 },
