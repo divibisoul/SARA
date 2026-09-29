@@ -185,6 +185,13 @@ class RGOEngine:
                 pass
         return dict(record)
 
+    def stage_evidence_integrity(self) -> bool:
+        return self._verify_stage_integrity()
+
+    def stage_evidence_count(self) -> int:
+        with self._lock:
+            return len(self._stage_records)
+
     def _verify_stage_integrity(self) -> bool:
         with self._lock:
             if len(self._stage_records) != len(self._stage_chain):
