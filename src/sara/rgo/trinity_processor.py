@@ -192,9 +192,21 @@ class RGOTrinityProcessor:
         status: str = "EXECUTED",
     ) -> StageEnvelope:
         payload_hash = self._hash(data)
+        sequence_index = (parent.sequence_index + 1) if parent else 1
+        self._mmd.transition_explicit(
+            self.STAGE_SCALE[stage],
+            evidence={
+                "finding_id": finding_id,
+                "cycle_id": cycle_id,
+                "stage": stage,
+                "sequence_index": sequence_index,
+                "parent_hash": parent.output_hash if parent else "GENESIS",
+                "output_hash": payload_hash,
+            },
+        )
         snapshot = self._eru_bridge.observe(cycle_id, stage, data)
         envelope = StageEnvelope(
-            sequence_index=(parent.sequence_index + 1) if parent else 1,
+            sequence_index=sequence_index,
             stage=stage,
             scale=self.STAGE_SCALE[stage],
             finding_id=finding_id,
@@ -244,7 +256,6 @@ class RGOTrinityProcessor:
         parent: StageEnvelope | None = None
         stages: list[StageEnvelope] = []
 
-        self._mmd.transition_explicit("MICRO", evidence={"stage": "RGO", "finding_id": env.finding_id})
         rgo_stage = self._stage(
             stage="RGO", finding_id=env.finding_id, cycle_id=cycle_id, parent=None,
             data={
@@ -275,7 +286,6 @@ class RGOTrinityProcessor:
         stages.append(ara_stage)
         parent = ara_stage
 
-        self._mmd.transition_explicit("MID", evidence={"stage": "ITR", "finding_id": env.finding_id, "parent_hash": parent.output_hash})
         plan = self._itr.generate_strategic(
             text,
             context={
@@ -307,7 +317,6 @@ class RGOTrinityProcessor:
         stages.append(etr_stage)
         parent = etr_stage
         if not pre_etr.approved:
-            self._mmd.transition_explicit("MID", evidence={"stage": "ETR", "finding_id": env.finding_id, "approved": False})
             self._last = TrinityProcessorResult(cycle_id, env.finding_id, tuple(stages), "BLOCKED", parent.output_hash, self._mmd.state, rgo_record)
             return self._last
 
@@ -361,7 +370,6 @@ class RGOTrinityProcessor:
             self._last = TrinityProcessorResult(cycle_id, env.finding_id, tuple(stages), "BLOCKED", parent.output_hash, self._mmd.state, rgo_record)
             return self._last
 
-        self._mmd.transition_explicit("MACRO", evidence={"stage": "ERU", "finding_id": env.finding_id, "parent_hash": parent.output_hash})
         eru_hash = self._eru.freeze(
             f"RGO_TRINITY::{cycle_id}",
             {
