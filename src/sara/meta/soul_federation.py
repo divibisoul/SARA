@@ -72,6 +72,30 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "purpose": "recuperar evidência correlacionada de um ciclo",
         "requires_auth": True,
     },
+    "rgo.ingest": {
+        "version": "1.0.0",
+        "endpoint": "/v1/rgo/ingest",
+        "method": "POST",
+        "phases": ["governance", "persistence", "monitoring"],
+        "purpose": "ingerir finding RGO com evidência e proveniência",
+        "requires_auth": True,
+    },
+    "rgo.state": {
+        "version": "1.0.0",
+        "endpoint": "/v1/rgo/state",
+        "method": "GET",
+        "phases": ["persistence", "monitoring"],
+        "purpose": "consultar integridade do ledger RGO",
+        "requires_auth": True,
+    },
+    "rgo.trinity.process": {
+        "version": "1.0.0",
+        "endpoint": "/v1/rgo/trinity",
+        "method": "POST",
+        "phases": ["ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring"],
+        "purpose": "processar RGO através de ARA/ITR/ETR/ERU/MMD mantendo herança por hash",
+        "requires_auth": True,
+    },
 }
 
 
