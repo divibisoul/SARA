@@ -142,6 +142,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     ),
                     "rgo.ingest@1.0.0": ("/v1/rgo/ingest", ("governance", "persistence", "monitoring")),
                     "rgo.state@1.0.0": ("/v1/rgo/state", ("monitoring", "persistence")),
+                    "rgo.trinity.process@1.0.0": ("/v1/rgo/trinity", ("ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring")),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -171,6 +172,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "sara.trace@1.0.0",
                         "rgo.ingest@1.0.0",
                         "rgo.state@1.0.0",
+                        "rgo.trinity.process@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -259,6 +261,14 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 except RGOValidationError as exc:
                     raise SaraAPIError(422, "RGO_INVALID", str(exc)) from exc
                 self._json(200, result)
+                return
+
+            if path == "/v1/rgo/trinity":
+                try:
+                    result = system.components["trinity_rgo"].process(body.get("finding", body), cycle_id=body.get("cycle_id"))
+                except RGOValidationError as exc:
+                    raise SaraAPIError(422, "RGO_INVALID", str(exc)) from exc
+                self._json(200, result.as_dict())
                 return
 
             if path in ("/v1/audit", "/v1/regenerate"):
