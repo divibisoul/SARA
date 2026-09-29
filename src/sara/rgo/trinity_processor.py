@@ -194,7 +194,7 @@ class RGOTrinityProcessor:
             output_hash=payload_hash,
             status=status,
             eru_snapshot_hash=self._eru.freeze(
-                f"RGO_TRINITY_STAGE::{cycle_id}::{len(self._eru._snapshots)}::{stage}",
+                f"RGO_TRINITY_STAGE::{cycle_id}::{stage}::{payload_hash}",
                 {
                     "stage": stage,
                     "finding_id": finding_id,
