@@ -18,6 +18,7 @@ from sara.infra.vagus_bus import VagusNerveBus
 
 @dataclass(frozen=True)
 class StageEnvelope:
+    sequence_index: int
     stage: str
     scale: str
     finding_id: str
@@ -32,6 +33,7 @@ class StageEnvelope:
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "sequence_index": self.sequence_index,
             "stage": self.stage,
             "scale": self.scale,
             "finding_id": self.finding_id,
@@ -190,6 +192,7 @@ class RGOTrinityProcessor:
         payload_hash = self._hash(data)
         snapshot = self._eru_bridge.observe(cycle_id, stage, data)
         envelope = StageEnvelope(
+            sequence_index=(parent.sequence_index + 1) if parent else 1,
             stage=stage,
             scale=self.STAGE_SCALE[stage],
             finding_id=finding_id,
