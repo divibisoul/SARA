@@ -10,6 +10,7 @@ from sara.core.ara_extended import ARA_Extended
 from sara.core.etr_extended import ETR_Extended
 from sara.core.itr_extended import ITR_Extended
 from sara.meta.eru_engine import ERU_Engine
+from sara.meta.eru_trinity_bridge import ERUTrinityBridge
 from sara.rgo.engine import RGOEngine
 from sara.omega.soul_services import MicroMacroManager
 from sara.infra.vagus_bus import VagusNerveBus
@@ -113,6 +114,7 @@ class RGOTrinityProcessor:
         eru: ERU_Engine,
         mmd: MicroMacroManager,
         vagus_bus: VagusNerveBus,
+        eru_bridge: ERUTrinityBridge | None = None,
         horta_sink: Callable[[StageEnvelope], dict[str, Any] | None] | None = None,
     ) -> None:
         self._rgo = rgo
@@ -120,6 +122,8 @@ class RGOTrinityProcessor:
         self._itr = itr
         self._etr = etr
         self._eru = eru
+        self._eru_bridge = eru_bridge or ERUTrinityBridge(eru)
+        self._eru_bridge.register_trinity(ara, etr, itr)
         self._mmd = mmd
         self._vagus = vagus_bus
         self._horta_sink = horta_sink
@@ -138,6 +142,7 @@ class RGOTrinityProcessor:
             "inheritance": "content_hash_chain",
             "vagus_bus": True,
             "horta_sink_configured": self._horta_sink is not None,
+            "eru_trinity_bridge": self._eru_bridge.describe(),
         }
 
     @staticmethod
@@ -183,6 +188,7 @@ class RGOTrinityProcessor:
         status: str = "EXECUTED",
     ) -> StageEnvelope:
         payload_hash = self._hash(data)
+        snapshot = self._eru_bridge.observe(cycle_id, stage, data)
         envelope = StageEnvelope(
             stage=stage,
             scale=self.STAGE_SCALE[stage],
@@ -193,18 +199,7 @@ class RGOTrinityProcessor:
             input_hash=parent.output_hash if parent else self._hash({"finding_id": finding_id}),
             output_hash=payload_hash,
             status=status,
-            eru_snapshot_hash=self._eru.freeze(
-                f"RGO_TRINITY_STAGE::{cycle_id}::{stage}::{payload_hash}",
-                {
-                    "stage": stage,
-                    "finding_id": finding_id,
-                    "cycle_id": cycle_id,
-                    "parent_hash": parent.output_hash if parent else "GENESIS",
-                    "output_hash": payload_hash,
-                    "status": status,
-                    "data": data,
-                },
-            ),
+            eru_snapshot_hash=snapshot.snapshot_hash,
             data=data,
         )
         self._emit("RGO_TRINITY_STAGE", envelope)
@@ -215,6 +210,7 @@ class RGOTrinityProcessor:
         cycle_id = cycle_id or self._hash(payload)[7:19]
         env = self._rgo.prepare(payload)
         rgo_record = self._rgo.ingest_envelope(env)
+        self._eru_bridge.observe_capabilities(cycle_id, "INPUT")
 
         parent: StageEnvelope | None = None
         stages: list[StageEnvelope] = []
