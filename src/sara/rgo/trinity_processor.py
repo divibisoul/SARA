@@ -29,6 +29,7 @@ class StageEnvelope:
     output_hash: str
     status: str
     eru_snapshot_hash: str
+    rgo_evidence_chain_hash: str
     data: dict[str, Any]
 
     def as_dict(self) -> dict[str, Any]:
@@ -44,6 +45,7 @@ class StageEnvelope:
             "output_hash": self.output_hash,
             "status": self.status,
             "eru_snapshot_hash": self.eru_snapshot_hash,
+            "rgo_evidence_chain_hash": self.rgo_evidence_chain_hash,
             "data": self.data,
         }
 
@@ -204,6 +206,30 @@ class RGOTrinityProcessor:
             status=status,
             eru_snapshot_hash=snapshot.snapshot_hash,
             data=data,
+        )
+        evidence_record = self._rgo.record_stage_evidence(
+            finding_id=finding_id,
+            cycle_id=cycle_id,
+            sequence_index=envelope.sequence_index,
+            stage=stage,
+            parent_hash=envelope.parent_hash,
+            output_hash=envelope.output_hash,
+            status=status,
+        )
+        envelope = StageEnvelope(
+            sequence_index=envelope.sequence_index,
+            stage=envelope.stage,
+            scale=envelope.scale,
+            finding_id=envelope.finding_id,
+            cycle_id=envelope.cycle_id,
+            parent_stage=envelope.parent_stage,
+            parent_hash=envelope.parent_hash,
+            input_hash=envelope.input_hash,
+            output_hash=envelope.output_hash,
+            status=envelope.status,
+            eru_snapshot_hash=envelope.eru_snapshot_hash,
+            rgo_evidence_chain_hash=evidence_record["chain_hash"],
+            data=envelope.data,
         )
         self._emit("RGO_TRINITY_STAGE", envelope)
         self._persist_horta(envelope)
