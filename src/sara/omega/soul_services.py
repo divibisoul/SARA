@@ -99,6 +99,9 @@ class MicroMacroManager:
             "observation_index": len(self._observations) - 1,
         }
 
+    def observation_count(self) -> int:
+        return len(self._observations)
+
     def transition(self, *, health_score: float, completed: int | None = None) -> str:
         # Compatibility path for the existing Omega implementation. Its previous
         # health-driven behavior remains available, while new integrations use
