@@ -1,9 +1,8 @@
-name: rgo-integration
+name: rgo-trinity-mmd
 on:
   push:
-    branches: [rgo-integration-2026-09-28]
+    branches: [rgo-trinity-mmd-2026-09-28]
   pull_request:
-  workflow_dispatch:
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -12,5 +11,5 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.12'}
       - run: python -m pip install -e '.[dev]'
-      - run: python -m pytest -q tests/test_rgo.py tests/test_rgo_bugshield.py
+      - run: python -m pytest -q tests/test_rgo.py tests/test_rgo_bugshield.py tests/test_rgo_trinity_processor.py
       - run: python -m compileall -q src
