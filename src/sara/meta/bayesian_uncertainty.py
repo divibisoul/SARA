@@ -107,5 +107,7 @@ class BayesianMetaLearner:
             "name": self.NAME,
             "version": self.VERSION,
             "threshold": self.confidence_threshold,
+            "prior": self.parameters.prior,
+            "evidence_weight": self.parameters.evidence_weight,
             "calibration_status": "EXPLICIT_INPUTS_ONLY",
         }
