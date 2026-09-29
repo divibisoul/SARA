@@ -130,3 +130,90 @@ def test_cycle_propagates_correlation_id():
     finally:
         server.shutdown()
         server.server_close()
+
+def test_cycle_accepts_optional_probabilistic_context_when_enabled():
+    old = os.environ.get("PROBABILISTIC_LAYER")
+    os.environ["PROBABILISTIC_LAYER"] = "true"
+    server = _start_server()[0]
+    try:
+        status, payload = _request(
+            server,
+            "/v1/cycle",
+            method="POST",
+            body={
+                "input": "preservar autonomia e transparência",
+                "context": {
+                    "session_id": "http-prob-001",
+                    "client": "web",
+                    "probabilistic": {
+                        "structure": {"edges": []},
+                        "nodes": [{
+                            "name": "uncertainty",
+                            "states": ["low", "high"],
+                            "prior": {"low": 0.5, "high": 0.5},
+                            "pseudo_counts": 1.0,
+                            "evidence": {"high": 1.0},
+                            "provenance": "USER",
+                            "neural": {"logits": [0.0, 1.0]},
+                        }],
+                    },
+                },
+            },
+            token="test-token-123456789",
+            correlation_id="corr-prob-http-001",
+        )
+        assert status == 200
+        assert payload["correlation_id"] == "corr-prob-http-001"
+        node = payload["probabilistic"]["nodes"][0]
+        assert node["source"] == "fused"
+        assert node["dirichlet_posterior"]
+        assert node["neural_posterior"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        if old is None:
+            os.environ.pop("PROBABILISTIC_LAYER", None)
+        else:
+            os.environ["PROBABILISTIC_LAYER"] = old
+
+
+def test_invalid_probabilistic_graph_returns_deterministic_422():
+    old = os.environ.get("PROBABILISTIC_LAYER")
+    os.environ["PROBABILISTIC_LAYER"] = "true"
+    server = _start_server()[0]
+    try:
+        status, payload = _request(
+            server,
+            "/v1/audit",
+            method="POST",
+            body={
+                "input": "validar contexto",
+                "context": {
+                    "probabilistic": {
+                        "structure": {"edges": [["a", "b"], ["b", "a"]]},
+                        "nodes": [
+                            {
+                                "name": "a",
+                                "states": ["x"],
+                                "prior": {"x": 1.0},
+                            },
+                            {
+                                "name": "b",
+                                "states": ["x"],
+                                "prior": {"x": 1.0},
+                            },
+                        ],
+                    }
+                },
+            },
+            token="test-token-123456789",
+        )
+        assert status == 422
+        assert payload["error"]["code"] == "INVALID_PROBABILISTIC_CONTEXT"
+    finally:
+        server.shutdown()
+        server.server_close()
+        if old is None:
+            os.environ.pop("PROBABILISTIC_LAYER", None)
+        else:
+            os.environ["PROBABILISTIC_LAYER"] = old

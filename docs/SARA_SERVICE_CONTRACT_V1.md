@@ -71,6 +71,34 @@ Retorna estado observável do SistemaVivo, histórico, trace, registry e proveni
 
 Retorna entradas encadeadas do DecisionTrace daquele ciclo, registros temporais relacionados e integridade de trace/proveniência.
 
+## Contexto probabilístico opcional
+
+`POST /v1/cycle` aceita o campo retrocompatível `context`. Quando
+`PROBABILISTIC_LAYER=true`, `context.probabilistic` é validado e processado
+pelo `ProbabilisticReasoningLayer`. O campo contém, quando disponível:
+
+- nós discretos com `states`, `prior`, `prior_type`, `pseudo_counts`, `evidence`, `posterior`, `confidence`, `entropy`, `source` e `provenance`;
+- estrutura DAG em `structure.edges`;
+- intervenções `do/evidence/query`, validadas sem alegar efeito causal quando não há tabelas condicionais;
+- fusão `alpha_dirichlet`, `beta_neural` e `temperature`.
+
+Defaults: `pseudo_counts=1.0`, `alpha_dirichlet=0.5`,
+`beta_neural=0.5`, `temperature=1.0`, `prior_strength=1.0`.
+
+A camada neural aceita logits explícitos ou um mapa linear explícito
+`logits = W*x+b`; usa softmax com temperature scaling e registra entropy e
+max-probability. Não há treino online de pesos no ciclo.
+
+Quando a flag está desativada, o campo permanece opcional e o caminho de ciclo
+existente continua válido sem depender da camada. Contexto probabilístico inválido
+com a flag ativa produz erro determinístico e o ciclo não é executado
+silenciosamente com um grafo inválido.
+
+`POST /v1/audit` também aceita o mesmo `context` e devolve o bloco
+`probabilistic` quando ele foi processado. Isso permite a sequência
+VALIDATE → EXECUTE sem duplicar a autoridade do SARA.
+
+
 ## Erros
 
 Formato único:
