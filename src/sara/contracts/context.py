@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Optional, Protocol
 from sara.infra.clock import now_iso
+from sara.infra.hashing import hash_json
 
 
 @dataclass
@@ -10,6 +11,7 @@ class TraceSink:
     decision_trace: Any
     temporal: Any
     provenance: Any
+    vagus_bus: Any | None = None
 
 
 @dataclass
@@ -41,7 +43,30 @@ class CycleContext:
             raise TypeError("CycleContext.record requer sucesso explícito")
         ok = bool(success)
         ts = now_iso()
-        step = CycleStep(phase=phase, module=module, ok=ok, info=dict(info), ts=ts)
+        enriched_info = dict(info)
+        if self.sink.vagus_bus is not None:
+            try:
+                self.sink.vagus_bus.publish_sync(
+                    "SARA.CYCLE",
+                    module,
+                    "cycle.step",
+                    {
+                        "cycle_id": self.cycle_id,
+                        "phase": phase,
+                        "module": module,
+                        "ok": ok,
+                        "info_hash": hash_json(info),
+                    },
+                    status="EXECUTE" if ok else "ERROR",
+                    correlation_id=self.cycle_id,
+                    priority=100 if not ok else 50,
+                    ttl=5_000,
+                )
+                enriched_info["vagus_publish"] = "VERIFIED"
+            except Exception as exc:
+                enriched_info["vagus_publish"] = "BLOCKED"
+                enriched_info["vagus_publish_error"] = f"{type(exc).__name__}: {exc}"
+        step = CycleStep(phase=phase, module=module, ok=ok, info=enriched_info, ts=ts)
         self.steps.append(step)
 
         temporal_id = None
@@ -51,7 +76,7 @@ class CycleContext:
                 "phase": phase,
                 "module": module,
                 "ok": ok,
-                "info": info,
+                "info": enriched_info,
                 "ts": ts,
             })
             step.info.setdefault("temporal_id", temporal_id)
@@ -59,7 +84,7 @@ class CycleContext:
         if self.sink.decision_trace is not None:
             # O payload enviado ao trace precisa ser independente do dicionário
             # que continuará sendo enriquecido com temporal_id/decision_hash.
-            trace_info = dict(info)
+            trace_info = dict(enriched_info)
             entry = self.sink.decision_trace.log({
                 "event": "cycle_step",
                 "cycle_id": self.cycle_id,
