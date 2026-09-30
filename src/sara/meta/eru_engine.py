@@ -166,6 +166,13 @@ class ERU_Engine:
         snapshot_hash = self.freeze(snapshot_name, state)
         return snapshot_hash
 
+    def snapshot_state(self, name: str) -> Any:
+        """Retorna uma cópia do estado congelado sem expor armazenamento interno."""
+        snapshot = self._snapshots.get(name)
+        if snapshot is None:
+            raise ValueError("ERU_SNAPSHOT_MISSING")
+        return copy.deepcopy(snapshot.state)
+
     def has_snapshot(self, name: str) -> bool:
         return name in self._snapshots
 
