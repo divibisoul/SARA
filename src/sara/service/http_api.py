@@ -334,7 +334,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
-                    "federated_context": federated_context,
+                    "federated_context_hash": result.federated_context_hash,
                 })
                 return
 
