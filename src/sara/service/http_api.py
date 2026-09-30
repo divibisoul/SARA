@@ -166,6 +166,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "operations": [
                         "sara.health@1.0.0",
                         "sara.cycle@1.0.0",
+                        "sara.hortacore.assess@1.0.0",
                         "sara.audit@1.0.0",
                         "sara.regenerate@1.0.0",
                         "sara.state@1.0.0",
