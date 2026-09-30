@@ -29,6 +29,7 @@ class CycleContext:
     input: str
     current: str
     sink: TraceSink
+    federated_context: dict[str, Any] = field(default_factory=dict)
     steps: list[CycleStep] = field(default_factory=list)
     artifacts: dict[str, Any] = field(default_factory=dict)
     flags: dict[str, Any] = field(default_factory=dict)
@@ -44,6 +45,8 @@ class CycleContext:
         ok = bool(success)
         ts = now_iso()
         enriched_info = dict(info)
+        if self.federated_context:
+            enriched_info.setdefault("federated_context_hash", hash_json(self.federated_context))
         if self.sink.vagus_bus is not None:
             try:
                 self.sink.vagus_bus.publish_sync(
