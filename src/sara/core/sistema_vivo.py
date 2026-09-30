@@ -65,11 +65,17 @@ class SistemaVivo:
                     "invariants": connection["invariants"],
                 })
         cid = cycle_id or f"sv-cycle-{self._cycle_count}"
+        context_data = dict(federated_context) if isinstance(federated_context, dict) else {}
         start = self._trace.log({
             "event": "cycle_start", "cycle_id": cid,
             "input_len": len(str(input_text)),
         })
-        report = self._loop.run(input_text, cycle_id=cid)
+        if context_data:
+            self._trace.log({
+                "event": "federated_context_received",
+                "cycle_id": cid,
+                "context_hash": hash_json(context_data),
+            })
 
         monitoring_id = None
         if monitor_hours > 0:
