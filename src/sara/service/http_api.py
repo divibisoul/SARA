@@ -324,7 +324,12 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     not isinstance(cycle_id, str) or not cycle_id.strip()
                 ):
                     raise SaraAPIError(422, "INVALID_CYCLE_ID", "'cycle_id' deve ser string não vazia.")
-                result = system.sistema_vivo.process(text, cycle_id=cycle_id)
+                federated_context = body.get("context", {})
+                if federated_context is None:
+                    federated_context = {}
+                if not isinstance(federated_context, dict):
+                    raise SaraAPIError(422, "INVALID_CONTEXT", "'context' deve ser objeto JSON.")
+                result = system.sistema_vivo.process(text, cycle_id=cycle_id, federated_context=federated_context)
                 correlation_id = correlation or result.cycle_id
                 self._json(200, {
                     "request_id": correlation_id,
@@ -336,6 +341,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rollback_performed": result.loop_report.rollback_performed,
                     "execution_report": result.loop_report.execution_report,
                     "trace_hash": result.trace_hash,
+                    "federated_context_hash": result.federated_context_hash,
                 })
                 return
 
