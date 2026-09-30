@@ -122,10 +122,13 @@ class RegenerativeLoop:
             if not self._prov.verify_integrity():
                 raise _Aborted("PREFLIGHT", "provenance_integrity_failed")
 
-    def run(self, input_text: str, cycle_id: str | None = None) -> LoopReport:
+    def run(self, input_text: str, cycle_id: str | None = None, federated_context: dict[str, Any] | None = None) -> LoopReport:
         cid = cycle_id or f"cycle-{now_iso()}"
         sink = TraceSink(self._trace, self._temporal, self._prov, self._vagus_bus)
-        ctx = CycleContext(cid, str(input_text), str(input_text), sink)
+        context_data = dict(federated_context) if isinstance(federated_context, dict) else {}
+        ctx = CycleContext(cid, str(input_text), str(input_text), sink, federated_context=context_data)
+        if context_data:
+            ctx.register_artifact("federated_context", context_data)
         if self._working_memory is not None:
             self._working_memory.put("cycle_context", {
                 "cycle_id": cid,
