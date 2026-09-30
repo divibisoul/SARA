@@ -9,6 +9,7 @@ from sara.monitoring.storm_monitor import StormMonitor
 from sara.monitoring.decision_trace import DecisionTrace
 from sara.contracts import ModuleRegistry
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
+from sara.infra.hashing import hash_json
 from sara.core.connected_runtime import ConnectedRuntime
 
 
@@ -21,6 +22,7 @@ class CycleResult:
     monitoring_id: Optional[str] = None
     registry_snapshot: Optional[dict] = None
     provenance_summary: Optional[dict] = None
+    federated_context_hash: Optional[str] = None
 
 
 class SistemaVivo:
@@ -53,7 +55,7 @@ class SistemaVivo:
             "connected_runtime": self._connected_runtime is not None,
         }
 
-    def process(self, input_text, cycle_id=None, monitor_hours=0.0) -> CycleResult:
+    def process(self, input_text, cycle_id=None, monitor_hours=0.0, federated_context=None) -> CycleResult:
         self._cycle_count += 1
         if self._connected_runtime is not None:
             connection = self._connected_runtime.validate_connection()
@@ -63,11 +65,14 @@ class SistemaVivo:
                     "invariants": connection["invariants"],
                 })
         cid = cycle_id or f"sv-cycle-{self._cycle_count}"
+        context_data = dict(federated_context) if isinstance(federated_context, dict) else {}
         start = self._trace.log({
             "event": "cycle_start", "cycle_id": cid,
             "input_len": len(str(input_text)),
         })
-        report = self._loop.run(input_text, cycle_id=cid)
+        if context_data:
+            self._trace.log({"event": "federated_context_received", "cycle_id": cid, "context_hash": hash_json(context_data)})
+        report = self._loop.run(input_text, cycle_id=cid, federated_context=context_data)
 
         monitoring_id = None
         if monitor_hours > 0:
@@ -82,7 +87,8 @@ class SistemaVivo:
         })
         snap = self._registry.snapshot() if self._registry else None
         prov_summary = self._provenance.report() if self._provenance else None
-        return CycleResult(cid, input_text, report, start.hash, monitoring_id, snap, prov_summary)
+        context_hash = hash_json(context_data) if context_data else None
+        return CycleResult(cid, input_text, report, start.hash, monitoring_id, snap, prov_summary, context_hash)
 
     def state(self) -> dict:
         return {
