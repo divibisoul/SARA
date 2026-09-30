@@ -259,6 +259,24 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
 
+            if path == "/v1/hortacore/assess":
+                proposal = body.get("proposal")
+                if not isinstance(proposal, dict):
+                    raise SaraAPIError(422, "INVALID_PROPOSAL", "'proposal' deve ser objeto.")
+                bridge = system.components.get("aeternum_chimera")
+                if bridge is None:
+                    raise SaraAPIError(503, "AETERNUM_CHIMERA_UNAVAILABLE", "AeternumChimeraBridge indisponível.")
+                result = bridge.fuse_assessment(proposal)
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+                self._json(200, {
+                    "request_id": correlation,
+                    "correlation_id": correlation,
+                    "operation": "hortacore_assess",
+                    "authority": "AeternumChimeraBridge",
+                    "assessment": result,
+                })
+                return
+
             if path == "/v1/mesh/probe":
                 fusion = system.components.get("octacore_fusion")
                 if fusion is None:
