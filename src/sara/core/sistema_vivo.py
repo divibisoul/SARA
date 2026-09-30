@@ -9,6 +9,7 @@ from sara.monitoring.storm_monitor import StormMonitor
 from sara.monitoring.decision_trace import DecisionTrace
 from sara.contracts import ModuleRegistry
 from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
+from sara.infra.hashing import hash_json
 from sara.core.connected_runtime import ConnectedRuntime
 
 
@@ -21,6 +22,7 @@ class CycleResult:
     monitoring_id: Optional[str] = None
     registry_snapshot: Optional[dict] = None
     provenance_summary: Optional[dict] = None
+    federated_context_hash: Optional[str] = None
 
 
 class SistemaVivo:
@@ -82,7 +84,17 @@ class SistemaVivo:
         })
         snap = self._registry.snapshot() if self._registry else None
         prov_summary = self._provenance.report() if self._provenance else None
-        return CycleResult(cid, input_text, report, start.hash, monitoring_id, snap, prov_summary)
+        context_hash = hash_json(context_data) if context_data else None
+        return CycleResult(
+            cid,
+            input_text,
+            report,
+            start.hash,
+            monitoring_id,
+            snap,
+            prov_summary,
+            context_hash,
+        )
 
     def state(self) -> dict:
         return {
