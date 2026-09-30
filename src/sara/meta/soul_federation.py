@@ -72,8 +72,6 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "purpose": "recuperar evidência correlacionada de um ciclo",
         "requires_auth": True,
     },
-}
-
     "rgo.ingest": {
         "version": "1.0.0",
         "endpoint": "/v1/rgo/ingest",
@@ -98,6 +96,9 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "purpose": "processar RGO por ARA/ITR/ETR/ERU/MMD mantendo herança por hash",
         "requires_auth": True,
     },
+}
+
+
 
 @dataclass(frozen=True)
 class NucleusAffinity:
