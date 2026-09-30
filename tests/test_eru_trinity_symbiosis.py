@@ -187,3 +187,14 @@ def test_eru_capability_recovery_candidates():
     assert len(lost) == 1
     assert lost[0]["recoverable"] is True
     assert lost[0]["automatic_reintegration"] is False
+
+
+def test_eru_bridge_preserves_distinct_repeated_phase_snapshots():
+    eru = ERU_Engine()
+    bridge = ERUTrinityBridge(eru)
+    first = bridge.observe("repeat-cycle", "ETR", {"approved": True, "value": 1})
+    second = bridge.observe("repeat-cycle", "ETR", {"approved": True, "value": 2})
+    assert first.snapshot_name != second.snapshot_name
+    assert first.snapshot_hash != second.snapshot_hash
+    audit = bridge.audit_cycle("repeat-cycle")
+    assert len(audit["observations"]) == 2
