@@ -53,7 +53,7 @@ class SistemaVivo:
             "connected_runtime": self._connected_runtime is not None,
         }
 
-    def process(self, input_text, cycle_id=None, monitor_hours=0.0) -> CycleResult:
+    def process(self, input_text, cycle_id=None, monitor_hours=0.0, federated_context=None) -> CycleResult:
         self._cycle_count += 1
         if self._connected_runtime is not None:
             connection = self._connected_runtime.validate_connection()
