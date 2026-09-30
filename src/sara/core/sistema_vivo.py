@@ -76,6 +76,11 @@ class SistemaVivo:
                 "cycle_id": cid,
                 "context_hash": hash_json(context_data),
             })
+        report = self._loop.run(
+            input_text,
+            cycle_id=cid,
+            federated_context=context_data,
+        )
 
         monitoring_id = None
         if monitor_hours > 0:
