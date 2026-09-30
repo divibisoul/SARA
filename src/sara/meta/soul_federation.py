@@ -48,6 +48,14 @@ SARA_OPERATIONS: Final[dict[str, dict]] = {
         "purpose": "regenerar preservando a entrada e retornar evidência",
         "requires_auth": True,
     },
+    "sara.hortacore.assess": {
+        "version": "1.0.0",
+        "endpoint": "/v1/hortacore/assess",
+        "method": "POST",
+        "phases": ["governance", "persistence", "monitoring"],
+        "purpose": "executar a avaliação meta do AeternumChimeraBridge/HortaCore",
+        "requires_auth": True,
+    },
     "sara.state": {
         "version": "1.0.0",
         "endpoint": "/v1/state",
