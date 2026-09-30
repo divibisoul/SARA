@@ -53,6 +53,8 @@ from sara.research.quantum_crawler import QuantumCrawler
 from sara.research.quantum_scanner import QuantumScanner
 from sara.audit.cycle_auditor import CycleAuditor
 from sara.omega import SoulETROmegaSystem
+from sara.rgo.engine import RGOEngine
+from sara.rgo.trinity_processor import RGOTrinityProcessor
 from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment, transystem_adapters_from_environment
 from sara.infra.vagus_bus import VagusNerveBus
 
@@ -149,6 +151,9 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     connected_runtime = ConnectedRuntime(registry, vagus_bus=vagus_bus)
     aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler, vagus_bus=vagus_bus)
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
+    mmd = omega.micro_macro
+    rgo = RGOEngine(provenance=prov, vagus_bus=vagus_bus)
+    trinity_rgo = RGOTrinityProcessor(rgo=rgo, trinity=trinity_eru, mmd=mmd, vagus_bus=vagus_bus, eru=eru, eru_bridge=eru_bridge)
     octacore_g0 = OctaCoreG0Kernel(vagus_bus=vagus_bus)
 
     loop = RegenerativeLoop(
@@ -185,7 +190,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         neuro, neural_lens,
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
-        aeternum_chimera, omega,
+        aeternum_chimera, omega, mmd, rgo, trinity_rgo,
         octacore_g0, octacore_fusion,
     ]
 
@@ -251,6 +256,9 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "connected_runtime": connected_runtime,
             "aeternum_chimera": aeternum_chimera,
             "omega": omega,
+            "mmd": mmd,
+            "rgo": rgo,
+            "trinity_rgo": trinity_rgo,
             "vagus_bus": vagus_bus,
             "octacore_g0": octacore_g0,
             "octacore_fusion": octacore_fusion,
