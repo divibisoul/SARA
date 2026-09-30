@@ -10,6 +10,7 @@ from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 from sara.meta.eru_engine import ERU_Engine
 from sara.meta.eru_drift_detector import ERUDriftDetector
 from sara.meta.eru_recovery_advisor import ERURecoveryAdvisor
+from sara.infra.hashing import hash_json
 
 
 @dataclass(frozen=True)
@@ -75,7 +76,8 @@ class ERUTrinityBridge:
             raise ValueError("cycle_id é obrigatório")
         if not phase:
             raise ValueError("phase é obrigatória")
-        snapshot_name = f"ERU:{cycle_id}:{phase}"
+        state_hash = hash_json(state)
+        snapshot_name = f"ERU:{cycle_id}:{phase}:{state_hash[:16]}"
         snapshot_hash = self._eru.freeze(snapshot_name, state)
         observation = Observation(
             cycle_id=cycle_id,

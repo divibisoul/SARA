@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from sara.omega.models import ETRContext, ETRMetric, utc_now
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
 
 
 @dataclass
@@ -55,11 +56,48 @@ class AnticipationEngine:
         return {"recommendations": recommendations, "evidence": dict(context)}
 
 class MicroMacroManager:
+    """Escala micro/mid/macro explicitamente, sem política de parada implícita."""
     NAME = "MicroMacroManager"
+    VERSION = "1.1"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.META
+    DEPENDENCIES = ()
+    CYCLE_PHASES = (CyclePhase.AUDIT, CyclePhase.EXECUTION, CyclePhase.MONITORING, CyclePhase.PERSISTENCE)
     STATES = ("MICRO", "MID", "MACRO")
     def __init__(self) -> None:
         self.state = "MICRO"
         self.completed = 0
+        self._observations: list[dict[str, Any]] = []
+
+    def describe(self) -> dict[str, Any]:
+        return {
+            "name": self.NAME, "version": self.VERSION, "status": self.STATUS.value,
+            "role": self.ROLE.value, "dependencies": list(self.DEPENDENCIES),
+            "phases": [x.value for x in self.CYCLE_PHASES],
+            "state": self.state, "completed": self.completed,
+            "observations": len(self._observations),
+        }
+
+    def transition_explicit(self, state: str, *, evidence: dict[str, Any]) -> str:
+        state = str(state).strip().upper()
+        if state not in self.STATES:
+            raise ValueError("MMD_INVALID_STATE")
+        if not isinstance(evidence, dict) or not evidence:
+            raise ValueError("MMD_EVIDENCE_REQUIRED")
+        self.state = state
+        self._observations.append({"kind": "explicit_transition", "state": state, "evidence": dict(evidence), "ts": utc_now()})
+        return self.state
+
+    def observe_scale(self, state: str, *, evidence: dict[str, Any]) -> dict[str, Any]:
+        self.transition_explicit(state, evidence=evidence)
+        return {"state": self.state, "evidence": dict(evidence), "observation_index": len(self._observations) - 1}
+
+    def observation_count(self) -> int:
+        return len(self._observations)
+
+    def emit_trace(self, ctx: Any) -> None:
+        if hasattr(ctx, "record"):
+            ctx.record("monitoring", self.NAME, True, state=self.state, completed=self.completed, observations=len(self._observations))
     def transition(self, *, health_score: float, completed: int | None = None) -> str:
         if completed is not None:
             self.completed = max(0, int(completed))
