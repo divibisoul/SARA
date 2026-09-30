@@ -1,0 +1,16 @@
+name: rgo-trinity-mmd-final
+on:
+  push:
+    branches: [rgo-trinity-mmd-2026-09-29-final]
+  pull_request:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[dev]'
+      - run: python -m pytest -q tests/test_rgo.py tests/test_rgo_bugshield.py tests/test_rgo_trinity_processor.py tests/test_eru_trinity_symbiosis.py
+      - run: python -m compileall -q src
