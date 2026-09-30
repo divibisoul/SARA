@@ -130,3 +130,27 @@ def test_cycle_propagates_correlation_id():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_hortacore_assess_exposes_existing_chimera_bridge_and_correlation():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/hortacore/assess",
+            method="POST",
+            body={"proposal": {
+                "name": "http-horta-test",
+                "description": "preservar estado e rastreabilidade",
+            }},
+            token="test-token-123456789",
+            correlation_id="corr-horta-http-001",
+        )
+        assert status == 200
+        assert payload["operation"] == "hortacore_assess"
+        assert payload["authority"] == "AeternumChimeraBridge"
+        assert payload["correlation_id"] == "corr-horta-http-001"
+        assert payload["assessment"]["status"] == "FUSED_REAL"
+    finally:
+        server.shutdown()
+        server.server_close()
