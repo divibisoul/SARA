@@ -69,7 +69,7 @@ class N07OrbitalPrefrontalAdapter:
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         request = urllib.request.Request(
-            f"{self.endpoint}/execute",
+            f"{self.endpoint}/v1/execute",
             data=body,
             method="POST",
             headers=headers,
