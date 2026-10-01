@@ -85,3 +85,14 @@ A conexão com o SOUL é aditiva: SARA continua autoridade de ARA/ETR/ITR, ERU, 
 | N06 | cognição, síntese, auditoria, governança | sara.audit, sara.state, sara.trace, sara.regenerate, sara.cycle | ERU_Engine, GovernedSARA, DecisionTrace, ProvenanceTracker |
 
 **Prova de conexão:** manifesto = contrato; configuração = URL + credencial; conexão = requisição HTTP real + resposta válida + correlação; falha = erro explícito. Declaração de afinidade não conta como execução.
+
+
+## Consumidor orbital/Prefrontal — 2026-10-01
+
+SARA agora possui um adapter consumidor explícito para a fronteira N07 `prefrontal.orbital.evaluate@1.0.0`. Isso não transfere TCE nem Prefrontal para SARA.
+
+- **SARA / Transsystem boundary:** consome a decisão/evidência quando `N07_ORBITAL_URL` e credencial são configurados.
+- **N07 TCE:** continua proprietário de `transcendental.estimate@1.0.0` e da simulação determinística.
+- **N07 Prefrontal:** continua proprietário da admissão e do commit da decisão.
+- **SARA:** mantém ARA/ETR/ITR, ERU, memória, proveniência, rollback e governança; pode usar a evidência orbital como contexto verificável.
+- Ausência de endpoint/credencial continua **BLOCKED_INFRASTRUCTURE/UNMEASURABLE**, nunca sucesso sintético.
