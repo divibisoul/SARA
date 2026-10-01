@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 from sara.bootstrap import SaraSystem, build_default_system
 from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 from sara.meta.soul_federation import federation_manifest, SARA_OPERATIONS
+from sara.meta.n02_external_capability import N02ExternalCapabilityAdapter
 from sara.rgo.contracts import RGOValidationError
 
 _RATE_WINDOW_S = 60
@@ -143,6 +144,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rgo.ingest@1.0.0": ("/v1/rgo/ingest", ("governance", "persistence", "monitoring")),
                     "rgo.state@1.0.0": ("/v1/rgo/state", ("monitoring", "persistence")),
                     "rgo.trinity.process@1.0.0": ("/v1/rgo/trinity", ("ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring")),
+                    "sara.external.capability@1.0.0": ("/v1/external/capability", ("audit", "strategy", "execution", "validation", "monitoring")),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -174,6 +176,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "rgo.ingest@1.0.0",
                         "rgo.state@1.0.0",
                         "rgo.trinity.process@1.0.0",
+                        "sara.external.capability@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -259,6 +262,42 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/external/capability":
+                endpoint = os.getenv("SOUL_MESH_N07_URL", "").strip()
+                if not endpoint:
+                    raise SaraAPIError(503, "N07_ENDPOINT_NOT_CONFIGURED", "SOUL_MESH_N07_URL não configurado; delegação externa permanece fechada.")
+                capability = body.get("capability")
+                correlation = self.headers.get("X-Correlation-ID", "").strip() or str(uuid.uuid4())
+                if not isinstance(capability, str) or not capability.strip():
+                    raise SaraAPIError(422, "CAPABILITY_REQUIRED", "'capability' deve ser string não vazia.")
+                payload = body.get("payload", {})
+                workloads = body.get("workloads", [])
+                candidate = body.get("candidate", {})
+                strategy = body.get("strategy", "sara-external-capability")
+                if not isinstance(workloads, list):
+                    raise SaraAPIError(422, "WORKLOADS_MUST_BE_ARRAY", "'workloads' deve ser array.")
+                if not isinstance(candidate, dict):
+                    raise SaraAPIError(422, "CANDIDATE_MUST_BE_OBJECT", "'candidate' deve ser objeto.")
+                adapter = N02ExternalCapabilityAdapter(
+                    endpoint,
+                    token=os.getenv("N07_APP_TOKEN", "").strip(),
+                )
+                result = adapter.execute(
+                    capability=capability,
+                    payload=payload,
+                    correlation_id=correlation,
+                    workloads=workloads,
+                    candidate=candidate,
+                    strategy=strategy if isinstance(strategy, str) else "sara-external-capability",
+                )
+                self._json(200 if result.status < 400 else result.status, {
+                    "operation": "sara.external.capability",
+                    "correlation_id": result.correlation_id,
+                    "status": result.status,
+                    "result": result.payload,
+                })
+                return
 
             if path == "/v1/hortacore/assess":
                 proposal = body.get("proposal")
