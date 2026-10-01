@@ -13,6 +13,20 @@ from typing import Final
 
 SARA_FEDERATION_CONTRACT_VERSION: Final[str] = "1.0.0"
 
+# SARA consumes these N07-owned capabilities; it does not own or duplicate them.
+N07_ORBITAL_CONSUMER_OPERATIONS: Final[dict[str, dict]] = {
+    "prefrontal.orbital.evaluate@1.0.0": {
+        "owner": "N07",
+        "purpose": "combinar evidência de simulação TCE com admissão Prefrontal",
+        "consumer": "SARA",
+    },
+    "transcendental.estimate@1.0.0": {
+        "owner": "N07",
+        "purpose": "estimar custo/latência/memória em simulação determinística",
+        "consumer": "SARA",
+    },
+}
+
 SARA_OPERATIONS: Final[dict[str, dict]] = {
     "sara.health": {
         "version": "1.0.0",
@@ -197,6 +211,9 @@ def federation_manifest() -> dict:
         "non_destructive": True,
         "operations": {
             name: dict(spec) for name, spec in SARA_OPERATIONS.items()
+        },
+        "n07_orbital_consumer_operations": {
+            name: dict(spec) for name, spec in N07_ORBITAL_CONSUMER_OPERATIONS.items()
         },
         "nucleus_affinities": [item.as_dict() for item in SOUL_NUCLEUS_AFFINITIES],
         "proof_rule": {
