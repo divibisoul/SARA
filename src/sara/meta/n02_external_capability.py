@@ -57,6 +57,8 @@ class N02ExternalCapabilityAdapter:
             "metadata": {
                 "target": "N02",
                 "capability": capability,
+                "correlation_id": correlation_id,
+                "trace_id": correlation_id,
                 "payload": json.dumps({
                     "payload": payload,
                     "metadata": {
