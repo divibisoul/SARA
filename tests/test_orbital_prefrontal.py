@@ -13,7 +13,7 @@ class _Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length).decode("utf-8"))
         assert body["operation"] == "prefrontal.orbital.evaluate@1.0.0"
         assert self.headers["X-Correlation-ID"] == "corr-sara-orbit"
-        payload = {"status": "ok", "metadata": {"simulation_is_not_hardware": "true"}}
+        payload = {"status": "ok", "correlationId": "corr-sara-orbit", "metadata": {"simulation_is_not_hardware": "true"}}
         raw = json.dumps(payload).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
@@ -51,6 +51,37 @@ def test_n07_orbital_prefrontal_adapter_preserves_contract():
         assert result.status == "200"
         assert result.correlation_id == "corr-sara-orbit"
         assert result.payload["metadata"]["simulation_is_not_hardware"] == "true"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+\n\ndef test_n07_orbital_prefrontal_adapter_rejects_correlation_mismatch():
+    class _MismatchHandler(_Handler):
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length", "0"))
+            json.loads(self.rfile.read(length).decode("utf-8"))
+            raw = json.dumps({"status": "ok", "correlationId": "wrong-correlation"}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+    server = HTTPServer(("127.0.0.1", 0), _MismatchHandler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        adapter = N07OrbitalPrefrontalAdapter(f"http://127.0.0.1:{server.server_port}", token="test-token")
+        try:
+            adapter.evaluate(
+                correlation_id="corr-sara-orbit",
+                payload=[1.0],
+                workloads=[{"ID": "w1"}],
+                candidate={"ID": "candidate"},
+            )
+            raise AssertionError("correlation mismatch must be rejected")
+        except RuntimeError as exc:
+            assert str(exc) == "N07_ORBITAL_CORRELATION_MISMATCH"
     finally:
         server.shutdown()
         server.server_close()
