@@ -20,7 +20,7 @@ def test_external_adapter_preserves_n07_execute_contract_and_correlation(monkeyp
     class Handler(BaseHTTPRequestHandler):
         def do_POST(self):  # noqa: N802
             length = int(self.headers["Content-Length"])
-            observed["headers"] = dict(self.headers)
+            observed["correlation_header"] = self.headers.get("X-Correlation-ID")
             observed["body"] = json.loads(self.rfile.read(length))
             raw = json.dumps({"ok": True, "operation": "cooperation.exchange"}).encode()
             self.send_response(200)
@@ -48,7 +48,7 @@ def test_external_adapter_preserves_n07_execute_contract_and_correlation(monkeyp
             candidate={"capability": "strategic_planning", "cost": 0.2},
         )
         assert result.status == 200
-        assert observed["headers"]["X-Correlation-ID"] == "corr-sara-n07-001"
+        assert observed["correlation_header"] == "corr-sara-n07-001"
         assert observed["body"]["operation"] == "cooperation.exchange@1.0.0"
         assert observed["body"]["payload"] == []
         metadata = observed["body"]["metadata"]
