@@ -28,6 +28,14 @@ N07_ORBITAL_CONSUMER_OPERATIONS: Final[dict[str, dict]] = {
 }
 
 SARA_OPERATIONS: Final[dict[str, dict]] = {
+    "sara.external.capability": {
+        "version": "1.0.0",
+        "endpoint": "/v1/external/capability",
+        "method": "POST",
+        "phases": ["audit", "strategy", "execution", "validation", "monitoring"],
+        "purpose": "delegar capability externa ao owner canônico via N07 cooperation.exchange",
+        "requires_auth": True,
+    },
     "sara.health": {
         "version": "1.0.0",
         "endpoint": "/health",
