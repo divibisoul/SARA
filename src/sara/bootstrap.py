@@ -22,6 +22,7 @@ from sara.memory.dna_tags import DNA_Tags
 from sara.memory.temporal_vector_db import TemporalVectorDB
 from sara.memory.regenerative_memory import RegenerativeMemory
 from sara.memory.working_memory import WorkingMemory
+from sara.memory.lexical_retrieval import LexicalRetrieval
 from sara.security.identity_core import IdentityCore
 from sara.security.emergency_rollback import EmergencyRollback
 from sara.security.ethical_filter_chain import EthicalFilterChain
@@ -81,6 +82,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     temporal = TemporalVectorDB()
     memory = RegenerativeMemory()
     working_memory = WorkingMemory()
+    lexical_retrieval = LexicalRetrieval()
     loaded_memory = memory.load_if_configured()
     loaded_temporal = temporal.load_if_configured()
     rollback = EmergencyRollback()
@@ -182,7 +184,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         trinity=trinity_eru,
     )
     candidates = [
-        prov, dna, temporal, memory, working_memory, rollback, trace,
+        prov, dna, temporal, memory, working_memory, lexical_retrieval, rollback, trace,
         ara, ara_extended, identity, ubuntu, buen, etr, etr_extended,
         safe_sandbox, itr, itr_extended, filters,
         legal_compliance, legal_ai, committee, radar, governed,
