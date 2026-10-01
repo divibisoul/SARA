@@ -53,7 +53,7 @@ class N02ExternalCapabilityAdapter:
 
         request_payload = {
             "operation": self.OPERATION,
-            "payload": {"payload": payload},
+            "payload": [],
             "metadata": {
                 "target": "N02",
                 "capability": capability,
