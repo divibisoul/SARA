@@ -53,6 +53,7 @@ class N07OrbitalPrefrontalAdapter:
         body = json.dumps({
             "operation": self.OPERATION,
             "payload": payload,
+            "correlationId": correlation_id,
             "metadata": {
                 "workloads_json": json.dumps(workloads, separators=(",", ":")),
                 "candidate_json": json.dumps(candidate, separators=(",", ":")),
@@ -88,4 +89,9 @@ class N07OrbitalPrefrontalAdapter:
             raise RuntimeError("N07_ORBITAL_INVALID_JSON") from exc
         if not isinstance(result, dict):
             raise RuntimeError("N07_ORBITAL_INVALID_RESPONSE")
-        return OrbitalPrefrontalResponse(status=str(status), correlation_id=correlation_id, payload=result)
+        remote_correlation = str(result.get("correlationId", result.get("correlation_id", ""))).strip()
+        if not remote_correlation:
+            raise RuntimeError("N07_ORBITAL_CORRELATION_MISSING")
+        if remote_correlation != correlation_id.strip():
+            raise RuntimeError("N07_ORBITAL_CORRELATION_MISMATCH")
+        return OrbitalPrefrontalResponse(status=str(status), correlation_id=remote_correlation, payload=result)
