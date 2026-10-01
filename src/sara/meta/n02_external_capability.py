@@ -10,7 +10,6 @@ from dataclasses import dataclass
 import json
 import urllib.error
 import urllib.request
-import urllib.parse
 from typing import Any
 
 
@@ -53,12 +52,20 @@ class N02ExternalCapabilityAdapter:
             raise ValueError("correlation_id_required")
 
         request_payload = {
-            "payload": payload,
+            "operation": self.OPERATION,
+            "payload": {"payload": payload},
             "metadata": {
-                "prefrontal_orbital": "true",
-                "workloads_json": json.dumps(workloads or [], separators=(",", ":")),
-                "candidate_json": json.dumps(candidate or {"capability": capability}, separators=(",", ":")),
-                "strategy": strategy,
+                "target": "N02",
+                "capability": capability,
+                "payload": json.dumps({
+                    "payload": payload,
+                    "metadata": {
+                        "prefrontal_orbital": "true",
+                        "workloads_json": json.dumps(workloads or [], separators=(",", ":")),
+                        "candidate_json": json.dumps(candidate or {"capability": capability}, separators=(",", ":")),
+                        "strategy": strategy,
+                    },
+                }, separators=(",", ":")),
             },
         }
         body = json.dumps(request_payload, separators=(",", ":")).encode("utf-8")
@@ -72,10 +79,7 @@ class N02ExternalCapabilityAdapter:
             headers["Authorization"] = f"Bearer {self.token}"
 
         request = urllib.request.Request(
-            f"{self.endpoint}/execute"
-            f"?operation={self.OPERATION}"
-            f"&target=N02"
-            f"&capability={urllib.parse.quote(capability)}",
+            f"{self.endpoint}/execute",
             data=body,
             method="POST",
             headers=headers,
