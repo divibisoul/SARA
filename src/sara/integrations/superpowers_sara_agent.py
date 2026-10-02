@@ -8,9 +8,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from sara.contracts.base import ModuleStatus, CycleRole, CyclePhase
+
 
 @dataclass(frozen=True)
 class SuperpowersSaraAgent:
+    NAME = "SuperpowersSaraAgent"
+    VERSION = "1.0"
+    STATUS = ModuleStatus.IMPLEMENTED
+    ROLE = CycleRole.META
+    DEPENDENCIES = ("ARA_Extended", "ETR_Extended", "ITR_Extended", "RGOEngine", "MicroMacroManager")
+    CYCLE_PHASES = (CyclePhase.AUDIT, CyclePhase.STRATEGY, CyclePhase.EXECUTION, CyclePhase.VALIDATION, CyclePhase.PERSISTENCE)
     name: str = "superpowers.sara-trinity"
     upstream: str = "https://github.com/obra/superpowers"
     revision: str = "8ca22dba9a94f28898bbce59f2537ff4d87c747d"
@@ -46,6 +54,10 @@ class SuperpowersSaraAgent:
             "runtime_activation_requires_explicit_adapter": True,
             "no_fake_runtime_success": True,
         }
+
+    def emit_trace(self, ctx: Any) -> None:
+        if hasattr(ctx, "record"):
+            ctx.record("monitoring", self.NAME, True, targets=list(self.targets), bound_targets=sorted(getattr(self, "_bindings", {})))
 
     def prepare(self, target: str, operation: str, *, evidence: dict[str, Any]) -> dict[str, Any]:
         if target not in self.targets:
