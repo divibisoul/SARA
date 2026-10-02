@@ -55,7 +55,9 @@ def test_n07_orbital_prefrontal_adapter_preserves_contract():
         server.shutdown()
         server.server_close()
 
-\n\ndef test_n07_orbital_prefrontal_adapter_rejects_correlation_mismatch():
+
+
+def test_n07_orbital_prefrontal_adapter_rejects_correlation_mismatch():
     class _MismatchHandler(_Handler):
         def do_POST(self):
             length = int(self.headers.get("Content-Length", "0"))
