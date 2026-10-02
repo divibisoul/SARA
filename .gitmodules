@@ -1,0 +1,3 @@
+[submodule "integrations/soul-upstream/pydantic-ai"]
+	path = integrations/soul-upstream/pydantic-ai
+	url = https://github.com/pydantic/pydantic-ai.git
