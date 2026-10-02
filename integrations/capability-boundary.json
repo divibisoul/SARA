@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "component": {
+    "id": "SARA",
+    "role": "regeneração, governança e resiliência"
+  },
+  "reason": "functional-complementation",
+  "upstream_capability_sources": [
+    "pydantic-ai"
+  ],
+  "canonical_control_plane": "divibisoul/Orquestrador-",
+  "integration": {
+    "agent_engineering": "superpowers.sara-trinity",
+    "routing": "canonical Vagus/Mesh boundary",
+    "execution": "ARA/ETR/ITR/RGO/MMD chain",
+    "verification": "SARA unit/integration + evidence gate",
+    "structural_state": "REAL",
+    "runtime_state": "PROJECTED"
+  },
+  "rule": "SARA remains the canonical regeneration/governance authority; upstream runtime is never silently substituted"
+}
