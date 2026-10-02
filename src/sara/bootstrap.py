@@ -58,6 +58,7 @@ from sara.rgo.engine import RGOEngine
 from sara.rgo.trinity_processor import RGOTrinityProcessor
 from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment, transystem_adapters_from_environment
 from sara.infra.vagus_bus import VagusNerveBus
+from sara.integrations.superpowers_sara_agent import SuperpowersSaraAgent
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
 
@@ -157,6 +158,8 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     rgo = RGOEngine(provenance=prov, vagus_bus=vagus_bus)
     trinity_rgo = RGOTrinityProcessor(rgo=rgo, trinity=trinity_eru, mmd=mmd, vagus_bus=vagus_bus, eru=eru, eru_bridge=eru_bridge)
     octacore_g0 = OctaCoreG0Kernel(vagus_bus=vagus_bus)
+    superpowers_sara_agent = SuperpowersSaraAgent()
+    superpowers_sara_agent.bind(ara=ara_extended, etr=etr_extended, itr=itr_extended, rgo=rgo, mmd=mmd)
 
     loop = RegenerativeLoop(
         ara=ara_extended, etr=etr_extended, itr=itr_extended,
@@ -193,7 +196,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
         synergy_engine, quantum_crawler, quantum_scanner, transystem,
         storm, governance_backend, auditor, loop, trinity, sistema,
         aeternum_chimera, omega, mmd, rgo, trinity_rgo,
-        octacore_g0, octacore_fusion,
+        octacore_g0, octacore_fusion, superpowers_sara_agent,
     ]
 
     for module in candidates:
@@ -264,5 +267,6 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             "vagus_bus": vagus_bus,
             "octacore_g0": octacore_g0,
             "octacore_fusion": octacore_fusion,
+            "superpowers_sara_agent": superpowers_sara_agent,
         },
     )
