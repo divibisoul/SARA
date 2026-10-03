@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0.0",
+  "system": "SOUL",
+  "component_id": "SARA",
+  "relation": "transversal-observer-link",
+  "canonical_owner": "N07",
+  "n07_commit": "c689f4e4e92e4c5ca33fb167f5ce6421d7835eab",
+  "source_registry": "https://github.com/divibisoul/Orquestrador-/blob/feat/soul-oss-fusion-wave1/integrations/external-capabilities.json",
+  "runtime_policy": "SARA may consume evidence and memory services through the canonical N07 boundary; SARA does not vendor or duplicate the external runtimes.",
+  "added_sources": [
+    {
+      "id": "everything-claude-code",
+      "capabilities": [
+        "skills",
+        "continuous-learning",
+        "security-scanning"
+      ]
+    },
+    {
+      "id": "swarmclaw",
+      "capabilities": [
+        "multi-agent-swarms",
+        "delegation",
+        "memory"
+      ]
+    },
+    {
+      "id": "mem0",
+      "capabilities": [
+        "persistent-agent-memory"
+      ]
+    },
+    {
+      "id": "letta",
+      "capabilities": [
+        "stateful-agents",
+        "advanced-memory"
+      ]
+    },
+    {
+      "id": "langfuse",
+      "capabilities": [
+        "tracing",
+        "evaluation"
+      ]
+    },
+    {
+      "id": "vllm",
+      "capabilities": [
+        "inference-serving"
+      ]
+    },
+    {
+      "id": "sglang",
+      "capabilities": [
+        "high-performance-serving"
+      ]
+    },
+    {
+      "id": "ray",
+      "capabilities": [
+        "distributed-compute",
+        "parallelism"
+      ]
+    },
+    {
+      "id": "megatron-lm",
+      "capabilities": [
+        "distributed-transformer-training"
+      ]
+    }
+  ],
+  "invariants": {
+    "preserve_sara_authority": true,
+    "no_n08": true,
+    "no_second_mesh": true,
+    "no_second_public_ingress": true,
+    "provenance_required": true,
+    "runtime_success_not_implied_by_structure": true
+  }
+}
