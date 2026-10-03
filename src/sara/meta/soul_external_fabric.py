@@ -15,8 +15,8 @@ class ExternalProvider:
     state: str
 
 EXTERNAL_PROVIDERS: Final[tuple[ExternalProvider, ...]] = (
-    ExternalProvider("superpowers","https://github.com/obra/superpowers","8ca22dba9a94f28898bbce59f2537ff4d87c747d","N07",["N07"],["agentic-skills","subagents","planning","tdd","review","debugging"],["governance.engineering","sara.audit"],true,"CATALOG_BOUND"),
-    ExternalProvider("superagi","https://github.com/TransformerOptimus/SuperAGI","c3c1982e7bd6a11cfed53c5a193ea502f924b1b6","N07",["N07"],["autonomous-agents","tools","memory","multimodal","telemetry"],["sara.external.capability","sara.audit"],false,"CATALOG_BOUND"),
+    ExternalProvider("superpowers","https://github.com/obra/superpowers","8ca22dba9a94f28898bbce59f2537ff4d87c747d","N07",["N07"],["agentic-skills","subagents","planning","tdd","review","debugging"],["governance.engineering","sara.audit"],True,"CATALOG_BOUND"),
+    ExternalProvider("superagi","https://github.com/TransformerOptimus/SuperAGI","c3c1982e7bd6a11cfed53c5a193ea502f924b1b6","N07",["N07"],["autonomous-agents","tools","memory","multimodal","telemetry"],["sara.external.capability","sara.audit"],False,"CATALOG_BOUND"),
     ExternalProvider("langgraph","https://github.com/langchain-ai/langgraph","157a06dda988d85afeb8751ff27b35ab3f4f8bf4","N07",["N07","N01"],["stateful-agents","durable-workflows","orchestration"],["sara.external.capability","sara.audit"],false,"CATALOG_BOUND"),
     ExternalProvider("crewai","https://github.com/crewAIInc/crewAI","8078f9130c35a47be95d4a55bf1d73b3fd44fc88","N07",["N07"],["multi-agent-crews","flows","role-specialization"],["sara.external.capability","sara.audit"],false,"CATALOG_BOUND"),
     ExternalProvider("microsoft-agent-framework","https://github.com/microsoft/agent-framework","a2f4506c0ba30cea7c9bbe907fc158c0db2cc6a3","N07",["N07"],["agents","workflows","MCP","A2A"],["sara.external.capability","sara.audit"],false,"CATALOG_BOUND"),
