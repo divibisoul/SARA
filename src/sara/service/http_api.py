@@ -21,6 +21,7 @@ from sara.contracts.federation import FederationIdentity, CapabilityDescriptor
 from sara.meta.soul_federation import federation_manifest, SARA_OPERATIONS
 from sara.meta.n02_external_capability import N02ExternalCapabilityAdapter
 from sara.rgo.contracts import RGOValidationError
+from sara.integrations import mem0
 
 _RATE_WINDOW_S = 60
 _RATE_MAX = 60
@@ -145,6 +146,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rgo.state@1.0.0": ("/v1/rgo/state", ("monitoring", "persistence")),
                     "rgo.trinity.process@1.0.0": ("/v1/rgo/trinity", ("ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring")),
                     "sara.external.capability@1.0.0": ("/v1/external/capability", ("audit", "strategy", "execution", "validation", "monitoring")),
+                    "mem0.status@1.0.0": ("/v1/mem0/status", ("monitoring",)),
+                    "mem0.add@1.0.0": ("/v1/mem0/add", ("persistence",)),
+                    "mem0.search@1.0.0": ("/v1/mem0/search", ("persistence", "monitoring")),
+                    "mem0.list@1.0.0": ("/v1/mem0/list", ("persistence", "monitoring")),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -177,6 +182,10 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "rgo.state@1.0.0",
                         "rgo.trinity.process@1.0.0",
                         "sara.external.capability@1.0.0",
+                        "mem0.status@1.0.0",
+                        "mem0.add@1.0.0",
+                        "mem0.search@1.0.0",
+                        "mem0.list@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -262,6 +271,36 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             body = self._body()
             if not system.ready:
                 raise SaraAPIError(503, "NOT_READY", "SARA não passou pelas invariantes de bootstrap.", system.invariant_report)
+
+            if path == "/v1/mem0/status":
+                self._json(200, mem0.status())
+                return
+
+            if path == "/v1/mem0/add":
+                messages = body.get("messages", body.get("message", ""))
+                try:
+                    result = mem0.add(messages, user_id=body.get("user_id"), metadata=body.get("metadata"))
+                except (RuntimeError, ValueError) as exc:
+                    raise SaraAPIError(502, "MEM0_ADD_FAILED", str(exc)) from exc
+                self._json(200, {"operation": "mem0.add", "provider": "mem0ai/mem0", "upstream_commit": mem0.UPSTREAM_COMMIT, "result": result})
+                return
+
+            if path == "/v1/mem0/search":
+                query = body.get("query", "")
+                try:
+                    result = mem0.search(query, user_id=body.get("user_id"), top_k=body.get("top_k"), filters=body.get("filters"))
+                except (RuntimeError, ValueError) as exc:
+                    raise SaraAPIError(502, "MEM0_SEARCH_FAILED", str(exc)) from exc
+                self._json(200, {"operation": "mem0.search", "provider": "mem0ai/mem0", "upstream_commit": mem0.UPSTREAM_COMMIT, "result": result})
+                return
+
+            if path == "/v1/mem0/list":
+                try:
+                    result = mem0.get_all(user_id=body.get("user_id"), page=body.get("page"), page_size=body.get("page_size"), filters=body.get("filters"))
+                except (RuntimeError, ValueError) as exc:
+                    raise SaraAPIError(502, "MEM0_LIST_FAILED", str(exc)) from exc
+                self._json(200, {"operation": "mem0.list", "provider": "mem0ai/mem0", "upstream_commit": mem0.UPSTREAM_COMMIT, "result": result})
+                return
 
             if path == "/v1/external/capability":
                 endpoint = os.getenv("SOUL_MESH_N07_URL", "").strip()
