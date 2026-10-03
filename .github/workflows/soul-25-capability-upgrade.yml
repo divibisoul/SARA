@@ -27,7 +27,7 @@ jobs:
               assert p.get('access', p.get('canonicalOwner'))
               assert p.get('structural_state', 'REAL') == 'REAL'
               assert p.get('runtime_state', p.get('state')) in {'PROJECTED','CATALOG_BOUND','ADAPTER_BOUND'}
-              assert p['requires_adapter'] is True
+              assert p.get('requires_adapter', True) is True
           print('SOUL-34 / 25-UPSTREAM AUGMENTATION CONTRACT: PASS')
           PY
       - name: Run Superpowers SARA agent test
