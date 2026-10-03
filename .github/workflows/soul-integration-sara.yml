@@ -26,8 +26,8 @@ jobs:
         run: |
           python - <<'PY'
           import json
-          d=json.load(open('integrations/external-capabilities.json'))
-          assert len(d['repositories']) == 25
+          d=json.load(open('integrations/soul-25-augmentation.json'))
+          assert len(d['external_providers']) == 25
           for x in d['repositories']:
               assert x['source'].startswith('https://github.com/')
               assert x['revision'] and x['targets']
