@@ -28,6 +28,10 @@ N07_ORBITAL_CONSUMER_OPERATIONS: Final[dict[str, dict]] = {
 }
 
 SARA_OPERATIONS: Final[dict[str, dict]] = {
+    "mem0.status@1.0.0": {"version": "1.0.0", "endpoint": "/v1/mem0/status", "method": "GET", "phases": ["monitoring"], "purpose": "consultar prontidão real do adaptador Mem0", "requires_auth": True},
+    "mem0.add@1.0.0": {"version": "1.0.0", "endpoint": "/v1/mem0/add", "method": "POST", "phases": ["persistence"], "purpose": "persistir memória via Mem0", "requires_auth": True},
+    "mem0.search@1.0.0": {"version": "1.0.0", "endpoint": "/v1/mem0/search", "method": "POST", "phases": ["persistence", "monitoring"], "purpose": "buscar memória semântica via Mem0", "requires_auth": True},
+    "mem0.list@1.0.0": {"version": "1.0.0", "endpoint": "/v1/mem0/list", "method": "POST", "phases": ["persistence", "monitoring"], "purpose": "listar memória persistida via Mem0", "requires_auth": True},
     "sara.external.capability": {
         "version": "1.0.0",
         "endpoint": "/v1/external/capability",

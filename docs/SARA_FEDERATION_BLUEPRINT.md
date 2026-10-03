@@ -216,3 +216,8 @@ Fase 2: serviço HTTP SARA.
 Fase 3: N07 + N04 + N06 conectados.
 Fase 4: persistência externa e observabilidade distribuída.
 Fase 5: extração de bounded contexts somente quando métricas de carga, isolamento ou disponibilidade justificarem.
+
+
+## 11. SOUL-34 external capability fabric
+
+SARA now exposes a first-class catalog of 25 pinned upstream capability sources through `src/sara/meta/soul_external_fabric.py`. Functional affinity routes sources to SARA governance, regeneration, memory and evidence boundaries while preserving native ownership. `SARA.resident` is the bound resident agent for this layer. A source is not treated as runtime-executable merely because its repository is pinned; adapter, configuration and real execution evidence are required.

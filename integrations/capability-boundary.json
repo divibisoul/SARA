@@ -6,7 +6,8 @@
   },
   "reason": "functional-complementation",
   "upstream_capability_sources": [
-    "pydantic-ai"
+    "pydantic-ai",
+    "mem0"
   ],
   "canonical_control_plane": "divibisoul/Orquestrador-",
   "integration": {
@@ -15,7 +16,7 @@
     "execution": "ARA/ETR/ITR/RGO/MMD chain",
     "verification": "SARA unit/integration + evidence gate",
     "structural_state": "REAL",
-    "runtime_state": "PROJECTED"
+    "runtime_state": "PROJECTED_UNTIL_REAL_MEM0_E2E"
   },
   "rule": "SARA remains the canonical regeneration/governance authority; upstream runtime is never silently substituted"
 }
