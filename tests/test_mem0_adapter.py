@@ -51,7 +51,7 @@ def test_mem0_calls():
         assert Handler.calls[1][1] == "/v3/memories/add/"
         assert Handler.calls[2][1] == "/v3/memories/search/"
         assert Handler.calls[1][2]["Authorization"] == "Token k"
-        assert Handler.calls[1][2]["Mem0-User-ID"] == "sara-test"
+        assert next(value for key, value in Handler.calls[1][2].items() if key.lower() == "mem0-user-id") == "sara-test"
     finally:
         for key, value in {
             "SARA_MEM0_URL": old_url,
