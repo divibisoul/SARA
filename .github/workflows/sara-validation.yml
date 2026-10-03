@@ -33,3 +33,6 @@ jobs:
         run: python -m pytest -q
       - name: Regression scan
         run: python scripts/forensic_self_check.py
+
+      - name: Validate Mem0 adapter
+        run: python -m tests.test_mem0_adapter
