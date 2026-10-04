@@ -1,0 +1,46 @@
+name: P0 Readiness Runtime - SARA
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install SARA
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Start SARA
+        env:
+          SARA_API_TOKEN: ci-readiness-token
+          SARA_HOST: 127.0.0.1
+          SARA_PORT: 8090
+        run: |
+          python src/sara/service/main.py > /tmp/sara.log 2>&1 &
+          echo $! > /tmp/sara.pid
+      - name: Probe /ready
+        run: |
+          set -euo pipefail
+          trap 'kill $(cat /tmp/sara.pid) 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            code=$(curl -sS -o /tmp/sara-ready.json -w '%{http_code}' http://127.0.0.1:8090/ready || true)
+            if [ "$code" = "200" ]; then
+              cat /tmp/sara-ready.json
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/sara.log
+          cat /tmp/sara-ready.json || true
+          exit 1
