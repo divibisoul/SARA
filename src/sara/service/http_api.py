@@ -102,6 +102,23 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
             self._authorized(path)
             self._rate_limit()
             system = self._runtime()
+            if path == "/ready":
+                trace_ok = system.components["trace"].verify()
+                provenance_ok = system.components["provenance"].verify_integrity()
+                rollback_ok = system.components["rollback"].verify_chain()
+                ready = bool(system.ready and trace_ok and provenance_ok and rollback_ok)
+                self._json(200 if ready else 503, {
+                    "service": "SARA",
+                    "ready": ready,
+                    "version": "3.1.0",
+                    "checks": {
+                        "bootstrap": bool(system.ready),
+                        "trace_integrity": bool(trace_ok),
+                        "provenance_integrity": bool(provenance_ok),
+                        "rollback_chain_integrity": bool(rollback_ok),
+                    },
+                })
+                return
             if path == "/health":
                 self._json(200, {
                     "service": "SARA",
