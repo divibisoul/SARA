@@ -34,7 +34,7 @@ jobs:
           set -euo pipefail
           trap 'kill $(cat /tmp/sara.pid) 2>/dev/null || true' EXIT
           for i in $(seq 1 60); do
-            code=$(curl -sS -o /tmp/sara-ready.json -w '%{http_code}' http://127.0.0.1:8090/ready || true)
+            code=$(curl -sS -H 'Authorization: Bearer ci-readiness-token' -o /tmp/sara-ready.json -w '%{http_code}' http://127.0.0.1:8090/ready || true)
             if [ "$code" = "200" ]; then
               cat /tmp/sara-ready.json
               exit 0
