@@ -75,4 +75,5 @@ def test_vagus_describe_is_explicit_about_non_external_delivery():
     description = VagusNerveBus().describe()
     assert description["version"] == "1.1"
     assert description["backend"] == "in_process"
-    assert description["external_broker"] == "UNMEASURABLE"
+    assert description["external_broker"] is False
+    assert description["delivery_guarantee"] == "in_process_best_effort"
