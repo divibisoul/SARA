@@ -149,12 +149,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     eru_bridge = ERUTrinityBridge(eru)
     eru_bridge.register_trinity(ara_extended, etr_extended, itr_extended)
     trinity_eru = TrinityERUUnified(
-        ara_extended,
-        etr_extended,
-        itr_extended,
-        eru=eru,
-        bridge=eru_bridge,
-        trinity=trinity,
+        ara_extended, etr_extended, itr_extended, eru=eru, bridge=eru_bridge, trinity=trinity
     )
     connected_runtime = ConnectedRuntime(registry, vagus_bus=vagus_bus)
     aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler, vagus_bus=vagus_bus)
@@ -174,15 +169,7 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
             provenance="RGOTrinityProcessor",
         )
 
-    trinity_rgo = RGOTrinityProcessor(
-        rgo=rgo,
-        trinity=trinity_eru,
-        mmd=mmd,
-        vagus_bus=vagus_bus,
-        eru=eru,
-        eru_bridge=eru_bridge,
-        horta_sink=_horta_stage_sink,
-    )
+    trinity_rgo = RGOTrinityProcessor(rgo=rgo, trinity=trinity_eru, mmd=mmd, vagus_bus=vagus_bus, eru=eru, eru_bridge=eru_bridge, horta_sink=_horta_stage_sink)
     octacore_g0 = OctaCoreG0Kernel(vagus_bus=vagus_bus)
     superpowers_sara_agent = SuperpowersSaraAgent()
     superpowers_sara_agent.bind(ara=ara_extended, etr=etr_extended, itr=itr_extended, rgo=rgo, mmd=mmd)
