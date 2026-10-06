@@ -149,7 +149,12 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     eru_bridge = ERUTrinityBridge(eru)
     eru_bridge.register_trinity(ara_extended, etr_extended, itr_extended)
     trinity_eru = TrinityERUUnified(
-        ara_extended, etr_extended, itr_extended, eru=eru, bridge=eru_bridge
+        ara_extended,
+        etr_extended,
+        itr_extended,
+        eru=eru,
+        bridge=eru_bridge,
+        trinity=trinity,
     )
     connected_runtime = ConnectedRuntime(registry, vagus_bus=vagus_bus)
     aeternum_chimera = AeternumChimeraBridge(governed, eru, quantum_crawler, vagus_bus=vagus_bus)
