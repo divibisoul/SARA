@@ -156,7 +156,28 @@ def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     omega = SoulETROmegaSystem(safe_sandbox=safe_sandbox)
     mmd = omega.micro_macro
     rgo = RGOEngine(provenance=prov, vagus_bus=vagus_bus)
-    trinity_rgo = RGOTrinityProcessor(rgo=rgo, trinity=trinity_eru, mmd=mmd, vagus_bus=vagus_bus, eru=eru, eru_bridge=eru_bridge)
+
+    def _horta_stage_sink(stage):
+        return vagus_bus.publish_sync(
+            source="RGOTrinityProcessor",
+            target="HortaCore",
+            event_type="rgo.hortacore.store",
+            payload=stage.as_dict(),
+            status="OBSERVE",
+            correlation_id=stage.cycle_id,
+            phase=stage.stage,
+            provenance="RGOTrinityProcessor",
+        )
+
+    trinity_rgo = RGOTrinityProcessor(
+        rgo=rgo,
+        trinity=trinity_eru,
+        mmd=mmd,
+        vagus_bus=vagus_bus,
+        eru=eru,
+        eru_bridge=eru_bridge,
+        horta_sink=_horta_stage_sink,
+    )
     octacore_g0 = OctaCoreG0Kernel(vagus_bus=vagus_bus)
     superpowers_sara_agent = SuperpowersSaraAgent()
     superpowers_sara_agent.bind(ara=ara_extended, etr=etr_extended, itr=itr_extended, rgo=rgo, mmd=mmd)
