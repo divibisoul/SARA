@@ -154,3 +154,44 @@ def test_hortacore_assess_exposes_existing_chimera_bridge_and_correlation():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_vagus_preserves_inbound_provenance_on_bus_event():
+    server, _ = _start_server()
+    try:
+        provenance = {
+            "trace_id": "trace-vagus-001",
+            "correlation_id": "corr-vagus-001",
+            "message_id": "msg-vagus-001",
+            "sequence_index": 1,
+            "parent_hash": "sha256:parent",
+            "input_hash": "sha256:input",
+            "output_hash": "sha256:output",
+        }
+        status, payload = _request(
+            server,
+            "/v1/vagus",
+            method="POST",
+            body={
+                "vagus_version": "1.0",
+                "message_id": "msg-vagus-001",
+                "correlation_id": "corr-vagus-001",
+                "source": "N07.NervoVago",
+                "target": "SARA",
+                "priority": 100,
+                "ttl": 5000,
+                "type": "nervo.event",
+                "payload": {"kind": "provenance-test"},
+                "provenance": provenance,
+            },
+            token="test-token-123456789",
+            correlation_id="corr-vagus-001",
+        )
+        assert status == 200
+        event = payload["event"]
+        assert event["id"] == "msg-vagus-001"
+        assert event["correlation_id"] == "corr-vagus-001"
+        assert json.loads(event["provenance"]) == provenance
+    finally:
+        server.shutdown()
+        server.server_close()
