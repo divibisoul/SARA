@@ -57,7 +57,7 @@ from sara.omega import SoulETROmegaSystem
 from sara.rgo.engine import RGOEngine
 from sara.rgo.trinity_processor import RGOTrinityProcessor
 from sara.infra.activation import docker_backend_from_environment, network_crawler_backends_from_environment, patent_oracle_from_environment, transystem_adapters_from_environment
-from sara.infra.vagus_bus import VagusNerveBus
+from sara.infra.nervo_vago import NervoVago
 from sara.integrations.superpowers_sara_agent import SuperpowersSaraAgent
 
 logger = logging.getLogger("SARA_BOOTSTRAP")
@@ -76,7 +76,7 @@ class SaraSystem:
 def build_default_system(*, fail_closed: bool = True) -> SaraSystem:
     registry = ModuleRegistry()
     report = {"registered": [], "failed": [], "pending": [], "memory_loaded": False, "temporal_loaded": False, "vagus_binding": {}}
-    vagus_bus = VagusNerveBus()
+    vagus_bus = NervoVago()
 
     prov = ProvenanceTracker()
     dna = DNA_Tags()
