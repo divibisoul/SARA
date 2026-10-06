@@ -85,3 +85,8 @@ Integração N07: `SARA_SERVICE_URL`, `SARA_SERVICE_TOKEN`,
 
 Integração N04/N06: `SARA_BASE_URL`, `SARA_API_TOKEN`,
 `SARA_ENABLE_CHAT=true`.
+
+
+## Mem0 runtime integration
+
+SARA exposes Mem0 through `/v1/mem0/status`, `/v1/mem0/add`, `/v1/mem0/search` and `/v1/mem0/list`. The adapter is version-pinned to upstream commit `abb81c88e1f738a8117d8293530fbc31a5ef8fd9` and remains fail-closed when credentials or the provider are unavailable.

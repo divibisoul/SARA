@@ -1,7 +1,7 @@
 name: SOUL Integration CI - SARA
 on:
   push:
-    branches: [main]
+    branches: [main, feat/mem0-memory-adapter]
   pull_request:
 permissions:
   contents: read
@@ -21,15 +21,18 @@ jobs:
           if test -f .gitmodules; then
             git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}' | while read p; do test -e "$p"; done
           fi
-      - name: Validate 16-repository registry
-        if: github.event.repository.name == 'Orquestrador-'
+      - name: Validate 25-source capability registry
+        if: github.event.repository.name == 'SARA'
         run: |
           python - <<'PY'
           import json
-          d=json.load(open('integrations/external-capabilities.json'))
-          assert len(d['repositories']) == 16
+          d=json.load(open('integrations/soul-25-augmentation.json'))
+          assert len(d['external_providers']) == 25
           for x in d['repositories']:
               assert x['source'].startswith('https://github.com/')
               assert x['revision'] and x['targets']
-          print('16/16 external repositories: VALID')
+          print('25/25 external capability sources: VALID')
           PY
+
+      - name: Validate SARA external fabric
+        run: python -m pytest -q tests/test_soul_external_fabric.py tests/test_mem0_adapter.py
