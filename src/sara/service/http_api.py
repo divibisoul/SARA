@@ -352,6 +352,13 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 payload = body["payload"]
                 if not isinstance(payload, dict):
                     raise SaraAPIError(422, "INVALID_VAGUS_ENVELOPE", "'payload' deve ser objeto JSON.")
+                provenance = body.get("provenance")
+                if provenance is not None and not isinstance(provenance, dict):
+                    raise SaraAPIError(422, "INVALID_VAGUS_PROVENANCE", "'provenance' deve ser objeto JSON.")
+                provenance_json = (
+                    json.dumps(provenance, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                    if provenance is not None else None
+                )
                 if vagus_version != "1.0":
                     raise SaraAPIError(422, "INVALID_VAGUS_VERSION", "Vagus version não suportada.")
                 if not message_id or not correlation_id or not source or not target or not event_type or not 0 <= priority <= 100 or ttl <= 0:
@@ -366,6 +373,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     message_id=message_id,
                     priority=priority,
                     ttl=ttl,
+                    provenance=provenance_json,
                 )
                 self._json(200, {"operation": "vagus", "event": event})
                 return
