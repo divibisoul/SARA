@@ -47,11 +47,14 @@ class ERU_Engine:
     DEPENDENCIES = ("ProvenanceTracker", "TemporalVectorDB")
     CYCLE_PHASES = (CyclePhase.PERSISTENCE,)
 
-    def __init__(self, provenance=None, temporal=None) -> None:
+    def __init__(self, provenance=None, temporal=None, max_snapshots: int = 1000) -> None:
+        if int(max_snapshots) <= 0:
+            raise ValueError("max_snapshots deve ser > 0")
         self._snapshots: dict[str, FrozenState] = {}
         self._behavior_observations: dict[str, list[dict[str, Any]]] = {}
         self._provenance = provenance
         self._temporal = temporal
+        self._max_snapshots = int(max_snapshots)
 
     def describe(self) -> dict:
         return {
@@ -68,6 +71,20 @@ class ERU_Engine:
         previous = self._snapshots[name].hash if name in self._snapshots else None
         if previous is not None and previous == h:
             return h
+
+        if name not in self._snapshots and len(self._snapshots) >= self._max_snapshots:
+            oldest_name = next(iter(self._snapshots))
+            oldest = self._snapshots[oldest_name]
+            if self._temporal is not None:
+                self._temporal.insert({
+                    "event": "eru_snapshot_evicted",
+                    "name": oldest.name,
+                    "state_hash": oldest.hash,
+                    "ts": now_iso(),
+                    "reason": "max_snapshots",
+                })
+            del self._snapshots[oldest_name]
+
         self._snapshots[name] = FrozenState(
             name=name, state=copy.deepcopy(state), hash=h, ts=now_iso()
         )
