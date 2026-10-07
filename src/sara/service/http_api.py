@@ -145,6 +145,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rgo.state@1.0.0": ("/v1/rgo/state", ("monitoring", "persistence")),
                     "rgo.trinity.process@1.0.0": ("/v1/rgo/trinity", ("ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring")),
                     "sara.external.capability@1.0.0": ("/v1/external/capability", ("audit", "strategy", "execution", "validation", "monitoring")),
+                    "sara.grce.hooks@1.0.0": ("/v1/grce/hooks", ("ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring")),
                 }
                 descriptors = [
                     CapabilityDescriptor(
@@ -177,6 +178,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "rgo.state@1.0.0",
                         "rgo.trinity.process@1.0.0",
                         "sara.external.capability@1.0.0",
+                        "sara.grce.hooks@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
@@ -418,6 +420,43 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                 except RGOValidationError as exc:
                     raise SaraAPIError(422, "RGO_INVALID", str(exc)) from exc
                 self._json(200, result.as_dict())
+                return
+
+            if path == "/v1/grce/hooks":
+                try:
+                    result = system.components["trinity_rgo"].process(
+                        body.get("finding", body), cycle_id=body.get("cycle_id")
+                    )
+                except RGOValidationError as exc:
+                    raise SaraAPIError(422, "RGO_INVALID", str(exc)) from exc
+                payload = result.as_dict()
+                stages = payload.get("stages", [])
+                names = [
+                    str(item.get("stage", ""))
+                    for item in stages
+                    if isinstance(item, dict)
+                ]
+                hook_evidence = {
+                    "RGO": any(name == "RGO" for name in names),
+                    "ARA": any(name.startswith("TRINITY::ARA") for name in names),
+                    "ITR": any("ITR" in name for name in names),
+                    "ETR": any("ETR" in name for name in names),
+                    "ERU": any(name == "ERU" for name in names),
+                    "MMD": any(name == "MMD" for name in names),
+                }
+                self._json(200, {
+                    "operation": "sara.grce.hooks",
+                    "execution_authority": "RGOTrinityProcessor -> TrinityERUUnified",
+                    "cycle_id": payload.get("cycle_id"),
+                    "final_status": payload.get("final_status"),
+                    "stages": stages,
+                    "hook_evidence": hook_evidence,
+                    "all_hooks_observed": all(hook_evidence.values()),
+                    "provenance": {
+                        "final_output_hash": payload.get("final_output_hash"),
+                        "finding_id": payload.get("finding_id"),
+                    },
+                })
                 return
 
             if path in ("/v1/audit", "/v1/regenerate"):

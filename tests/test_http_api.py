@@ -154,3 +154,55 @@ def test_hortacore_assess_exposes_existing_chimera_bridge_and_correlation():
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_grce_hooks_execute_real_trinity_and_return_all_hook_evidence():
+    server, _ = _start_server()
+    try:
+        status, payload = _request(
+            server,
+            "/v1/grce/hooks",
+            method="POST",
+            body={"finding": {
+                "schema_version": "1.0.0",
+                "finding_id": "grce-http-test-001",
+                "object_id": "object-grce-http-001",
+                "timestamp": "2026-10-07T00:00:00+00:00",
+                "correlation_id": "corr-grce-hooks-001",
+                "trace_id": "trace-grce-hooks-001",
+                "source": {"system": "SOUL", "module": "GRCE", "version": "2.0.0"},
+                "epistemic": {"mode": "INSPECTION", "verification_state": "VERIFIED"},
+                "actionability": {"status": "ACTIONABLE"},
+                "failure": {
+                    "type": "BUG",
+                    "description": "corrigir falha preservando histórico e proveniência",
+                    "nature": "validation",
+                },
+                "correction_boundary": {
+                    "problem_to_resolve": "executar GRCE mantendo proveniência",
+                    "required_property": "preservar histórico e proveniência",
+                },
+                "dual": {"status": "UNRESOLVED"},
+                "evidence": [{"id": "ev-grce-http-001", "kind": "test", "ref": "test://grce-hooks"}],
+                "provenance": {"origin": "test", "input_hash": "sha256:grce-http-input"},
+            }},
+            token="test-token-123456789",
+            correlation_id="corr-grce-hooks-001",
+        )
+        assert status == 200
+        assert payload["operation"] == "sara.grce.hooks"
+        assert payload["execution_authority"] == "RGOTrinityProcessor -> TrinityERUUnified"
+        assert payload["all_hooks_observed"] is True
+        assert all(payload["hook_evidence"].values())
+        assert payload["provenance"]["final_output_hash"]
+        assert payload["provenance"]["finding_id"] == "grce-http-test-001"
+        names = [stage["stage"] for stage in payload["stages"]]
+        assert "RGO" in names
+        assert "ERU" in names
+        assert "MMD" in names
+        assert any(name.startswith("TRINITY::ARA") for name in names)
+        assert any("ITR" in name for name in names)
+        assert any("ETR" in name for name in names)
+    finally:
+        server.shutdown()
+        server.server_close()
