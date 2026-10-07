@@ -145,6 +145,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                     "rgo.state@1.0.0": ("/v1/rgo/state", ("monitoring", "persistence")),
                     "rgo.trinity.process@1.0.0": ("/v1/rgo/trinity", ("ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring")),
                     "sara.external.capability@1.0.0": ("/v1/external/capability", ("audit", "strategy", "execution", "validation", "monitoring")),
+                    "sara.grce.hooks@1.0.0": ("/v1/grce/hooks", ("ingestion", "audit", "strategy", "ethics", "regeneration", "execution", "persistence", "monitoring")),
                 }
                 descriptors = [
                     CapabilityDescriptor(
