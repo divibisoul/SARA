@@ -178,6 +178,7 @@ class SaraHTTPHandler(BaseHTTPRequestHandler):
                         "rgo.state@1.0.0",
                         "rgo.trinity.process@1.0.0",
                         "sara.external.capability@1.0.0",
+                        "sara.grce.hooks@1.0.0",
                     ],
                     "phases": [p.value for p in system.components["loop"].CYCLE_PHASES],
                     "modules": modules,
