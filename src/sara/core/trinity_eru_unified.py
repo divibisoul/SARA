@@ -46,6 +46,7 @@ class TrinityERUUnified:
         eru: ERU_Engine,
         bridge: ERUTrinityBridge | None = None,
         max_iterations: int = 3,
+        trinity: TrinitySynergy | None = None,
     ) -> None:
         self._ara = ara
         self._etr = etr
@@ -53,7 +54,7 @@ class TrinityERUUnified:
         self._eru = eru
         self._bridge = bridge or ERUTrinityBridge(eru)
         self._bridge.register_trinity(ara, etr, itr)
-        self._trinity = TrinitySynergy(
+        self._trinity = trinity or TrinitySynergy(
             ara, etr, itr, max_iterations=max_iterations, eru=eru
         )
         self._trinity._eru_bridge = self._bridge
