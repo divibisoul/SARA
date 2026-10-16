@@ -63,6 +63,9 @@ class ERU_Engine:
             "dependencies": list(self.DEPENDENCIES),
             "phases": [p.value for p in self.CYCLE_PHASES],
             "snapshots": len(self._snapshots),
+            "snapshot_limit": self._max_snapshots,
+            "snapshot_limit_reached": len(self._snapshots) >= self._max_snapshots,
+            "snapshot_retention": "append_only",
             "behavior_observations": sum(len(v) for v in self._behavior_observations.values()),
         }
 
@@ -73,17 +76,20 @@ class ERU_Engine:
             return h
 
         if name not in self._snapshots and len(self._snapshots) >= self._max_snapshots:
-            oldest_name = next(iter(self._snapshots))
-            oldest = self._snapshots[oldest_name]
+            # This is a soft pressure threshold, not permission to discard state.
+            # ERU audit history is append-only: keep every snapshot queryable even
+            # after the configured threshold, and emit explicit evidence instead.
+            oldest = next(iter(self._snapshots.values()))
             if self._temporal is not None:
                 self._temporal.insert({
-                    "event": "eru_snapshot_evicted",
+                    "event": "eru_snapshot_limit_reached",
                     "name": oldest.name,
                     "state_hash": oldest.hash,
                     "ts": now_iso(),
-                    "reason": "max_snapshots",
+                    "limit": self._max_snapshots,
+                    "snapshot_count": len(self._snapshots),
+                    "reason": "soft_limit_preserves_history",
                 })
-            del self._snapshots[oldest_name]
 
         self._snapshots[name] = FrozenState(
             name=name, state=copy.deepcopy(state), hash=h, ts=now_iso()
