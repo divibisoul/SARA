@@ -1,4 +1,8 @@
 name: rgo-trinity-mmd
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [rgo-trinity-mmd-2026-09-28]
