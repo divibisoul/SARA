@@ -4,21 +4,8 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    branches:
-      - "recovery/cycle3-sara-chimera-2026-09-28"
-  pull_request:
-    branches: [main]
-    paths:
-      - "src/sara/meta/octacore_mesh_fusion.py"
-      - "src/sara/meta/aeternum_chimera.py"
-      - "src/sara/meta/soul_federation.py"
-      - "src/sara/meta/eru_runtime.py"
-      - "src/sara/core/connected_runtime.py"
-      - "src/sara/service/http_api.py"
-      - "tests/test_octacore_mesh_fusion.py"
-      - ".github/workflows/sara-chimera-fusion.yml"
   workflow_dispatch:
+
 permissions:
   contents: read
 jobs:

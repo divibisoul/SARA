@@ -4,9 +4,8 @@ concurrency:
   cancel-in-progress: true
 
 on:
-  push:
-    branches: [rgo-trinity-mmd-2026-09-29-final]
-  pull_request:
+  workflow_dispatch:
+
 jobs:
   verify:
     runs-on: ubuntu-latest
