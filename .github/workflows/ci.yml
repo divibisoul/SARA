@@ -1,7 +1,7 @@
 name: SARA CI
 
 concurrency:
-  group: sara-ci-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 on:
